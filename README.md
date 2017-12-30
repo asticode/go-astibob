@@ -1,0 +1,15 @@
+TODO
+
+# Installation
+## Third party libraries
+### All platforms
+
+- [PortAudio](http://www.portaudio.com/)
+
+### Linux
+
+- [ESpeak](http://espeak.sourceforge.net/)
+
+### MacOSX
+
+### Windows

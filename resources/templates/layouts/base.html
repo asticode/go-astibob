@@ -1,0 +1,34 @@
+{{ define "base" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Metadata -->
+    <meta charset="UTF-8">
+    <title>{{ template "title" . }}</title>
+
+    <!-- Font awesome -->
+    <link rel="stylesheet" href="/static/lib/font-awesome-4.7.0/css/font-awesome.min.css">
+
+    <!-- Base CSS -->
+    <link rel="stylesheet" href="/static/css/table.css"/>
+    <link rel="stylesheet" href="/static/css/switch.css"/>
+
+    <!-- Custom CSS -->
+    {{ template "css" . }}
+</head>
+<body>
+    <!-- Custom HTML -->
+    {{ template "html" . }}
+
+    <!-- jQuery -->
+    <script src="/static/lib/jquery-3.2.1/jquery.min.js"></script>
+
+    <!-- Base JS -->
+    <script src="/static/js/consts.js"></script>
+    <script src="/static/js/base.js"></script>
+
+    <!-- Custom JS -->
+    {{ template "js" . }}
+</body>
+</html>
+{{ end }}

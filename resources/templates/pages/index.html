@@ -1,0 +1,12 @@
+{{ define "title" }}Welcome on Bob's web interface{{ end }}
+{{ define "css" }}{{ end }}
+{{ define "html" }}
+    <div id="index"></div>
+{{ end }}
+{{ define "js" }}
+    <script type="text/javascript" src="/static/js/pages/index.js"></script>
+    <script>
+        index.init();
+    </script>
+{{ end }}
+{{ template "base" . }}
