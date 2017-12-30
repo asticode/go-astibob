@@ -1,0 +1,55 @@
+/* base */
+
+* {
+    box-sizing: border-box;
+}
+
+html, body {
+    background-color: #ecedf1;
+    color: #333;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    width: 100%;
+}
+
+body > .table {
+    height: 100%;
+    width: 100%;
+}
+
+body > .table > .row .cell:first-child {
+    width: 300px;
+}
+
+/* header */
+
+#header {
+    height: 40px;
+}
+
+#header > .cell:first-child {
+    padding: 15px 0 15px 30px;
+}
+
+#header > .cell:first-child h1 {
+    margin: 0;
+    padding: 0;
+}
+
+#header > .cell:last-child {
+    padding-right: 30px;
+    text-align: right;
+}
+
+#header > .cell:last-child i {
+    cursor: pointer;
+    font-size: 19px;
+}
+
+/* menu */
+
+#menu {
+    padding: 15px;
+    vertical-align: top;
+}

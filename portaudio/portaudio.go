@@ -32,8 +32,8 @@ func (p *PortAudio) Close() (err error) {
 	return
 }
 
-// String implements the Stringer interface
-func (p *PortAudio) String() (s string) {
+// Info returns information about itself
+func (p *PortAudio) Info() (s string) {
 	// Get host APIs
 	as, err := portaudio.HostApis()
 	if err != nil {

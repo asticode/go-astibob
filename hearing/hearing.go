@@ -11,7 +11,7 @@ import (
 // Hearing represents an object capable of parsing an audio reader, split it in valuable chunks and execute a speech to
 // text analysis on each of them.
 type Hearing struct {
-	o HearingOptions
+	o Options
 	r SampleReader
 }
 
@@ -26,13 +26,13 @@ type Starter interface {
 	Stop() error
 }
 
-// HearingOptions represents hearing options.
-type HearingOptions struct {
-	WorkingDirectory string
+// Options represents hearing options.
+type Options struct {
+	WorkingDirectory string `toml:"working_directory"`
 }
 
 // New creates a new hearing.
-func New(r SampleReader, o HearingOptions) *Hearing {
+func New(r SampleReader, o Options) *Hearing {
 	return &Hearing{
 		o: o,
 		r: r,

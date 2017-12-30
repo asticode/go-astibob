@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"flag"
-	"fmt"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -16,7 +15,6 @@ import (
 	"github.com/asticode/go-astibob/speaking"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/config"
-	"github.com/asticode/go-astitools/flag"
 	"github.com/pkg/errors"
 )
 
@@ -34,7 +32,6 @@ var (
 
 func main() {
 	// Parse flags
-	sb := astiflag.Subcommand()
 	flag.Parse()
 	astilog.FlagInit()
 
@@ -44,51 +41,37 @@ func main() {
 	// Handle signals
 	handleSignals()
 
-	// Switch on subcommand
-	switch sb {
-	case "env":
-		// Init portaudio
-		p, err := astiportaudio.New()
-		if err != nil {
-			astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio failed"))
-		}
-		defer p.Close()
+	// Init portaudio
+	p, err := astiportaudio.New()
+	if err != nil {
+		astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio failed"))
+	}
+	defer p.Close()
 
-		// Log portaudio information
-		fmt.Fprintln(os.Stdout, p)
-	default:
-		// Init portaudio
-		p, err := astiportaudio.New()
-		if err != nil {
-			astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio failed"))
-		}
-		defer p.Close()
+	// Init portaudio stream
+	s, err := p.NewDefaultStream(make([]int32, 192), c.PortAudio)
+	if err != nil {
+		astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio default stream failed"))
+	}
+	defer s.Close()
 
-		// Init portaudio stream
-		s, err := p.NewDefaultStream(make([]int32, 192), c.PortAudio)
-		if err != nil {
-			astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio default stream failed"))
-		}
-		defer s.Close()
+	// Init hearing
+	hearing := astihearing.New(s, c.Hearing)
 
-		// Init hearing
-		hearing := astihearing.New(s, c.Hearing)
+	// Init speaking
+	speaking := astispeaking.New(c.Speaking)
 
-		// Init speaking
-		speaking := astispeaking.New()
+	// Init bob
+	bob := astibob.New(c.Bob)
+	defer bob.Close()
 
-		// Init bob
-		bob := astibob.New(c.Bob)
-		defer bob.Close()
+	// Learn abilities
+	bob.Learn("Hearing", hearing, astibob.AbilityOptions{AutoStart: c.AutoStart})
+	bob.Learn("Speaking", speaking, astibob.AbilityOptions{AutoStart: c.AutoStart})
 
-		// Learn abilities
-		bob.Learn("Hearing", hearing, astibob.AbilityOptions{AutoStart: c.AutoStart})
-		bob.Learn("Speaking", speaking, astibob.AbilityOptions{AutoStart: c.AutoStart})
-
-		// Run Bob
-		if err = bob.Run(ctx); err != nil {
-			astilog.Fatal(errors.Wrap(err, "astibob: running bob failed"))
-		}
+	// Run Bob
+	if err = bob.Run(ctx); err != nil {
+		astilog.Fatal(errors.Wrap(err, "astibob: running bob failed"))
 	}
 }
 
@@ -96,8 +79,9 @@ func main() {
 type Configuration struct {
 	AutoStart bool                        `toml:"auto_start"`
 	Bob       astibob.Options             `toml:"bob"`
-	Hearing   astihearing.HearingOptions  `toml:"hearing"`
+	Hearing   astihearing.Options         `toml:"hearing"`
 	PortAudio astiportaudio.StreamOptions `toml:"portaudio"`
+	Speaking  astispeaking.Options        `toml:"speaking"`
 }
 
 // newConfiguration creates a new configuration
@@ -111,12 +95,15 @@ func newConfiguration() *Configuration {
 			ServerUsername:     "admin",
 			ResourcesDirectory: "resources",
 		},
-		Hearing: astihearing.HearingOptions{
+		Hearing: astihearing.Options{
 			WorkingDirectory: filepath.Join(os.TempDir(), "bob", "hearing"),
 		},
 		PortAudio: astiportaudio.StreamOptions{
 			NumInputChannels: 1,
 			SampleRate:       16000,
+		},
+		Speaking: astispeaking.Options{
+			BinaryPath: "espeak",
 		},
 	}
 

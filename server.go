@@ -46,7 +46,7 @@ func APIWrite(rw http.ResponseWriter, data interface{}) {
 }
 
 // runServer runs the server.
-func (b *Bob) runServer(ctx context.Context, o Options) (err error) {
+func (b *Bob) runServer(ctx context.Context, cancel context.CancelFunc, o Options) (err error) {
 	// Init router
 	var r = httprouter.New()
 
@@ -73,6 +73,7 @@ func (b *Bob) runServer(ctx context.Context, o Options) (err error) {
 
 	// API
 	r.GET("/api/bob", astihttp.ChainRouterMiddlewares(b.handleAPIBobGET, astihttp.RouterMiddlewareContentType("application/json")))
+	r.GET("/api/bob/stop", b.handleAPIBobStopGET(cancel))
 	r.GET("/api/references", astihttp.ChainRouterMiddlewares(b.handleAPIReferencesGET, astihttp.RouterMiddlewareContentType("application/json")))
 
 	// Abilities
@@ -178,7 +179,7 @@ type APIAbility struct {
 	Name      string `json:"name"`
 }
 
-// handleAPIBobGET returns Bob's status.
+// handleAPIBobGET returns Bob's information.
 func (b *Bob) handleAPIBobGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	// Init data
 	d := APIBob{Abilities: make(map[string]APIAbility)}
@@ -195,6 +196,13 @@ func (b *Bob) handleAPIBobGET(rw http.ResponseWriter, r *http.Request, p httprou
 
 	// Write
 	APIWrite(rw, d)
+}
+
+// handleAPIBobStopGET stops Bob.
+func (b *Bob) handleAPIBobStopGET(cancel context.CancelFunc) httprouter.Handle {
+	return func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		cancel()
+	}
 }
 
 // APIReferences represents the references.

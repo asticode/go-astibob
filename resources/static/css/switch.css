@@ -1,7 +1,7 @@
-/* https://www.w3schools.com/howto/howto_css_switch.asp */
+/* https://www.w3schools.com/howto/howto_css_toggle.asp */
 
-/* The switch - the box around the slider */
-.switch {
+/* The toggle - the box around the slider */
+.toggle {
     position: relative;
     display: inline-block;
     width: 60px;
@@ -19,6 +19,7 @@
     background-color: #d9534f;
     -webkit-transition: .4s;
     transition: .4s;
+    border-radius: 34px;
 }
 
 .slider:before {
@@ -31,23 +32,15 @@
     background-color: white;
     -webkit-transition: .4s;
     transition: .4s;
+    border-radius: 50%;
 }
 
-.switch.on .slider {
+.toggle.on .slider {
     background-color: #5cb85c;
 }
 
-.switch.on .slider:before {
+.toggle.on .slider:before {
     -webkit-transform: translateX(26px);
     -ms-transform: translateX(26px);
     transform: translateX(26px);
-}
-
-/* Rounded sliders */
-.slider.round {
-    border-radius: 34px;
-}
-
-.slider.round:before {
-    border-radius: 50%;
 }

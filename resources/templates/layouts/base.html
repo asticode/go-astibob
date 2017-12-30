@@ -9,7 +9,14 @@
     <!-- Font awesome -->
     <link rel="stylesheet" href="/static/lib/font-awesome-4.7.0/css/font-awesome.min.css">
 
+    <!-- Astitools -->
+    <link rel="stylesheet" href="/static/lib/astiloader/astiloader.css"/>
+    <link rel="stylesheet" href="/static/lib/astimodaler/astimodaler.css"/>
+    <link rel="stylesheet" href="/static/lib/astinotifier/astinotifier.css"/>
+
     <!-- Base CSS -->
+    <link rel="stylesheet" href="/static/css/base.css"/>
+    <link rel="stylesheet" href="/static/css/color.css"/>
     <link rel="stylesheet" href="/static/css/table.css"/>
     <link rel="stylesheet" href="/static/css/switch.css"/>
 
@@ -17,11 +24,46 @@
     {{ template "css" . }}
 </head>
 <body>
-    <!-- Custom HTML -->
-    {{ template "html" . }}
+
+    <!-- Base -->
+    <div class="table">
+
+        <!-- Header -->
+        <div class="row" id="header">
+
+            <!-- Bob -->
+            <div class="cell color-bob">
+                <h1>Bob</h1>
+            </div>
+
+            <!-- Buttons -->
+            <div class="cell color-header">
+                <i class="fa fa-sign-out" id="btn-bob-stop" title="Stop Bob"></i>
+            </div>
+        </div>
+
+        <!-- Menu + Content -->
+        <div class="row">
+
+            <!-- Menu -->
+            <div class="cell color-menu" id="menu"></div>
+
+            <!-- Content -->
+            <div class="cell">
+
+                <!-- Custom HTML -->
+                {{ template "html" . }}
+            </div>
+        </div>
+    </div>
 
     <!-- jQuery -->
     <script src="/static/lib/jquery-3.2.1/jquery.min.js"></script>
+
+    <!-- Astitools -->
+    <script src="/static/lib/astiloader/astiloader.js"></script>
+    <script src="/static/lib/astimodaler/astimodaler.js"></script>
+    <script src="/static/lib/astinotifier/astinotifier.js"></script>
 
     <!-- Base JS -->
     <script src="/static/js/consts.js"></script>

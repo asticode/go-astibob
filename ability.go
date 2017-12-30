@@ -23,7 +23,7 @@ type Initializer interface {
 	Init() error
 }
 
-// Router represents an object capable of adding custom routes to the router
+// Router represents an object capable of presenting its custom http routes
 type Router interface {
 	Routes() []Route
 }

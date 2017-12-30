@@ -19,9 +19,9 @@ type Stream struct {
 
 // StreamOptions represents stream options
 type StreamOptions struct {
-	NumInputChannels  int
-	NumOutputChannels int
-	SampleRate        float64
+	NumInputChannels  int     `toml:"num_input_channels"`
+	NumOutputChannels int     `toml:"num_output_channels"`
+	SampleRate        float64 `toml:"sample_rate"`
 }
 
 // NewDefaultStream creates a new default stream

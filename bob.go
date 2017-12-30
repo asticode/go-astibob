@@ -105,7 +105,7 @@ func (b *Bob) Learn(name string, a Ability, o AbilityOptions) *Bob {
 }
 
 // Run runs Bob.
-func (b *Bob) Run(ctx context.Context) (err error) {
+func (b *Bob) Run(parentCtx context.Context) (err error) {
 	// Loop through abilities
 	if err = b.abilities(func(a *ability) (err error) {
 		// Initialize
@@ -128,8 +128,11 @@ func (b *Bob) Run(ctx context.Context) (err error) {
 		return
 	}
 
+	// Create local ctx
+	ctx, cancel := context.WithCancel(parentCtx)
+
 	// Run server
-	if err = b.runServer(ctx, b.o); err != nil {
+	if err = b.runServer(ctx, cancel, b.o); err != nil {
 		if err != http.ErrServerClosed {
 			err = errors.Wrap(err, "astibob: running server failed")
 		} else {
