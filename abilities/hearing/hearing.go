@@ -13,3 +13,8 @@ type Starter interface {
 	Start() error
 	Stop() error
 }
+
+// Websocket event names
+const (
+	websocketEventNameSamples = "samples"
+)

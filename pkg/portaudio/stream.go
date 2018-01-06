@@ -1,10 +1,7 @@
 package astiportaudio
 
 import (
-	"os"
-
 	"github.com/asticode/go-astilog"
-	"github.com/cryptix/wav"
 	"github.com/gordonklaus/portaudio"
 	"github.com/pkg/errors"
 )
@@ -74,11 +71,6 @@ func (s *Stream) Stop() (err error) {
 	return
 }
 
-// TEST
-var w *wav.Writer
-var count int
-var f *os.File
-
 // ReadSample implements the astihearing.SampleReader interface.
 func (s *Stream) ReadSample() (r int32, err error) {
 	// Queue is empty
@@ -86,57 +78,16 @@ func (s *Stream) ReadSample() (r int32, err error) {
 		// Read
 		if err = s.s.Read(); err != nil {
 			err = errors.Wrap(err, "astiportaudio: reading failed")
-			count = 0
-			w.Close()
-			f.Close()
-			w = nil
 			return
 		}
 
 		// Copy buffer to queue
 		s.queue = make([]int32, len(s.b))
 		copy(s.queue, s.b)
-
-		// TEST
-		if w == nil {
-			const filename = "caca.wav"
-			if f, err = os.Create(filename); err != nil {
-				err = errors.Wrapf(err, "creating %s failed", filename)
-				return
-			}
-			caca := wav.File{
-				Channels:        1,
-				SampleRate:      16000,
-				SignificantBits: 32,
-			}
-			if w, err = caca.NewWriter(f); err != nil {
-				err = errors.Wrap(err, "creating wav writer failed")
-				return
-			}
-		}
 	}
 
 	// Process queue
-
-	// TEST
-	if err = w.WriteInt32(s.queue[0]); err != nil {
-		w.Close()
-		f.Close()
-		w = nil
-		count = 0
-		err = errors.Wrap(err, "writing failed")
-		return
-	}
-	count++
-	if count > 100000 {
-		astilog.Debug("Wrote wav")
-		w.Close()
-		f.Close()
-		w = nil
-		count = 0
-		err = errors.New("caca")
-		return
-	}
+	r = s.queue[0]
 
 	// Update queue
 	s.queue = s.queue[1:]

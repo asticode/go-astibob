@@ -47,8 +47,8 @@ func New(o Options) (b *Bob, err error) {
 	}
 
 	// Create servers
-	brainsWs := astiws.NewManager(4096)
-	clientsWs := astiws.NewManager(4096)
+	brainsWs := astiws.NewManager(o.BrainsServer.MaxMessageSize)
+	clientsWs := astiws.NewManager(o.ClientsServer.MaxMessageSize)
 	b.clientsServer = newClientsServer(t, b.brains, clientsWs, b.stop, o)
 	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, b.dispatcher, o.BrainsServer)
 	return

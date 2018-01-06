@@ -55,8 +55,6 @@ WARNING: some abilities require specific libs installed on your system, please c
 
 Abilities are simple tasks such as speech-synthesis, recording audio, etc.
 
-You can use them in **Bob** and a **brain**, or you can use their features standalone and independently of **Bob**. 
-
 WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
 
 ## Speaking
@@ -77,16 +75,6 @@ This ability says words to your audio output using speech synthesis.
 N/A
 
 ### In your code
-#### Standalone
-
-```go
-// Init speaking
-speaking := astispeaking.NewAbility(astispeaking.AbilityOptions{})
-
-// Say something
-speaking.Say("I love you Bob")
-```
-
 #### Brain
 
 ```go

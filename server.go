@@ -20,11 +20,13 @@ type server struct {
 
 // ServerOptions are server options
 type ServerOptions struct {
-	ListenAddr string
-	Password   string
-	PublicAddr string
-	Timeout    time.Duration
-	Username   string
+	ListenAddr     string        `toml:"listen_addr"`
+	MaxMessageSize int           `toml:"max_message_size"`
+	Password       string        `toml:"password"`
+	PublicAddr     string        `toml:"public_addr"`
+	Timeout        time.Duration `toml:"timeout"`
+	URL            string        `toml:"url"`
+	Username       string        `toml:"username"`
 }
 
 // newServer creates a new server

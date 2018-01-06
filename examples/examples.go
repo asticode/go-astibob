@@ -23,26 +23,29 @@ var (
 	}
 	BobOptions = astibob.Options{
 		BrainsServer: astibob.ServerOptions{
-			ListenAddr: "127.0.0.1:6970",
-			Password:   "admin",
-			PublicAddr: "127.0.0.1:6970",
-			Timeout:    5 * time.Second,
-			Username:   "admin",
+			ListenAddr:     "127.0.0.1:6970",
+			MaxMessageSize: 512 * 1024,
+			Password:       "admin",
+			PublicAddr:     "127.0.0.1:6970",
+			Timeout:        5 * time.Second,
+			Username:       "admin",
 		},
 		ClientsServer: astibob.ServerOptions{
-			ListenAddr: "127.0.0.1:6969",
-			Password:   "admin",
-			PublicAddr: "127.0.0.1:6969",
-			Timeout:    5 * time.Second,
-			Username:   "admin",
+			ListenAddr:     "127.0.0.1:6969",
+			MaxMessageSize: 4 * 1024,
+			Password:       "admin",
+			PublicAddr:     "127.0.0.1:6969",
+			Timeout:        5 * time.Second,
+			Username:       "admin",
 		},
 		ResourcesDirectory: "resources",
 	}
 	BrainOptions = astibrain.Options{
 		Websocket: astibrain.WebsocketOptions{
-			Password: "admin",
-			URL:      "ws://127.0.0.1:6970/websocket",
-			Username: "admin",
+			MaxMessageSize: 4096,
+			Password:       "admin",
+			URL:            "ws://127.0.0.1:6970/websocket",
+			Username:       "admin",
 		},
 	}
 )

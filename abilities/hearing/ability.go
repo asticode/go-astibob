@@ -3,18 +3,27 @@ package astihearing
 import (
 	"context"
 
+	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
 )
 
-// Ability represents an object capable of parsing an audio reader and split it in valuable chunks.
+// Ability represents an object capable of parsing an audio reader and dispatch n chunks.
 type Ability struct {
-	r SampleReader
+	ch chan astibrain.Event
+	o  AbilityOptions
+	r  SampleReader
+}
+
+// AbilityOptions represents ability options
+type AbilityOptions struct {
+	DispatchCount int `toml:"dispatch_count"`
 }
 
 // NewAbility creates a new ability.
-func NewAbility(r SampleReader) *Ability {
+func NewAbility(r SampleReader, o AbilityOptions) *Ability {
 	return &Ability{
+		o: o,
 		r: r,
 	}
 }
@@ -24,13 +33,17 @@ func (a *Ability) Close() error {
 	return nil
 }
 
+// SetDispatchChan implements the astibrain.WebsocketDispatcher interface
+func (a *Ability) SetDispatchChan(ch chan astibrain.Event) {
+	a.ch = ch
+}
+
 // Name implements the astibrain.Ability interface
 func (a *Ability) Name() string {
 	return Name
 }
 
 // Run implements the astibrain.Runnable interface
-// TODO Fix when running after having switched it off
 func (a *Ability) Run(ctx context.Context) (err error) {
 	// Start and stop the reader
 	if v, ok := a.r.(Starter); ok {
@@ -50,7 +63,14 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 		}()
 	}
 
+	// Get dispatch count
+	var dispatchCount = a.o.DispatchCount
+	if dispatchCount <= 0 {
+		dispatchCount = 1
+	}
+
 	// Read
+	var buf = make([]int32, dispatchCount)
 	var s int32
 	for {
 		// Check context
@@ -64,9 +84,25 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 			err = errors.Wrap(err, "astihearing: reading sample failed")
 			return
 		}
-		_ = s
 
-		// TODO Split in smart chunks depending on audio level => use input function for that
+		// Reset buffer
+		if len(buf) == 0 || len(buf) >= dispatchCount {
+			buf = buf[:0]
+		}
+
+		// Add sample to buffer
+		buf = append(buf, s)
+
+		// Dispatch
+		if len(buf) >= dispatchCount {
+			dispatchBuf := make([]int32, len(buf))
+			copy(dispatchBuf, buf)
+			a.ch <- astibrain.Event{
+				AbilityName: Name,
+				Name:        websocketEventNameSamples,
+				Payload:     dispatchBuf,
+			}
+		}
 	}
 	return
 }

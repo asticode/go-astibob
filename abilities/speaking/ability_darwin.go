@@ -19,8 +19,8 @@ func (a *Ability) say(i string) (err error) {
 
 	// Binary path
 	var name = "say"
-	if len(a.o.BinaryPath) > 0 {
-		name = a.o.BinaryPath
+	if len(a.o.BinaryDirPath) > 0 {
+		name = filepath.Join(a.o.BinaryDirPath, name)
 	}
 
 	// Init cmd

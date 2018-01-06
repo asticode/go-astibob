@@ -39,9 +39,10 @@ type websocket struct {
 
 // WebsocketOptions are websocket options
 type WebsocketOptions struct {
-	Password string `toml:"password"`
-	URL      string `toml:"url"`
-	Username string `toml:"username"`
+	MaxMessageSize int    `toml:"max_message_size"`
+	Password       string `toml:"password"`
+	URL            string `toml:"url"`
+	Username       string `toml:"username"`
 }
 
 // newWebsocket creates a new websocket wrapper
@@ -49,7 +50,7 @@ func newWebsocket(abilities *abilities, o WebsocketOptions) (ws *websocket) {
 	// Create websocket
 	ws = &websocket{
 		abilities: abilities,
-		c:         astiws.NewClient(4096),
+		c:         astiws.NewClient(o.MaxMessageSize),
 		h:         make(http.Header),
 		o:         o,
 	}

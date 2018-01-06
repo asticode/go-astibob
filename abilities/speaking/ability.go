@@ -24,7 +24,7 @@ type Ability struct {
 
 // AbilityOptions represents ability options.
 type AbilityOptions struct {
-	BinaryPath string `toml:"binary_path"`
+	BinaryDirPath string `toml:"binary_dir_path"`
 	Voice      string `toml:"voice"`
 }
 

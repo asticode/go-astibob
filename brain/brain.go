@@ -11,11 +11,12 @@ import (
 
 // Brain is an object handling one or more abilities
 type Brain struct {
-	abilities *abilities
-	cancel    context.CancelFunc
-	ctx       context.Context
-	o         Options
-	ws        *websocket
+	abilities  *abilities
+	cancel     context.CancelFunc
+	ctx        context.Context
+	dispatcher *dispatcher
+	o          Options
+	ws         *websocket
 }
 
 // Options are brain options
@@ -34,6 +35,9 @@ func New(o Options) (b *Brain) {
 
 	// Add websocket
 	b.ws = newWebsocket(b.abilities, o.Websocket)
+
+	// Add dispatcher
+	b.dispatcher = newDispatcher(b.ws)
 	return
 }
 
@@ -66,6 +70,13 @@ func (b *Brain) Close() (err error) {
 		err = errors.Wrap(err, "astibrain: closing websocket failed")
 		return
 	}
+
+	// Close dispatcher
+	astilog.Debug("astibrain: closing dispatcher")
+	if err = b.dispatcher.Close(); err != nil {
+		err = errors.Wrap(err, "astibrain: closing dispatcher failed")
+		return
+	}
 	return
 }
 
@@ -76,6 +87,11 @@ func (b *Brain) Learn(a Ability, o AbilityOptions) {
 
 	// Add ability
 	b.abilities.set(newAbility(a, b.ws, o))
+
+	// Set dispatch channel
+	if v, ok := a.(WebsocketDispatcher); ok {
+		v.SetDispatchChan(b.dispatcher.chEvent)
+	}
 
 	// Add custom websocket listeners
 	if v, ok := a.(WebsocketListener); ok {
@@ -103,6 +119,9 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 
 	// Dial
 	go b.ws.dial(b.ctx, name)
+
+	// Dispatch
+	go b.dispatcher.read()
 
 	// Loop through abilities
 	if err = b.abilities.abilities(func(a *ability) (err error) {
