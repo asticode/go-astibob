@@ -13,14 +13,14 @@ func main() {
 	// Base init
 	ctx := astiexamples.Init()
 
-	// Init portaudio
+	// Create portaudio
 	p, err := astiportaudio.New()
 	if err != nil {
 		astilog.Fatal(errors.Wrap(err, "main: creating portaudio failed"))
 	}
 	defer p.Close()
 
-	// Init portaudio stream
+	// Create portaudio stream
 	s, err := p.NewDefaultStream(make([]int32, 192), astiportaudio.StreamOptions{
 		NumInputChannels: 1,
 		SampleRate:       16000,
@@ -30,11 +30,11 @@ func main() {
 	}
 	defer s.Close()
 
-	// Init brain
+	// Create brain
 	brain := astibrain.New(astiexamples.BrainOptions)
 	defer brain.Close()
 
-	// Init hearing
+	// Create hearing
 	hearing := astihearing.NewAbility(s, astihearing.AbilityOptions{
 		DispatchCount: 16000,
 	})

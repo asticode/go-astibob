@@ -2,6 +2,7 @@ package astispeaking
 
 import (
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	"github.com/asticode/go-astilog"

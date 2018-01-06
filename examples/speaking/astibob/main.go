@@ -19,10 +19,13 @@ func main() {
 	}
 	defer bob.Close()
 
+	// Create speaking
+	speaking := astispeaking.NewInterface()
+
 	// Add listeners
 	bob.On(astibob.EventNameAbilityStarted, func(e astibob.Event) bool {
 		if e.Ability != nil && e.Ability.Name == astispeaking.Name {
-			if err := bob.Exec(astispeaking.CmdSay("I love you Bob")); err != nil {
+			if err := bob.Exec(speaking.Say("I love you Bob")); err != nil {
 				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
 			}
 		}

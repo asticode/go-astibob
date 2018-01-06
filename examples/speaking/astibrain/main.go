@@ -12,11 +12,11 @@ func main() {
 	// Base init
 	ctx := astiexamples.Init()
 
-	// Init brain
+	// Create brain
 	brain := astibrain.New(astiexamples.BrainOptions)
 	defer brain.Close()
 
-	// Init speaking
+	// Create speaking
 	speaking := astispeaking.NewAbility(astispeaking.AbilityOptions{})
 
 	// Learn ability

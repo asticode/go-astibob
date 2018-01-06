@@ -28,11 +28,6 @@ func NewAbility(r SampleReader, o AbilityOptions) *Ability {
 	}
 }
 
-// Close implements the io.Closer interface.
-func (a *Ability) Close() error {
-	return nil
-}
-
 // SetDispatchChan implements the astibrain.WebsocketDispatcher interface
 func (a *Ability) SetDispatchChan(ch chan astibrain.Event) {
 	a.ch = ch

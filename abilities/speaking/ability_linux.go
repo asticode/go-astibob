@@ -4,9 +4,10 @@ import (
 	"os/exec"
 	"strings"
 
+	"path/filepath"
+
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
-	"path/filepath"
 )
 
 // say says words

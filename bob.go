@@ -19,6 +19,7 @@ type Bob struct {
 	clientsServer *clientsServer
 	ctx           context.Context
 	dispatcher    *dispatcher
+	interfaces    *interfaces
 	o             Options
 }
 
@@ -35,6 +36,7 @@ func New(o Options) (b *Bob, err error) {
 	b = &Bob{
 		brains:     newBrains(),
 		dispatcher: newDispatcher(),
+		interfaces: newInterfaces(),
 		o:          o,
 	}
 
@@ -50,7 +52,7 @@ func New(o Options) (b *Bob, err error) {
 	brainsWs := astiws.NewManager(o.BrainsServer.MaxMessageSize)
 	clientsWs := astiws.NewManager(o.ClientsServer.MaxMessageSize)
 	b.clientsServer = newClientsServer(t, b.brains, clientsWs, b.stop, o)
-	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, b.dispatcher, o.BrainsServer)
+	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, b.dispatcher, b.interfaces, o.BrainsServer)
 	return
 }
 
@@ -68,6 +70,11 @@ func (b *Bob) Close() (err error) {
 		astilog.Error(errors.Wrap(err, "astibob: closing clients server failed"))
 	}
 	return
+}
+
+// Declare declares an ability interface
+func (b *Bob) Declare(i Interface) {
+	b.interfaces.set(i)
 }
 
 // Run runs Bob.
@@ -124,7 +131,6 @@ func dispatchWsEventToManager(ws *astiws.Manager, name string, payload interface
 
 // dispatchWsEventToClient dispatches a websocket event to a client.
 func dispatchWsEventToClient(c *astiws.Client, name string, payload interface{}) {
-	// Write
 	if err := c.Write(name, payload); err != nil {
 		astilog.Error(errors.Wrapf(err, "astibob: writing %s event with payload %#v to ws client %p failed", name, payload, c))
 		return

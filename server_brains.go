@@ -20,15 +20,17 @@ type brainsServer struct {
 	brains     *brains
 	clientsWs  *astiws.Manager
 	dispatcher *dispatcher
+	interfaces *interfaces
 }
 
 // newBrainsServer creates a new brains server.
-func newBrainsServer(brains *brains, brainsWs *astiws.Manager, clientsWs *astiws.Manager, dispatcher *dispatcher, o ServerOptions) (s *brainsServer) {
+func newBrainsServer(brains *brains, brainsWs *astiws.Manager, clientsWs *astiws.Manager, dispatcher *dispatcher, interfaces *interfaces, o ServerOptions) (s *brainsServer) {
 	// Create server
 	s = &brainsServer{
 		brains:     brains,
 		clientsWs:  clientsWs,
 		dispatcher: dispatcher,
+		interfaces: interfaces,
 		server:     newServer("brains", brainsWs, o),
 	}
 
@@ -78,6 +80,17 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	for _, pa := range ip.Abilities {
 		// Create ability
 		var a = newAbility(pa.Name, pa.IsOn)
+
+		// Check if interface has been declared for this ability
+		i, ok := s.interfaces.get(a.name)
+		if ok {
+			// Add custom websocket listeners
+			if v, ok := i.(WebsocketListener); ok {
+				for n, l := range v.WebsocketListeners() {
+					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l)
+				}
+			}
+		}
 
 		// Add ability
 		b.set(a)

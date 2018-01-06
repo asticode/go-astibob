@@ -57,6 +57,52 @@ Abilities are simple tasks such as speech-synthesis, recording audio, etc.
 
 WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
 
+## Hearing
+
+This ability listens to an audio input and dispatches audio samples.
+
+### Recommendations
+
+The ability requires the following interface:
+
+```go
+type SampleReader interface {
+	ReadSample() (int32, error)
+}
+```
+
+which is best fulfilled with [PortAudio](http://www.portaudio.com/) (check out the corresponding example to see how to set it up). However you can choose another solution as long as it fulfills this interface.
+
+### In your code
+#### Brain
+
+```go
+// Create reader
+var r astihearing.SampleReader
+
+// Create ability
+hearing := astihearing.NewAbility(r, astihearing.AbilityOptions{})
+
+// Learn ability
+brain.Learn(hearing, astibrain.AbilityOptions{})
+```
+
+#### Bob
+
+```go
+// Create interface
+hearing := astihearing.NewInterface()
+
+// Handle samples
+hearing.OnSamples(func(samples []int32) error {
+    // Do stuff with the samples
+    return nil
+})
+
+// Declare interface
+bob.Declare(hearing)
+```
+
 ## Speaking
 
 This ability says words to your audio output using speech synthesis.
@@ -78,18 +124,21 @@ N/A
 #### Brain
 
 ```go
-// Init speaking
+// Create ability
 speaking := astispeaking.NewAbility(astispeaking.AbilityOptions{})
 
-// Learn speaking
+// Learn ability
 brain.Learn(speaking, astibrain.AbilityOptions{})
 ```
 
 ##### Bob
 
 ```go
+// Create interface
+speaking := astispeaking.NewInterface()
+	
 // Say something
-bob.Exec(astispeaking.CmdSay("I love you Bob"))
+bob.Exec(speaking.Say("I love you Bob"))
 ```
 
 # Events
