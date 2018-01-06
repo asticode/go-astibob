@@ -18,6 +18,7 @@ type Bob struct {
 	cancel        context.CancelFunc
 	clientsServer *clientsServer
 	ctx           context.Context
+	dispatcher    *dispatcher
 	o             Options
 }
 
@@ -32,8 +33,9 @@ type Options struct {
 func New(o Options) (b *Bob, err error) {
 	// Create bob
 	b = &Bob{
-		brains: newBrains(),
-		o:      o,
+		brains:     newBrains(),
+		dispatcher: newDispatcher(),
+		o:          o,
 	}
 
 	// Parse templates
@@ -48,7 +50,7 @@ func New(o Options) (b *Bob, err error) {
 	brainsWs := astiws.NewManager(4096)
 	clientsWs := astiws.NewManager(4096)
 	b.clientsServer = newClientsServer(t, b.brains, clientsWs, b.stop, o)
-	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, o.BrainsServer)
+	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, b.dispatcher, o.BrainsServer)
 	return
 }
 
@@ -88,6 +90,10 @@ func (b *Bob) Run(ctx context.Context) (err error) {
 		}
 	}()
 
+	// Dispatch event
+	// TODO Only fire this event once servers are up and running
+	b.dispatcher.dispatch(Event{Name: EventNameReady})
+
 	// Wait for context or chanDone to be done
 	select {
 	case <-b.ctx.Done():
@@ -123,4 +129,9 @@ func dispatchWsEventToClient(c *astiws.Client, name string, payload interface{})
 		astilog.Error(errors.Wrapf(err, "astibob: writing %s event with payload %#v to ws client %p failed", name, payload, c))
 		return
 	}
+}
+
+// On adds a listener to an event
+func (b *Bob) On(eventName string, l Listener) {
+	b.dispatcher.addListener(eventName, l)
 }

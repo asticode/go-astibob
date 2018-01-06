@@ -17,17 +17,19 @@ import (
 // brainsServer is a server for the brains
 type brainsServer struct {
 	*server
-	brains    *brains
-	clientsWs *astiws.Manager
+	brains     *brains
+	clientsWs  *astiws.Manager
+	dispatcher *dispatcher
 }
 
 // newBrainsServer creates a new brains server.
-func newBrainsServer(brains *brains, brainsWs *astiws.Manager, clientsWs *astiws.Manager, o ServerOptions) (s *brainsServer) {
+func newBrainsServer(brains *brains, brainsWs *astiws.Manager, clientsWs *astiws.Manager, dispatcher *dispatcher, o ServerOptions) (s *brainsServer) {
 	// Create server
 	s = &brainsServer{
-		brains:    brains,
-		clientsWs: clientsWs,
-		server:    newServer("brains", brainsWs, o),
+		brains:     brains,
+		clientsWs:  clientsWs,
+		dispatcher: dispatcher,
+		server:     newServer("brains", brainsWs, o),
 	}
 
 	// Init router
@@ -96,8 +98,14 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	// Dispatch event to brain
 	dispatchWsEventToClient(c, astibrain.WebsocketEventNameRegistered, nil)
 
+	// Create event payload
+	e := newEventBrain(b)
+
 	// Dispatch event to clients
-	dispatchWsEventToManager(s.clientsWs, clientsWebsocketEventNameBrainRegistered, newAPIBrain(b))
+	dispatchWsEventToManager(s.clientsWs, clientsWebsocketEventNameBrainRegistered, e)
+
+	// Dispatch event to GO
+	s.dispatcher.dispatch(Event{Brain: e, Name: EventNameBrainRegistered})
 	return nil
 }
 
@@ -110,8 +118,14 @@ func (s *brainsServer) handleWebsocketDisconnected(b *brain) astiws.ListenerFunc
 		// Log
 		astilog.Infof("astibob: brain %s has disconnected", b.name)
 
+		// Create event payload
+		e := newEventBrain(b)
+
 		// Dispatch event to clients
-		dispatchWsEventToManager(s.clientsWs, clientsWebsocketEventNameBrainDisconnected, newAPIBrain(b))
+		dispatchWsEventToManager(s.clientsWs, clientsWebsocketEventNameBrainDisconnected, e)
+
+		// Dispatch event to GO
+		s.dispatcher.dispatch(Event{Brain: e, Name: EventNameBrainDisconnected})
 
 		// Unregister client
 		s.ws.UnregisterClient(c)
@@ -137,21 +151,26 @@ func (s *brainsServer) handleWebsocketAbilityToggle(b *brain) astiws.ListenerFun
 		}
 
 		// Get event name
-		var e string
+		var eventNameClients, eventNameGO string
 		if eventName == astibrain.WebsocketEventNameAbilityStarted {
-			e = clientsWebsocketEventNameAbilityStarted
-			a.isOn = true
+			eventNameClients = clientsWebsocketEventNameAbilityStarted
+			eventNameGO = EventNameAbilityStarted
+			a.setOn(true)
 		} else {
-			e = clientsWebsocketEventNameAbilityStopped
-			a.isOn = false
+			eventNameClients = clientsWebsocketEventNameAbilityStopped
+			eventNameGO = EventNameAbilityStopped
+			a.setOn(false)
 		}
 
-		// Create payload
-		var p = newAPIAbility(a)
-		p.BrainName = b.name
+		// Create event payload
+		e := newEventAbility(a)
+		e.BrainName = b.name
 
 		// Dispatch event to clients
-		dispatchWsEventToManager(s.clientsWs, e, p)
+		dispatchWsEventToManager(s.clientsWs, eventNameClients, e)
+
+		// Dispatch event to GO
+		s.dispatcher.dispatch(Event{Ability: e, Name: eventNameGO})
 		return nil
 	}
 }

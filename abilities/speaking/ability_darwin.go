@@ -9,16 +9,22 @@ import (
 )
 
 // say says words
-func (s *Speaking) say(i string) (err error) {
+func (a *Ability) say(i string) (err error) {
 	// Init args
 	var args []string
-	if len(s.o.Voice) > 0 {
-		args = append(args, "-v", s.o.Voice)
+	if len(a.o.Voice) > 0 {
+		args = append(args, "-v", a.o.Voice)
 	}
 	args = append(args, i)
 
+	// Binary path
+	var name = "say"
+	if len(a.o.BinaryPath) > 0 {
+		name = a.o.BinaryPath
+	}
+
 	// Init cmd
-	var cmd = exec.Command(s.o.BinaryPath, args...)
+	var cmd = exec.Command(name, args...)
 
 	// Exec
 	astilog.Debugf("astispeaking: executing %s", strings.Join(cmd.Args, " "))

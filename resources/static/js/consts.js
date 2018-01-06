@@ -1,5 +1,5 @@
 let consts = {
-    webSocket: {
+    websocket: {
         eventNames: {
             abilityCrashed: "ability.crashed",
             abilityStart: "ability.start",

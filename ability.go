@@ -2,17 +2,31 @@ package astibob
 
 import "sync"
 
-// ability represents an ability as Bob knows it
+// ability represents an ability
 type ability struct {
-	isOn bool
-	m    sync.Mutex // Locks attributes
+	o    bool
+	m    sync.Mutex
 	name string
 }
 
 // newAbility creates a new ability
 func newAbility(name string, isOn bool) *ability {
 	return &ability{
-		isOn: isOn,
+		o:    isOn,
 		name: name,
 	}
+}
+
+// isOn returns whether the ability is on
+func (a *ability) isOn() bool {
+	a.m.Lock()
+	defer a.m.Unlock()
+	return a.o
+}
+
+// setOn sets whether the ability is on
+func (a *ability) setOn(on bool) {
+	a.m.Lock()
+	defer a.m.Unlock()
+	a.o = on
 }

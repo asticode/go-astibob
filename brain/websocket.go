@@ -11,7 +11,7 @@ import (
 
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
-	"github.com/gorilla/websocket"
+	gorilla "github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
 
@@ -26,28 +26,28 @@ const (
 	WebsocketEventNameRegistered     = "registered"
 )
 
-// webSocket represents a websocket wrapper
-type webSocket struct {
+// websocket represents a websocket wrapper
+type websocket struct {
 	abilities   *abilities
 	c           *astiws.Client
 	isConnected bool
 	h           http.Header
 	m           sync.Mutex
-	o           WebSocketOptions
+	o           WebsocketOptions
 	q           []astiws.BodyMessage
 }
 
-// WebSocketOptions are websocket options
-type WebSocketOptions struct {
+// WebsocketOptions are websocket options
+type WebsocketOptions struct {
 	Password string `toml:"password"`
 	URL      string `toml:"url"`
 	Username string `toml:"username"`
 }
 
-// newWebSocket creates a new websocket wrapper
-func newWebSocket(abilities *abilities, o WebSocketOptions) (ws *webSocket) {
+// newWebsocket creates a new websocket wrapper
+func newWebsocket(abilities *abilities, o WebsocketOptions) (ws *websocket) {
 	// Create websocket
-	ws = &webSocket{
+	ws = &websocket{
 		abilities: abilities,
 		c:         astiws.NewClient(4096),
 		h:         make(http.Header),
@@ -59,15 +59,20 @@ func newWebSocket(abilities *abilities, o WebSocketOptions) (ws *webSocket) {
 		ws.h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(o.Username+":"+o.Password)))
 	}
 
-	// Add listeners
+	// Add default listeners
 	ws.c.AddListener(WebsocketEventNameAbilityStart, ws.handleAbilityToggle)
 	ws.c.AddListener(WebsocketEventNameAbilityStop, ws.handleAbilityToggle)
 	ws.c.AddListener(WebsocketEventNameRegistered, ws.handleRegistered)
 	return
 }
 
+// WebsocketAbilityEventName returns the websocket ability event name
+func WebsocketAbilityEventName(abilityName, eventName string) string {
+	return fmt.Sprintf("ability.%s.%s", abilityName, eventName)
+}
+
 // Close implements the io.Closer interface
-func (ws *webSocket) Close() (err error) {
+func (ws *websocket) Close() (err error) {
 	// Close client
 	astilog.Debug("astibrain: closing websocket client")
 	if err = ws.c.Close(); err != nil {
@@ -78,7 +83,7 @@ func (ws *webSocket) Close() (err error) {
 }
 
 // dial dials the websocket
-func (ws *webSocket) dial(ctx context.Context, name string) {
+func (ws *websocket) dial(ctx context.Context, name string) {
 	// Infinite loop to handle reconnect
 	const sleepError = 5 * time.Second
 	for {
@@ -106,7 +111,7 @@ func (ws *webSocket) dial(ctx context.Context, name string) {
 			ws.m.Lock()
 			ws.isConnected = false
 			ws.m.Unlock()
-			if v, ok := errors.Cause(err).(*websocket.CloseError); ok && v.Code == websocket.CloseNormalClosure {
+			if v, ok := errors.Cause(err).(*gorilla.CloseError); ok && v.Code == gorilla.CloseNormalClosure {
 				astilog.Info("astibrain: brain has disconnected from bob")
 			} else {
 				astilog.Error(errors.Wrap(err, "astibrain: reading websocket failed"))
@@ -130,7 +135,7 @@ type APIAbility struct {
 }
 
 // sendRegister sends a register event
-func (ws *webSocket) sendRegister(name string) (err error) {
+func (ws *websocket) sendRegister(name string) (err error) {
 	// Create payload
 	p := APIRegister{
 		Abilities: make(map[string]APIAbility),
@@ -155,7 +160,7 @@ func (ws *webSocket) sendRegister(name string) (err error) {
 }
 
 // processQueue processes the queue
-func (ws *webSocket) processQueue() {
+func (ws *websocket) processQueue() {
 	// Lock
 	ws.m.Lock()
 	defer ws.m.Unlock()
@@ -178,7 +183,7 @@ func (ws *webSocket) processQueue() {
 }
 
 // send sends an event and mutes the error (which is still logged)
-func (ws *webSocket) send(eventName string, payload interface{}) {
+func (ws *websocket) send(eventName string, payload interface{}) {
 	// Retrieve connected status
 	ws.m.Lock()
 	isConnected := ws.isConnected
@@ -197,14 +202,14 @@ func (ws *webSocket) send(eventName string, payload interface{}) {
 }
 
 // write writes an event and mutes the error (which is still logged)
-func (ws *webSocket) write(eventName string, payload interface{}) {
+func (ws *websocket) write(eventName string, payload interface{}) {
 	if err := ws.c.Write(eventName, payload); err != nil {
 		astilog.Error(errors.Wrapf(err, "astibrain: sending %s websocket event with payload %#v failed", eventName, payload))
 	}
 }
 
 // handleRegistered handles the registered websocket event
-func (ws *webSocket) handleRegistered(c *astiws.Client, eventName string, payload json.RawMessage) error {
+func (ws *websocket) handleRegistered(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Process queued message
 	ws.processQueue()
 
@@ -219,7 +224,7 @@ func (ws *webSocket) handleRegistered(c *astiws.Client, eventName string, payloa
 }
 
 // handleAbilityToggle handles the ability toggle websocket events
-func (ws *webSocket) handleAbilityToggle(c *astiws.Client, eventName string, payload json.RawMessage) error {
+func (ws *websocket) handleAbilityToggle(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Decode payload
 	var name string
 	if err := json.Unmarshal(payload, &name); err != nil {

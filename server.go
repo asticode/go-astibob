@@ -67,39 +67,3 @@ func (s *server) run() (err error) {
 	}
 	return
 }
-
-// APIBrain represents a brain
-type APIBrain struct {
-	Abilities []APIAbility `json:"abilities,omitempty"`
-	Name      string       `json:"name"`
-}
-
-// newAPIBrain creates a new API brain based on a brain
-func newAPIBrain(b *brain) (ab APIBrain) {
-	// Create API brain
-	ab = APIBrain{
-		Name: b.name,
-	}
-
-	// Loop through abilities
-	b.abilities(func(a *ability) error {
-		ab.Abilities = append(ab.Abilities, newAPIAbility(a))
-		return nil
-	})
-	return
-}
-
-// APIAbility represents an ability.
-type APIAbility struct {
-	BrainName string `json:"brain_name,omitempty"`
-	IsOn      bool   `json:"is_on"`
-	Name      string `json:"name"`
-}
-
-// newAPIAbility creates a new API ability based on an ability
-func newAPIAbility(a *ability) APIAbility {
-	return APIAbility{
-		IsOn: a.isOn,
-		Name: a.name,
-	}
-}

@@ -4,7 +4,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"time"
 
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
@@ -16,13 +15,13 @@ type Brain struct {
 	cancel    context.CancelFunc
 	ctx       context.Context
 	o         Options
-	ws        *webSocket
+	ws        *websocket
 }
 
-// Options are brain's options
+// Options are brain options
 type Options struct {
 	Name      string           `toml:"name"`
-	WebSocket WebSocketOptions `toml:"websocket"`
+	Websocket WebsocketOptions `toml:"websocket"`
 }
 
 // New creates a new brain
@@ -34,7 +33,7 @@ func New(o Options) (b *Brain) {
 	}
 
 	// Add websocket
-	b.ws = newWebSocket(b.abilities, o.WebSocket)
+	b.ws = newWebsocket(b.abilities, o.Websocket)
 	return
 }
 
@@ -48,13 +47,9 @@ func (b *Brain) Close() (err error) {
 		// Switch the ability off
 		a.off()
 
-		// Wait for the ability to be really switched off
-		for {
-			if !a.isOn() {
-				break
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
+		// Wait for the ability to be really off
+		a.mr.Lock()
+		a.mr.Unlock()
 
 		// Close
 		if v, ok := a.a.(io.Closer); ok {
@@ -75,8 +70,19 @@ func (b *Brain) Close() (err error) {
 }
 
 // Learn allows the brain to learn a new ability.
-func (b *Brain) Learn(name string, a interface{}, o AbilityOptions) {
-	b.abilities.set(newAbility(name, a, b.ws, o))
+func (b *Brain) Learn(a Ability, o AbilityOptions) {
+	// Log
+	astilog.Debugf("astibrain: learning %s", a.Name())
+
+	// Add ability
+	b.abilities.set(newAbility(a, b.ws, o))
+
+	// Add custom websocket listeners
+	if v, ok := a.(WebsocketListener); ok {
+		for n, l := range v.WebsocketListeners() {
+			b.ws.c.AddListener(WebsocketAbilityEventName(a.Name(), n), l)
+		}
+	}
 }
 
 // Run runs the brain

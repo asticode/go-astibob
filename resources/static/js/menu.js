@@ -108,7 +108,7 @@ let menu = {
             <span class="slider"></span>
         </label>`);
         r.html.toggle.click(function() {
-            base.sendWs(r.is_on ? consts.webSocket.eventNames.abilityStop : consts.webSocket.eventNames.abilityStart, {
+            base.sendWs(r.is_on ? consts.websocket.eventNames.abilityStop : consts.websocket.eventNames.abilityStart, {
                 brain_name: r.brain_name,
                 name: r.name,
             });

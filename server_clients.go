@@ -150,34 +150,34 @@ func (s *clientsServer) handleWebsocketPing(c *astiws.Client, eventName string, 
 // handleWebsocketAbilityToggle handles the ability toggle websocket events
 func (s *clientsServer) handleWebsocketAbilityToggle(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Decode payload
-	var pa APIAbility
-	if err := json.Unmarshal(payload, &pa); err != nil {
+	var e EventAbility
+	if err := json.Unmarshal(payload, &e); err != nil {
 		astilog.Error(errors.Wrapf(err, "astibob: json unmarshaling %s payload %#v failed", eventName, payload))
 		return nil
 	}
 
 	// Retrieve brain
-	b, ok := s.brains.brain(pa.BrainName)
+	b, ok := s.brains.brain(e.BrainName)
 	if !ok {
-		astilog.Error(fmt.Errorf("astibob: unknown brain %s", pa.BrainName))
+		astilog.Error(fmt.Errorf("astibob: unknown brain %s", e.BrainName))
 		return nil
 	}
 
 	// Retrieve ability
-	_, ok = b.ability(pa.Name)
+	_, ok = b.ability(e.Name)
 	if !ok {
-		astilog.Error(fmt.Errorf("astibob: unknown ability %s for brain %s", pa.Name, b.name))
+		astilog.Error(fmt.Errorf("astibob: unknown ability %s for brain %s", e.Name, b.name))
 		return nil
 	}
 
 	// Get event name
-	var e = astibrain.WebsocketEventNameAbilityStop
+	var eventNameBrain = astibrain.WebsocketEventNameAbilityStop
 	if eventName == clientsWebsocketEventNameAbilityStart {
-		e = astibrain.WebsocketEventNameAbilityStart
+		eventNameBrain = astibrain.WebsocketEventNameAbilityStart
 	}
 
 	// Dispatch to brain
-	dispatchWsEventToClient(b.ws, e, pa.Name)
+	dispatchWsEventToClient(b.ws, eventNameBrain, e.Name)
 	return nil
 }
 
@@ -186,8 +186,8 @@ type APIError struct {
 	Message string `json:"message"`
 }
 
-// APIWriteError writes an API error
-func APIWriteError(rw http.ResponseWriter, code int, err error) {
+// apiWriteError writes an API error
+func apiWriteError(rw http.ResponseWriter, code int, err error) {
 	rw.WriteHeader(code)
 	astilog.Error(err)
 	if err := json.NewEncoder(rw).Encode(APIError{Message: err.Error()}); err != nil {
@@ -195,32 +195,17 @@ func APIWriteError(rw http.ResponseWriter, code int, err error) {
 	}
 }
 
-// APIWrite writes API data
-func APIWrite(rw http.ResponseWriter, data interface{}) {
+// apiWrite writes API data
+func apiWrite(rw http.ResponseWriter, data interface{}) {
 	if err := json.NewEncoder(rw).Encode(data); err != nil {
-		APIWriteError(rw, http.StatusInternalServerError, errors.Wrap(err, "astibob: json encoding failed"))
+		apiWriteError(rw, http.StatusInternalServerError, errors.Wrap(err, "astibob: json encoding failed"))
 		return
 	}
 }
 
-// APIBob represents Bob.
-type APIBob struct {
-	Brains []APIBrain `json:"brains,omitempty"`
-}
-
 // handleAPIBobGET returns Bob's information.
 func (s *clientsServer) handleAPIBobGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	// Init data
-	d := APIBob{}
-
-	// Loop through brains
-	s.brains.brains(func(b *brain) error {
-		d.Brains = append(d.Brains, newAPIBrain(b))
-		return nil
-	})
-
-	// Write
-	APIWrite(rw, d)
+	apiWrite(rw, newEventBob(s.brains))
 }
 
 // handleAPIBobStopGET stops Bob.
@@ -242,7 +227,7 @@ type APIReferences struct {
 
 // handleAPIReferencesGET returns the references.
 func (s *clientsServer) handleAPIReferencesGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	APIWrite(rw, APIReferences{
+	apiWrite(rw, APIReferences{
 		WsURL:        "ws://" + s.o.PublicAddr + "/websocket",
 		WsPingPeriod: int(astiws.PingPeriod.Seconds()),
 	})

@@ -5,8 +5,14 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
+
+// Ability represents required methods of an ability
+type Ability interface {
+	Name() string
+}
 
 // Initializable represents an object that can be initialized.
 type Initializable interface {
@@ -23,6 +29,11 @@ type Runnable interface {
 	Run(ctx context.Context) error
 }
 
+// WebsocketListener represents an object that can listen to a websocket
+type WebsocketListener interface {
+	WebsocketListeners() map[string]astiws.ListenerFunc
+}
+
 // AbilityOptions represents ability options
 type AbilityOptions struct {
 	AutoStart bool
@@ -30,40 +41,38 @@ type AbilityOptions struct {
 
 // ability represents an ability.
 type ability struct {
-	a        interface{}
-	cancel   context.CancelFunc
-	chanDone chan error
-	ctx      context.Context
-	m        sync.Mutex
-	name     string
-	o        AbilityOptions
-	ws       *webSocket
+	a          Ability
+	cancel     context.CancelFunc
+	chanDone   chan error
+	ctx        context.Context
+	isOnUnsafe bool
+	m          sync.Mutex // Locks attributes
+	mr         sync.Mutex // Locks when ability is running
+	name       string
+	o          AbilityOptions
+	ws         *websocket
 }
 
 // newAbility creates a new ability.
-func newAbility(name string, a interface{}, ws *webSocket, o AbilityOptions) *ability {
+func newAbility(a Ability, ws *websocket, o AbilityOptions) *ability {
 	return &ability{
 		a:        a,
 		chanDone: make(chan error),
-		name:     name,
+		name:     a.Name(),
 		o:        o,
 		ws:       ws,
 	}
-}
-
-// isOnUnsafe returns whether the ability is on while making the assumption that the mutex is locked.
-func (a *ability) isOnUnsafe() bool {
-	return a.ctx != nil && a.ctx.Err() == nil
 }
 
 // isOn returns whether the ability is on.
 func (a *ability) isOn() bool {
 	a.m.Lock()
 	defer a.m.Unlock()
-	return a.isOnUnsafe()
+	return a.isOnUnsafe
 }
 
 // on switches the ability on.
+// Its execution must not be blocking as it's used in a websocket call.
 func (a *ability) on() {
 	// Ability is already on
 	if a.isOn() {
@@ -76,15 +85,23 @@ func (a *ability) on() {
 	// Reset the context
 	a.ctx, a.cancel = context.WithCancel(context.Background())
 
-	// Wait for the end of execution in a go routine
-	go a.wait()
-
 	// Switch on the activity
 	if v, ok := a.a.(Activable); ok {
 		a.onActivable(v)
 	} else if v, ok := a.a.(Runnable); ok {
 		a.onRunnable(v)
 	}
+
+	// Update ability status
+	a.m.Lock()
+	a.isOnUnsafe = true
+	a.m.Unlock()
+
+	// Lock running mutex
+	a.mr.Lock()
+
+	// Wait for the end of execution in a go routine
+	go a.wait()
 
 	// Log
 	astilog.Infof("astibrain: %s have been switched on", a.name)
@@ -138,10 +155,19 @@ func (a *ability) wait() {
 		// Dispatch websocket event
 		a.ws.send(WebsocketEventNameAbilityStopped, a.name)
 	}
+
+	// Update ability status
+	a.m.Lock()
+	a.isOnUnsafe = false
+	a.m.Unlock()
+
+	// Unlock running mutex
+	a.mr.Unlock()
 	return
 }
 
 // off switches the ability off.
+// Its execution must not be blocking as it's used in a websocket call.
 func (a *ability) off() {
 	// Ability is already off
 	if !a.isOn() {

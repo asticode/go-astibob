@@ -2,7 +2,7 @@ let base = {
     finish: function() {
         asticode.loader.hide();
     },
-    init: function(webSocketFunc, pageFunc) {
+    init: function(websocketFunc, pageFunc) {
         // Init astitools
         asticode.loader.init();
         asticode.notifier.init();
@@ -23,7 +23,7 @@ let base = {
         asticode.loader.show();
         base.sendHttp("/api/references", "GET", function(data) {
             // Init the web socket
-            base.initWebSocket(webSocketFunc, data.ws_url, data.ws_ping_period, function() {
+            base.initWebsocket(websocketFunc, data.ws_url, data.ws_ping_period, function() {
                 // Get bob's information
                 base.sendHttp("/api/bob", "GET", function(data) {
                     // Init menu
@@ -45,14 +45,14 @@ let base = {
             base.sendHttp("/api/bob/stop", "GET");
         });
     },
-    initWebSocket: function(webSocketFunc, url, pingPeriod, pageFunc) {
+    initWebsocket: function(websocketFunc, url, pingPeriod, pageFunc) {
         // Try pinging the API
         $.ajax({
             url: "/api/ok",
             type: "GET",
             error: function() {
                 setTimeout(function() {
-                    base.initWebSocket(webSocketFunc, url, pingPeriod, pageFunc);
+                    base.initWebsocket(websocketFunc, url, pingPeriod, pageFunc);
                 }, 1000);
             },
             success: function() {
@@ -68,7 +68,7 @@ let base = {
                     }
                     clearInterval(intervalPing);
                     setTimeout(function() {
-                        base.initWebSocket(webSocketFunc, url, pingPeriod, pageFunc);
+                        base.initWebsocket(websocketFunc, url, pingPeriod, pageFunc);
                     }, 1000);
                 };
                 base.ws.onopen = function() {
@@ -78,8 +78,8 @@ let base = {
                 };
                 base.ws.onmessage = function(event) {
                     let data = JSON.parse(event.data);
-                    if (!base.webSocketFunc(data.event_name, data.payload)) {
-                        webSocketFunc(data.event_name, data.payload);
+                    if (!base.websocketFunc(data.event_name, data.payload)) {
+                        websocketFunc(data.event_name, data.payload);
                     }
                 };
             },
@@ -119,19 +119,19 @@ let base = {
     sendWs: function(event_name, payload) {
         base.ws.send(JSON.stringify({event_name: event_name, payload: payload}));
     },
-    webSocketFunc: function(event_name, payload) {
+    websocketFunc: function(event_name, payload) {
         switch (event_name) {
-            case consts.webSocket.eventNames.abilityCrashed:
-            case consts.webSocket.eventNames.abilityStopped:
+            case consts.websocket.eventNames.abilityCrashed:
+            case consts.websocket.eventNames.abilityStopped:
                 menu.updateToggle(payload, false);
                 break;
-            case consts.webSocket.eventNames.abilityStarted:
+            case consts.websocket.eventNames.abilityStarted:
                 menu.updateToggle(payload, true);
                 break;
-            case consts.webSocket.eventNames.brainDisconnected:
+            case consts.websocket.eventNames.brainDisconnected:
                 menu.removeBrain(payload);
                 break;
-            case consts.webSocket.eventNames.brainRegistered:
+            case consts.websocket.eventNames.brainRegistered:
                 menu.addBrain(payload);
                 break;
             default:

@@ -7,8 +7,8 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Init implements the astibob.Initializer interface
-func (s *Speaking) Init() (err error) {
+// Init implements the astibrain.Initializer interface
+func (a *Ability) Init() (err error) {
 	// Initialize ole
 	astilog.Debug("astispeaking: initializing ole")
 	if err = ole.CoInitialize(0); err != nil {
@@ -18,14 +18,14 @@ func (s *Speaking) Init() (err error) {
 
 	// Create SAPI.SpVoice object
 	astilog.Debug("astispeaking: creating SAPI.SpVoice ole object")
-	if s.windowsIUnknown, err = oleutil.CreateObject("SAPI.SpVoice"); err != nil {
+	if a.windowsIUnknown, err = oleutil.CreateObject("SAPI.SpVoice"); err != nil {
 		err = errors.Wrap(err, "astispeaking: creating SAPI.SpVoice ole object failed")
 		return
 	}
 
 	// Get IDispatch
 	astilog.Debug("astispeaking: getting ole IDispatch")
-	if s.windowsIDispatch, err = s.windowsIUnknown.QueryInterface(ole.IID_IDispatch); err != nil {
+	if a.windowsIDispatch, err = a.windowsIUnknown.QueryInterface(ole.IID_IDispatch); err != nil {
 		err = errors.Wrap(err, "astispeaking: getting ole IDispatch failed")
 		return
 	}
@@ -33,14 +33,14 @@ func (s *Speaking) Init() (err error) {
 }
 
 // Close implements the io.Closer interface
-func (s *Speaking) Close() (err error) {
+func (a *Ability) Close() (err error) {
 	// Release IDispatch
 	astilog.Debug("astispeaking: releasing IDispatch")
-	s.windowsIDispatch.Release()
+	a.windowsIDispatch.Release()
 
 	// Release IUnknown
 	astilog.Debug("astispeaking: releasing IUnkown")
-	s.windowsIUnknown.Release()
+	a.windowsIUnknown.Release()
 
 	// Uninitialize ole
 	astilog.Debug("astispeaking: uninitializing ole")
@@ -49,11 +49,11 @@ func (s *Speaking) Close() (err error) {
 }
 
 // say says words
-func (s *Speaking) say(i string) (err error) {
+func (a *Ability) say(i string) (err error) {
 	// Get muted attribute
-	s.m.Lock()
-	m := s.isMuted
-	s.m.Unlock()
+	a.m.Lock()
+	m := a.isMuted
+	a.m.Unlock()
 
 	// Do nothing if muted
 	if m {
@@ -61,14 +61,14 @@ func (s *Speaking) say(i string) (err error) {
 	}
 
 	// Init has not been executed
-	if s.windowsIDispatch == nil {
+	if a.windowsIDispatch == nil {
 		err = errors.New("astispeaking: the Init() method should be called before running anything else")
 		return
 	}
 
 	// Say
 	var v *ole.VARIANT
-	if v, err = oleutil.CallMethod(s.windowsIDispatch, "Speak", i); err != nil {
+	if v, err = oleutil.CallMethod(a.windowsIDispatch, "Speak", i); err != nil {
 		err = errors.Wrap(err, "astispeaking: calling Speak on IDispatch failed")
 		return
 	}
