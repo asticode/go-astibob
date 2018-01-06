@@ -1,7 +1,5 @@
 package astispeech
 
-import "github.com/asticode/go-astibob"
-
 // Handler represents a handler
 type Handler struct{}
 

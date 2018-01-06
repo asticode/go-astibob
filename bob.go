@@ -2,154 +2,125 @@ package astibob
 
 import (
 	"context"
-	"io"
-	"net/http"
-	"sync"
-	"time"
+	"path/filepath"
+	"text/template"
 
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/template"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
 
-// Bob is a polite AI with special abilities.
+// Bob is an object handling a collection of brains.
 type Bob struct {
-	a  map[string]*ability
-	ma sync.Mutex // Locks a.
-	o  Options
-	ws *astiws.Manager
+	brains        *brains
+	brainsServer  *brainsServer
+	cancel        context.CancelFunc
+	clientsServer *clientsServer
+	ctx           context.Context
+	o             Options
 }
 
-// Options represents Bob's options.
+// Options are Bob options.
 type Options struct {
+	BrainsServer       ServerOptions
+	ClientsServer      ServerOptions
 	ResourcesDirectory string
-	ServerAddr         string
-	ServerPassword     string
-	ServerTimeout      time.Duration
-	ServerUsername     string
 }
 
 // New creates a new Bob.
-func New(o Options) *Bob {
-	return &Bob{
-		a:  make(map[string]*ability),
-		o:  o,
-		ws: astiws.NewManager(4096),
+func New(o Options) (b *Bob, err error) {
+	// Create bob
+	b = &Bob{
+		brains: newBrains(),
+		o:      o,
 	}
+
+	// Parse templates
+	astilog.Debugf("astibob: parsing templates in %s", b.o.ResourcesDirectory)
+	var t map[string]*template.Template
+	if t, err = astitemplate.ParseDirectoryWithLayouts(filepath.Join(b.o.ResourcesDirectory, "templates", "pages"), filepath.Join(b.o.ResourcesDirectory, "templates", "layouts"), ".html"); err != nil {
+		err = errors.Wrapf(err, "astibob: parsing templates in resources directory %s failed", b.o.ResourcesDirectory)
+		return
+	}
+
+	// Create servers
+	brainsWs := astiws.NewManager(4096)
+	clientsWs := astiws.NewManager(4096)
+	b.clientsServer = newClientsServer(t, b.brains, clientsWs, b.stop, o)
+	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, o.BrainsServer)
+	return
 }
 
 // Close implements the io.Closer interface.
 func (b *Bob) Close() (err error) {
-	// Close abilities
-	b.abilities(func(a *ability) error {
-		// Log
-		astilog.Debugf("astibob: closing ability %s", a.name)
+	// Close brains server
+	astilog.Debug("astibob: closing brains server")
+	if err = b.brainsServer.Close(); err != nil {
+		astilog.Error(errors.Wrap(err, "astibob: closing brains server failed"))
+	}
 
-		// Switch the ability off
-		a.off()
-
-		// Wait for the toggle to be switched off indicating that the ability is really switched off
-		for {
-			if !a.t.isOn() {
-				break
-			}
-			time.Sleep(50 * time.Millisecond)
-		}
-
-		// Close
-		if v, ok := a.a.(io.Closer); ok {
-			if err := v.Close(); err != nil {
-				astilog.Error(errors.Wrapf(err, "closing ability %s failed", a.name))
-			}
-		}
-		return nil
-	})
-
-	// Close ws
-	astilog.Debug("astibob: closing ws")
-	if err = b.ws.Close(); err != nil {
-		err = errors.Wrap(err, "astibob: closing ws failed")
-		return
+	// Close clients server
+	astilog.Debug("astibob: closing clients server")
+	if err = b.clientsServer.Close(); err != nil {
+		astilog.Error(errors.Wrap(err, "astibob: closing clients server failed"))
 	}
 	return
-}
-
-// ability returns a specific ability.
-func (b *Bob) ability(key string) (a *ability, ok bool) {
-	b.ma.Lock()
-	defer b.ma.Unlock()
-	a, ok = b.a[key]
-	return
-}
-
-// abilities loops through abilities and execute a function on each of them.
-// If an error is returned by the function, the loop is stopped.
-func (b *Bob) abilities(fn func(a *ability) error) (err error) {
-	b.ma.Lock()
-	defer b.ma.Unlock()
-	for _, a := range b.a {
-		if err = fn(a); err != nil {
-			return
-		}
-	}
-	return
-}
-
-// Learn allows Bob to learn a new ability.
-func (b *Bob) Learn(name string, a Ability, o AbilityOptions) *Bob {
-	b.ma.Lock()
-	defer b.ma.Unlock()
-	wa := newAbility(name, a, o, b.ws)
-	b.a[wa.key] = wa
-	return b
 }
 
 // Run runs Bob.
-func (b *Bob) Run(parentCtx context.Context) (err error) {
-	// Loop through abilities
-	if err = b.abilities(func(a *ability) (err error) {
-		// Initialize
-		if v, ok := a.a.(Initializer); ok {
-			astilog.Debugf("astibob: initializing %s", a.name)
-			if err = v.Init(); err != nil {
-				err = errors.Wrapf(err, "astibob: initializing %s failed", a.name)
-				return
-			}
+// This is cancellable through the ctx.
+func (b *Bob) Run(ctx context.Context) (err error) {
+	// Reset ctx
+	b.ctx, b.cancel = context.WithCancel(ctx)
+	defer b.cancel()
 
+	// Run brains server
+	var chanDone = make(chan error)
+	go func() {
+		if err := b.brainsServer.run(); err != nil {
+			chanDone <- err
 		}
+	}()
+	go func() {
+		if err := b.clientsServer.run(); err != nil {
+			chanDone <- err
+		}
+	}()
 
-		// Auto start
-		if a.o.AutoStart {
-			a.on()
+	// Wait for context or chanDone to be done
+	select {
+	case <-b.ctx.Done():
+		if b.ctx.Err() != context.Canceled {
+			err = errors.Wrap(err, "astibob: context error")
 		}
 		return
-	}); err != nil {
-		err = errors.Wrap(err, "astibob: initializing abilities failed")
-		return
-	}
-
-	// Create local ctx
-	ctx, cancel := context.WithCancel(parentCtx)
-
-	// Run server
-	if err = b.runServer(ctx, cancel, b.o); err != nil {
-		if err != http.ErrServerClosed {
-			err = errors.Wrap(err, "astibob: running server failed")
-		} else {
-			err = nil
+	case err = <-chanDone:
+		if err != nil {
+			err = errors.Wrap(err, "astibob: running servers failed")
 		}
 		return
 	}
 	return
 }
 
-// dispatchWsEvent dispatches a websocket event.
-func dispatchWsEvent(ws *astiws.Manager, name string, payload interface{}) {
+// stop stops Bob
+func (b *Bob) stop() {
+	b.cancel()
+}
+
+// dispatchWsEventToManager dispatches a websocket event to a manager.
+func dispatchWsEventToManager(ws *astiws.Manager, name string, payload interface{}) {
 	ws.Loop(func(k interface{}, c *astiws.Client) {
-		// Write
-		if err := c.Write(name, payload); err != nil {
-			astilog.Error(errors.Wrapf(err, "astibob: writing to ws client %v failed", k))
-			return
-		}
+		dispatchWsEventToClient(c, name, payload)
 	})
+}
+
+// dispatchWsEventToClient dispatches a websocket event to a client.
+func dispatchWsEventToClient(c *astiws.Client, name string, payload interface{}) {
+	// Write
+	if err := c.Write(name, payload); err != nil {
+		astilog.Error(errors.Wrapf(err, "astibob: writing %s event with payload %#v to ws client %p failed", name, payload, c))
+		return
+	}
 }

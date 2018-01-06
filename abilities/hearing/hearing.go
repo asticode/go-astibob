@@ -44,7 +44,7 @@ func (h *Hearing) Close() error {
 	return nil
 }
 
-// Init implements the astibob.Initializer interface.
+// Init implements the astibrain.Initializable interface.
 func (h *Hearing) Init() (err error) {
 	// Create the working directory
 	astilog.Debugf("astihearing: creating working directory %s", h.o.WorkingDirectory)
@@ -55,7 +55,7 @@ func (h *Hearing) Init() (err error) {
 	return
 }
 
-// Run implements the astibob.Ability interface
+// Run implements the astibrain.Runnable interface
 // TODO Fix when running after having switched it off
 func (h *Hearing) Run(ctx context.Context) (err error) {
 	// Start and stop the reader

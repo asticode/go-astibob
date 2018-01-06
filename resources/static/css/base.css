@@ -50,6 +50,18 @@ body > .table > .row .cell:first-child {
 /* menu */
 
 #menu {
-    padding: 15px;
+    padding: 20px;
     vertical-align: top;
+}
+
+.menu-brain {
+    margin-bottom: 20px;
+}
+
+.menu-brain > div:first-child {
+    margin-bottom: 9px;
+}
+
+.menu-brain > div:last-child {
+    margin-left: 40px;
 }

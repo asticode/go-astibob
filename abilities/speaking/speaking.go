@@ -1,10 +1,7 @@
 package astispeaking
 
 import (
-	"context"
 	"sync"
-
-	"time"
 
 	"github.com/asticode/go-astilog"
 	"github.com/go-ole/go-ole"
@@ -13,9 +10,9 @@ import (
 
 // Speaking represents an object capable of saying words to an audio output.
 type Speaking struct {
-	isMuted bool
-	o       Options
-	m       sync.Mutex
+	activated bool
+	o         Options
+	m         sync.Mutex
 
 	// Windows
 	windowsIDispatch *ole.IDispatch
@@ -35,42 +32,24 @@ func New(o Options) *Speaking {
 	}
 }
 
-// Unmute unmutes the speaker
-func (s *Speaking) Unmute() {
+// Activate implements the astibrain.Activable interface
+func (s *Speaking) Activate(a bool) {
 	s.m.Lock()
 	defer s.m.Unlock()
-	s.isMuted = false
-}
-
-// Mute mutes the speaker
-func (s *Speaking) Mute() {
-	s.m.Lock()
-	defer s.m.Unlock()
-	s.isMuted = true
-}
-
-// Run implements the astibob.Ability interface
-func (s *Speaking) Run(ctx context.Context) (err error) {
-	// Handle muted attributed
-	s.Unmute()
-	defer s.Mute()
-
-	go func() {
-		time.Sleep(time.Second)
-		s.Say("Bonjour quentin, comment vas-tu aujourd'hui?")
-	}()
-
-	// Wait for context to be done
-	<-ctx.Done()
-	if ctx.Err() != nil {
-		err = errors.Wrap(err, "astispeaking: context error")
-		return
-	}
-	return
+	s.activated = a
 }
 
 // Say says words
 func (s *Speaking) Say(i string) (err error) {
+	// Not activated
+	s.m.Lock()
+	activated := s.activated
+	s.m.Unlock()
+	if !activated {
+		return
+	}
+
+	// Say
 	astilog.Debugf("astispeaking: saying \"%s\"", i)
 	if err = s.say(i); err != nil {
 		err = errors.Wrapf(err, "saying \"%s\" failed", i)

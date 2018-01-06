@@ -7,12 +7,11 @@ import (
 	"os/signal"
 	"path/filepath"
 	"syscall"
-	"time"
 
-	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astibob/hearing"
-	"github.com/asticode/go-astibob/portaudio"
-	"github.com/asticode/go-astibob/speaking"
+	"github.com/asticode/go-astibob/abilities/hearing"
+	"github.com/asticode/go-astibob/abilities/speaking"
+	"github.com/asticode/go-astibob/brain"
+	"github.com/asticode/go-astibob/cpkg/portaudio"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/config"
 	"github.com/pkg/errors"
@@ -20,14 +19,11 @@ import (
 
 // Flags
 var (
-	autoStart          = flag.Bool("as", false, "triggers the auto start")
-	ctx, cancel        = context.WithCancel(context.Background())
-	config             = flag.String("c", "", "the config path")
-	resourcesDirectory = flag.String("r", "", "the resources directory path")
-	serverAddr         = flag.String("a", "", "the server addr")
-	serverPassword     = flag.String("p", "", "the server password")
-	serverTimeout      = flag.Duration("t", 0, "the server timeout")
-	serverUsername     = flag.String("u", "", "the server username")
+	autoStart    = flag.Bool("a", false, "triggers the auto start for all abilities")
+	ctx, cancel  = context.WithCancel(context.Background())
+	config       = flag.String("c", "", "the config path")
+	name         = flag.String("n", "", "the brain's name")
+	webSocketURL = flag.String("w", "", "the websocket URL")
 )
 
 func main() {
@@ -44,14 +40,14 @@ func main() {
 	// Init portaudio
 	p, err := astiportaudio.New()
 	if err != nil {
-		astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio failed"))
+		astilog.Fatal(errors.Wrap(err, "astibrain: creating portaudio failed"))
 	}
 	defer p.Close()
 
 	// Init portaudio stream
 	s, err := p.NewDefaultStream(make([]int32, 192), c.PortAudio)
 	if err != nil {
-		astilog.Fatal(errors.Wrap(err, "astibob: creating portaudio default stream failed"))
+		astilog.Fatal(errors.Wrap(err, "astibrain: creating portaudio default stream failed"))
 	}
 	defer s.Close()
 
@@ -61,24 +57,24 @@ func main() {
 	// Init speaking
 	speaking := astispeaking.New(c.Speaking)
 
-	// Init bob
-	bob := astibob.New(c.Bob)
-	defer bob.Close()
+	// Init brain
+	brain := astibrain.New(c.Brain)
+	defer brain.Close()
 
 	// Learn abilities
-	bob.Learn("Hearing", hearing, astibob.AbilityOptions{AutoStart: c.AutoStart})
-	bob.Learn("Speaking", speaking, astibob.AbilityOptions{AutoStart: c.AutoStart})
+	brain.Learn("hearing", hearing, astibrain.AbilityOptions{AutoStart: c.AutoStart})
+	brain.Learn("speaking", speaking, astibrain.AbilityOptions{AutoStart: c.AutoStart})
 
-	// Run Bob
-	if err = bob.Run(ctx); err != nil {
-		astilog.Fatal(errors.Wrap(err, "astibob: running bob failed"))
+	// Run the brain
+	if err = brain.Run(ctx); err != nil {
+		astilog.Fatal(errors.Wrap(err, "astibrain: running brain failed"))
 	}
 }
 
 // Configuration represents a configuration
 type Configuration struct {
 	AutoStart bool                        `toml:"auto_start"`
-	Bob       astibob.Options             `toml:"bob"`
+	Brain     astibrain.Options           `toml:"brain"`
 	Hearing   astihearing.Options         `toml:"hearing"`
 	PortAudio astiportaudio.StreamOptions `toml:"portaudio"`
 	Speaking  astispeaking.Options        `toml:"speaking"`
@@ -88,12 +84,12 @@ type Configuration struct {
 func newConfiguration() *Configuration {
 	// Global config
 	gc := &Configuration{
-		Bob: astibob.Options{
-			ServerAddr:         "127.0.0.1:6969",
-			ServerPassword:     "admin",
-			ServerTimeout:      5 * time.Second,
-			ServerUsername:     "admin",
-			ResourcesDirectory: "resources",
+		Brain: astibrain.Options{
+			WebSocket: astibrain.WebSocketOptions{
+				Password: "admin",
+				URL:      "ws://127.0.0.1:6970/websocket",
+				Username: "admin",
+			},
 		},
 		Hearing: astihearing.Options{
 			WorkingDirectory: filepath.Join(os.TempDir(), "bob", "hearing"),
@@ -110,12 +106,11 @@ func newConfiguration() *Configuration {
 	// Flag config
 	fc := &Configuration{
 		AutoStart: *autoStart,
-		Bob: astibob.Options{
-			ServerAddr:         *serverAddr,
-			ServerPassword:     *serverPassword,
-			ServerTimeout:      *serverTimeout,
-			ServerUsername:     *serverUsername,
-			ResourcesDirectory: *resourcesDirectory,
+		Brain: astibrain.Options{
+			Name: *name,
+			WebSocket: astibrain.WebSocketOptions{
+				URL: *webSocketURL,
+			},
 		},
 	}
 
@@ -132,7 +127,7 @@ func handleSignals() {
 	signal.Notify(ch)
 	go func() {
 		for s := range ch {
-			astilog.Debugf("astibob: received signal %s", s)
+			astilog.Debugf("astibrain: received signal %s", s)
 			if s == syscall.SIGABRT || s == syscall.SIGKILL || s == syscall.SIGINT || s == syscall.SIGQUIT || s == syscall.SIGTERM {
 				cancel()
 			}
