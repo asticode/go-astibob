@@ -54,6 +54,7 @@ func (s *SpeechToText) Close() error {
 // SpeechToText implements the astiunderstanding.SpeechToText interface
 func (s *SpeechToText) SpeechToText(buffer []int32, bufferSize, sampleRate, significantBits int) string {
 	// Convert to 16 bits
+	// TODO Move to astiaudio
 	var samples = make([]int16, bufferSize)
 	var sample int16
 	for idx := 0; idx < bufferSize; idx++ {

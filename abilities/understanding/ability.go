@@ -3,35 +3,42 @@ package astiunderstanding
 import (
 	"context"
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/audio"
+	"github.com/asticode/go-astitools/sync"
 	"github.com/asticode/go-astiws"
+	"github.com/cryptix/wav"
 	"github.com/pkg/errors"
 )
 
 // Ability represents an object capable of doing speech to text analysis
 type Ability struct {
 	ch           chan PayloadSamples
-	d            *astiaudio.SilenceDetector
+	d            *astisync.Do
 	dispatchFunc astibrain.DispatchFunc
 	o            AbilityOptions
 	p            SpeechParser
+	sd           *astiaudio.SilenceDetector
 }
 
 // AbilityOptions represents ability options
 type AbilityOptions struct {
-	SilenceDetector astiaudio.SilenceDetectorOptions
+	SamplesDirectoryPath *string `toml:"samples_directory_path"`
+	SilenceDetector      astiaudio.SilenceDetectorOptions
 }
 
 // NewAbility creates a new ability
 func NewAbility(p SpeechParser, o AbilityOptions) *Ability {
 	return &Ability{
-		d: astiaudio.NewSilenceDetector(o.SilenceDetector),
-		o: o,
-		p: p,
+		d:  astisync.NewDo(),
+		o:  o,
+		p:  p,
+		sd: astiaudio.NewSilenceDetector(o.SilenceDetector),
 	}
 }
 
@@ -56,32 +63,98 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 		case p := <-a.ch:
 			// Add samples to silence detector and retrieve speech samples
 			// TODO Ease finding silence max audio level
-			speechSamples := a.d.Add(p.Samples, p.SampleRate)
+			speechSamples := a.sd.Add(p.Samples, p.SampleRate)
 
 			// No speech samples
 			if len(speechSamples) <= 0 {
 				continue
 			}
 
-			// Loop through speech samples
+			// Process samples
 			for _, samples := range speechSamples {
-				// Execute speech to text analysis
-				start := time.Now()
-				astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
-				s := a.p.SpeechToText(samples, len(samples), p.SampleRate, p.SignificantBits)
-				astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
-
-				// TODO Store everything for later validation and model improvement
-
-				// Dispatch
-				a.dispatchFunc(astibrain.Event{
-					AbilityName: Name,
-					Name:        websocketEventNameAnalysis,
-					Payload:     s,
-				})
+				a.processSamples(samples, p.SampleRate, p.SignificantBits)
 			}
 		case <-ctx.Done():
 			err = errors.Wrap(err, "astiunderstanding: context error")
+			return
+		}
+	}
+	return
+}
+
+// processSamples processes samples
+func (a *Ability) processSamples(samples []int32, sampleRate, significantBits int) {
+	// Make sure the following is not blocking but still executed in FIFO order
+	a.d.Do(func() {
+		// Execute speech to text analysis
+		start := time.Now()
+		astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
+		s := a.p.SpeechToText(samples, len(samples), sampleRate, significantBits)
+		astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
+
+		// Store everything for later validation
+		path, err := a.storeSamples(samples, sampleRate, significantBits)
+		if err != nil {
+			astilog.Error(errors.Wrap(err, "astiunderstanding: storing samples failed"))
+		}
+		if len(path) > 0 {
+			astilog.Debugf("astiunderstanding: samples have been stored to %s", path)
+		}
+
+		// Dispatch
+		a.dispatchFunc(astibrain.Event{
+			AbilityName: Name,
+			Name:        websocketEventNameAnalysis,
+			Payload:     s,
+		})
+	})
+}
+
+// storeSamples stores the samples for later validation
+func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int) (path string, err error) {
+	// No need to store samples
+	if a.o.SamplesDirectoryPath == nil {
+		return
+	}
+
+	// Create dir path
+	now := time.Now()
+	path = filepath.Join(*a.o.SamplesDirectoryPath, now.Format("2006-01-02"))
+
+	// Make sure the dir exists
+	if err = os.MkdirAll(path, 0777); err != nil {
+		err = errors.Wrapf(err, "astiunderstanding: mkdirall %s failed", path)
+		return
+	}
+
+	// Add filename to dir path
+	path = filepath.Join(path, now.Format("15-04-05")+".wav")
+
+	// Create file
+	var f *os.File
+	if f, err = os.Create(path); err != nil {
+		err = errors.Wrapf(err, "astiunderstanding: creating %s failed", path)
+		return
+	}
+	defer f.Close()
+
+	// Create wav writer
+	wf := wav.File{
+		Channels:        1,
+		SampleRate:      uint32(sampleRate),
+		SignificantBits: uint16(significantBits),
+	}
+	var w *wav.Writer
+	if w, err = wf.NewWriter(f); err != nil {
+		err = errors.Wrap(err, "astiunderstanding: creating wav writer failed")
+		return
+	}
+	defer w.Close()
+
+	// Write
+	for _, sample := range samples {
+		if err = w.WriteInt32(sample); err != nil {
+			err = errors.Wrap(err, "astiunderstanding: writing wav sample failed")
 			return
 		}
 	}
