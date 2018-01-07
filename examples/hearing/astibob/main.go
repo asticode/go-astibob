@@ -35,8 +35,8 @@ func main() {
 	hearing := astihearing.NewInterface()
 
 	// Handle samples
-	hearing.OnSamples(func(samples []int32) error {
-		astilog.Debug("Writing samples")
+	hearing.OnSamples(func(samples []int32, sampleRate, significantBits int) error {
+		astilog.Debugf("Writing samples - len: %d - sample rate: %d - significant bits: %d", len(samples), sampleRate, significantBits)
 		for idx, sample := range samples {
 			if err := w.WriteInt32(sample); err != nil {
 				astilog.Error(errors.Wrapf(err, "main: writing sample %d failed", idx))

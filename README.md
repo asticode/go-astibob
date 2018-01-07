@@ -4,25 +4,27 @@ Bob is a distributed AI written in GO.
 
 # Overview
 
-- an **ability** is a simple task such as speech-synthesis, recording audio, etc.
+- an **ability** is a simple task such as audio recording, speech-to-text analysis, speech-synthesis, etc.
 - a **brain** has one or more **abilities**
 - **Bob** is connected to one or more **brains**
 - **clients** connect to **Bob** to interact with **brains** and **abilities**
 
 ```
-    +-----------+     +-----------+
-    | Client #1 |     | Client #2 |
-    +-----------+     +-----------+
-               \       /
-                \     /
-                +-----+
-                | Bob |
-                +-----+
-                /     \
-               /       \
-     +----------+     +----------+
-     | Brain #1 |     | Brain #2 |       
-     +----------+     +----------+
+          +-----------+     +-----------+
+          | Client #1 |     | Client #2 |
+          +-----------+     +-----------+
+                     \       /
+                      \     /
+                      +-----+
+                      | Bob |
+                      +-----+
+                      /     \
+                     /       \
+     +----------------+     +----------------+
+     | Brain #1       |     | Brain #2       |
+     |   - Ability #1 |     |   - Ability #3 |
+     |   - Ability #2 |     |   - Ability #4 |
+     +----------------+     +----------------+
 ```
               
 # Installation
@@ -53,7 +55,7 @@ WARNING: some abilities require specific libs installed on your system, please c
 
 # Abilities
 
-Abilities are simple tasks such as speech-synthesis, recording audio, etc.
+Abilities are simple tasks audio recording, speech-to-text analysis, speech-synthesis, etc.
 
 WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
 
@@ -63,7 +65,7 @@ This ability listens to an audio input and dispatches audio samples.
 
 ### Recommendations
 
-The ability requires the following interface:
+It requires the following interface:
 
 ```go
 type SampleReader interface {
@@ -71,13 +73,15 @@ type SampleReader interface {
 }
 ```
 
-which is best fulfilled with [PortAudio](http://www.portaudio.com/) (check out the corresponding example to see how to set it up). However you can choose another solution as long as it fulfills this interface.
+which is best fulfilled with [PortAudio](http://www.portaudio.com/). However you can choose any other solution that fulfill that interface.
+
+The example needs [PortAudio](http://www.portaudio.com/) to be set up on your system and shows you how to use it.
 
 ### In your code
 #### Brain
 
 ```go
-// Create reader
+// Create sample reader
 var r astihearing.SampleReader
 
 // Create ability
@@ -94,7 +98,7 @@ brain.Learn(hearing, astibrain.AbilityOptions{})
 hearing := astihearing.NewInterface()
 
 // Handle samples
-hearing.OnSamples(func(samples []int32) error {
+hearing.OnSamples(func(samples []int32, sampleRate, significantBits int) error {
     // Do stuff with the samples
     return nil
 })
@@ -139,6 +143,54 @@ speaking := astispeaking.NewInterface()
 	
 // Say something
 bob.Exec(speaking.Say("I love you Bob"))
+```
+
+## Understanding
+
+This ability executes a speech to text analysis on audio samples.
+
+### Recommendations
+
+It requires the following interface:
+
+```go
+type SpeechParser interface {
+	SpeechToText(buffer []int32, bufferSize, sampleRate, significantBits int) string
+}
+```
+
+which is best fulfilled with [DeepSpeech](https://github.com/mozilla/DeepSpeech). However you can choose any other solution that fulfill that interface.
+
+The example requires [DeepSpeech](https://github.com/asticode/go-astideepspeech#install-deepspeech) to be set up on your system and shows you how to use it.
+
+### In your code
+#### Brain
+
+```go
+// Create speech parser
+var p astiunderstanding.SpeechParser
+
+// Create ability
+understanding := astiunderstanding.NewAbility(p)
+
+// Learn ability
+brain.Learn(understanding, astibrain.AbilityOptions{})
+```
+
+#### Bob
+
+```go
+// Create interface
+understanding := astiunderstanding.NewInterface()
+
+// Handle analysis
+understanding.OnAnalysis(func(text string) error {
+    // Do stuff with the text
+    return nil
+})
+
+// Send samples
+bob.Exec(understanding.Samples(samples, sampleRate, significantBits))
 ```
 
 # Events

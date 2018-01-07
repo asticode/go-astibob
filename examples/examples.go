@@ -42,7 +42,7 @@ var (
 	}
 	BrainOptions = astibrain.Options{
 		Websocket: astibrain.WebsocketOptions{
-			MaxMessageSize: 4096,
+			MaxMessageSize: 512 * 1024,
 			Password:       "admin",
 			URL:            "ws://127.0.0.1:6970/websocket",
 			Username:       "admin",

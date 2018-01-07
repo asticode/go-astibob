@@ -6,17 +6,18 @@ import (
 	"os"
 
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/sync"
 	"github.com/pkg/errors"
 )
 
 // Brain is an object handling one or more abilities
 type Brain struct {
-	abilities  *abilities
-	cancel     context.CancelFunc
-	ctx        context.Context
-	dispatcher *dispatcher
-	o          Options
-	ws         *websocket
+	abilities *abilities
+	cancel    context.CancelFunc
+	ctx       context.Context
+	d         *astisync.Do
+	o         Options
+	ws        *websocket
 }
 
 // Options are brain options
@@ -25,19 +26,24 @@ type Options struct {
 	Websocket WebsocketOptions `toml:"websocket"`
 }
 
+// Event represents an event
+type Event struct {
+	AbilityName string
+	Name        string
+	Payload     interface{}
+}
+
 // New creates a new brain
 func New(o Options) (b *Brain) {
 	// Create brain
 	b = &Brain{
 		abilities: newAbilities(),
+		d:         astisync.NewDo(),
 		o:         o,
 	}
 
 	// Add websocket
 	b.ws = newWebsocket(b.abilities, o.Websocket)
-
-	// Add dispatcher
-	b.dispatcher = newDispatcher(b.ws)
 	return
 }
 
@@ -71,10 +77,10 @@ func (b *Brain) Close() (err error) {
 		return
 	}
 
-	// Close dispatcher
-	astilog.Debug("astibrain: closing dispatcher")
-	if err = b.dispatcher.Close(); err != nil {
-		err = errors.Wrap(err, "astibrain: closing dispatcher failed")
+	// Close doer
+	astilog.Debug("astibrain: closing doer")
+	if err = b.d.Close(); err != nil {
+		err = errors.Wrap(err, "astibrain: closing doer failed")
 		return
 	}
 	return
@@ -88,9 +94,9 @@ func (b *Brain) Learn(a Ability, o AbilityOptions) {
 	// Add ability
 	b.abilities.set(newAbility(a, b.ws, o))
 
-	// Set dispatch channel
-	if v, ok := a.(WebsocketDispatcher); ok {
-		v.SetDispatchChan(b.dispatcher.chEvent)
+	// Set dispatch func
+	if v, ok := a.(Dispatcher); ok {
+		v.SetDispatchFunc(b.dispatch)
 	}
 
 	// Add custom websocket listeners
@@ -119,9 +125,6 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 
 	// Dial
 	go b.ws.dial(b.ctx, name)
-
-	// Dispatch
-	go b.dispatcher.read()
 
 	// Loop through abilities
 	if err = b.abilities.abilities(func(a *ability) (err error) {

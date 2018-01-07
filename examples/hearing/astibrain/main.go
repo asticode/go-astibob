@@ -36,7 +36,9 @@ func main() {
 
 	// Create hearing
 	hearing := astihearing.NewAbility(s, astihearing.AbilityOptions{
-		DispatchCount: 16000,
+		DispatchCount:   16000,
+		SampleRate:      16000,
+		SignificantBits: 24,
 	})
 
 	// Learn ability

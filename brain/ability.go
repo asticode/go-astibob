@@ -29,9 +29,12 @@ type Runnable interface {
 	Run(ctx context.Context) error
 }
 
-// WebsocketDispatcher represents an object that can dispatch events to a websocket
-type WebsocketDispatcher interface {
-	SetDispatchChan(ch chan Event)
+// DispatchFunc represents a dispatch func
+type DispatchFunc func(e Event)
+
+// Dispatcher represents an object that can dispatch an event to the brain
+type Dispatcher interface {
+	SetDispatchFunc(DispatchFunc)
 }
 
 // WebsocketListener represents an object that can listen to a websocket

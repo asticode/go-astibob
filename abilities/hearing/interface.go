@@ -14,7 +14,7 @@ type Interface struct {
 }
 
 // SamplesFunc represents the callback executed upon receiving samples
-type SamplesFunc func(samples []int32) error
+type SamplesFunc func(samples []int32, sampleRate, significantBits int) error
 
 // NewInterface creates a new interface
 func NewInterface() *Interface {
@@ -41,9 +41,9 @@ func (i *Interface) WebsocketListeners() map[string]astiws.ListenerFunc {
 // websocketListenerSamples listens to the samples websocket event
 func (i *Interface) websocketListenerSamples(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Unmarshal payload
-	var samples []int32
-	if err := json.Unmarshal(payload, &samples); err != nil {
-		astilog.Error(errors.Wrapf(err, "astihearing: json unmarshaling %s into %#v failed", payload, samples))
+	var p PayloadSamples
+	if err := json.Unmarshal(payload, &p); err != nil {
+		astilog.Error(errors.Wrapf(err, "astihearing: json unmarshaling %s into %#v failed", payload, p))
 		return nil
 	}
 
@@ -54,7 +54,7 @@ func (i *Interface) websocketListenerSamples(c *astiws.Client, eventName string,
 	}
 
 	// Execute callback
-	if err := i.onSamples(samples); err != nil {
+	if err := i.onSamples(p.Samples, p.SampleRate, p.SignificantBits); err != nil {
 		astilog.Error(errors.Wrap(err, "astihearing: executing samples callback failed"))
 		return nil
 	}

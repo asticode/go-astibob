@@ -10,14 +10,16 @@ import (
 
 // Ability represents an object capable of parsing an audio reader and dispatch n chunks.
 type Ability struct {
-	ch chan astibrain.Event
-	o  AbilityOptions
-	r  SampleReader
+	dispatchFunc astibrain.DispatchFunc
+	o            AbilityOptions
+	r            SampleReader
 }
 
 // AbilityOptions represents ability options
 type AbilityOptions struct {
-	DispatchCount int `toml:"dispatch_count"`
+	DispatchCount   int `toml:"dispatch_count"`
+	SampleRate      int `toml:"sample_rate"`
+	SignificantBits int `toml:"significant_bits"`
 }
 
 // NewAbility creates a new ability.
@@ -28,14 +30,21 @@ func NewAbility(r SampleReader, o AbilityOptions) *Ability {
 	}
 }
 
-// SetDispatchChan implements the astibrain.WebsocketDispatcher interface
-func (a *Ability) SetDispatchChan(ch chan astibrain.Event) {
-	a.ch = ch
+// SetDispatchFunc implements the astibrain.Dispatcher interface
+func (a *Ability) SetDispatchFunc(fn astibrain.DispatchFunc) {
+	a.dispatchFunc = fn
 }
 
 // Name implements the astibrain.Ability interface
 func (a *Ability) Name() string {
 	return Name
+}
+
+// PayloadSamples represents the samples payload
+type PayloadSamples struct {
+	SampleRate      int     `json:"sample_rate"`
+	Samples         []int32 `json:"samples"`
+	SignificantBits int     `json:"significant_bits"`
 }
 
 // Run implements the astibrain.Runnable interface
@@ -80,11 +89,6 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 			return
 		}
 
-		// Reset buffer
-		if len(buf) == 0 || len(buf) >= dispatchCount {
-			buf = buf[:0]
-		}
-
 		// Add sample to buffer
 		buf = append(buf, s)
 
@@ -92,11 +96,16 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 		if len(buf) >= dispatchCount {
 			dispatchBuf := make([]int32, len(buf))
 			copy(dispatchBuf, buf)
-			a.ch <- astibrain.Event{
+			buf = buf[:0]
+			a.dispatchFunc(astibrain.Event{
 				AbilityName: Name,
 				Name:        websocketEventNameSamples,
-				Payload:     dispatchBuf,
-			}
+				Payload: PayloadSamples{
+					SampleRate:      a.o.SampleRate,
+					Samples:         dispatchBuf,
+					SignificantBits: a.o.SignificantBits,
+				},
+			})
 		}
 	}
 	return
