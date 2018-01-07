@@ -1,11 +1,14 @@
 package main
 
 import (
+	"time"
+
 	"github.com/asticode/go-astibob/abilities/understanding"
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astibob/examples"
 	"github.com/asticode/go-astibob/pkg/speechtotext"
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/audio"
 	"github.com/pkg/errors"
 )
 
@@ -32,7 +35,13 @@ func main() {
 	})
 
 	// Create understanding
-	understanding := astiunderstanding.NewAbility(p)
+	understanding := astiunderstanding.NewAbility(p, astiunderstanding.AbilityOptions{
+		SilenceDetector: astiaudio.SilenceDetectorOptions{
+			AnalysisDuration:     300 * time.Millisecond,
+			SilenceMaxAudioLevel: 10000,
+			SilenceMinDuration:   time.Second,
+		},
+	})
 
 	// Learn ability
 	brain.Learn(understanding, astiexamples.AbilityOptions)

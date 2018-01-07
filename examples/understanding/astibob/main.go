@@ -148,24 +148,32 @@ func startSamples(bob *astibob.Bob, i *astiunderstanding.Interface, file file) {
 
 	// Loop
 	var idx int
+	var silencesCount int
 	for {
 		select {
 		case <-t.C:
 			// No more samples to send
-			if idx >= len(file.samples)-1 {
-				return
-			}
-
-			// Create buffer
 			var buf []int32
-			if len(file.samples[idx:]) > file.sampleRate {
+			if idx >= len(file.samples)-1 {
+				// Enough silences sent
+				if silencesCount >= 5 {
+					return
+				}
+
+				// Add silences
+				silencesCount++
 				buf = make([]int32, file.sampleRate)
-				copy(buf, file.samples[idx:idx+file.sampleRate])
-				idx += file.sampleRate
 			} else {
-				buf = make([]int32, len(file.samples)-idx)
-				copy(buf, file.samples[idx:])
-				idx = len(file.samples) - 1
+				// Create buffer
+				if len(file.samples[idx:]) > file.sampleRate {
+					buf = make([]int32, file.sampleRate)
+					copy(buf, file.samples[idx:idx+file.sampleRate])
+					idx += file.sampleRate
+				} else {
+					buf = make([]int32, len(file.samples)-idx)
+					copy(buf, file.samples[idx:])
+					idx = len(file.samples) - 1
+				}
 			}
 
 			// Send samples
@@ -177,5 +185,7 @@ func startSamples(bob *astibob.Bob, i *astiunderstanding.Interface, file file) {
 }
 
 func stopSamples() {
-	cancelDispatch()
+	if cancelDispatch != nil {
+		cancelDispatch()
+	}
 }

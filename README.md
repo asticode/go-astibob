@@ -171,7 +171,7 @@ The example requires [DeepSpeech](https://github.com/asticode/go-astideepspeech#
 var p astiunderstanding.SpeechParser
 
 // Create ability
-understanding := astiunderstanding.NewAbility(p)
+understanding := astiunderstanding.NewAbility(p, , astiunderstanding.AbilityOptions{})
 
 // Learn ability
 brain.Learn(understanding, astibrain.AbilityOptions{})
