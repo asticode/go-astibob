@@ -7,6 +7,7 @@ import (
 
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/audio"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
@@ -14,13 +15,22 @@ import (
 // Ability represents an object capable of doing speech to text analysis
 type Ability struct {
 	ch           chan PayloadSamples
+	d            *astiaudio.SilenceDetector
 	dispatchFunc astibrain.DispatchFunc
+	o            AbilityOptions
 	p            SpeechParser
 }
 
+// AbilityOptions represents ability options
+type AbilityOptions struct {
+	SilenceDetector astiaudio.SilenceDetectorOptions
+}
+
 // NewAbility creates a new ability
-func NewAbility(p SpeechParser) *Ability {
+func NewAbility(p SpeechParser, o AbilityOptions) *Ability {
 	return &Ability{
+		d: astiaudio.NewSilenceDetector(o.SilenceDetector),
+		o: o,
 		p: p,
 	}
 }
@@ -41,52 +51,39 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 	a.ch = make(chan PayloadSamples)
 
 	// Listen
-	var buf []int32
 	for {
 		select {
 		case p := <-a.ch:
-			// Retrieve valid samples
-			validSamples := a.validSamples(p, &buf)
+			// Add samples to silence detector and retrieve speech samples
+			// TODO Ease finding silence max audio level
+			speechSamples := a.d.Add(p.Samples, p.SampleRate)
 
-			// No valid samples
-			if len(validSamples) <= 0 {
+			// No speech samples
+			if len(speechSamples) <= 0 {
 				continue
 			}
 
-			// Execute speech to text analysis
-			start := time.Now()
-			astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(validSamples))
-			s := a.p.SpeechToText(validSamples, len(validSamples), p.SampleRate, p.SignificantBits)
-			astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
+			// Loop through speech samples
+			for _, samples := range speechSamples {
+				// Execute speech to text analysis
+				start := time.Now()
+				astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
+				s := a.p.SpeechToText(samples, len(samples), p.SampleRate, p.SignificantBits)
+				astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
 
-			// TODO Store everything for later validation and model improvement
+				// TODO Store everything for later validation and model improvement
 
-			// Dispatch
-			a.dispatchFunc(astibrain.Event{
-				AbilityName: Name,
-				Name:        websocketEventNameAnalysis,
-				Payload:     s,
-			})
+				// Dispatch
+				a.dispatchFunc(astibrain.Event{
+					AbilityName: Name,
+					Name:        websocketEventNameAnalysis,
+					Payload:     s,
+				})
+			}
 		case <-ctx.Done():
 			err = errors.Wrap(err, "astiunderstanding: context error")
 			return
 		}
-	}
-	return
-}
-
-// validSamples processes new samples and checks whether it adds up to valid samples when appended to buffered samples
-func (a *Ability) validSamples(p PayloadSamples, buf *[]int32) (validSamples []int32) {
-	// TODO Detect with audio level
-
-	// Append new samples
-	*buf = append(*buf, p.Samples...)
-
-	// TEST
-	if len(*buf) > 16000 {
-		validSamples = make([]int32, len(*buf))
-		copy(validSamples, *buf)
-		*buf = (*buf)[:0]
 	}
 	return
 }
