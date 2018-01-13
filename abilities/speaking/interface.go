@@ -10,7 +10,7 @@ func NewInterface() *Interface {
 	return &Interface{}
 }
 
-// CmdSay creates a say cmd
+// Say creates a say cmd
 func (i *Interface) Say(s string) *astibob.Cmd {
 	return &astibob.Cmd{
 		AbilityName: Name,

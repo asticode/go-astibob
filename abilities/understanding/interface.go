@@ -11,7 +11,7 @@ import (
 
 // Interface is the interface of the ability
 type Interface struct {
-	onAnalysis AnalysisFunc
+	onAnalysis []AnalysisFunc
 }
 
 // AnalysisFunc represents the callback executed upon receiving results of an analysis
@@ -19,9 +19,10 @@ type AnalysisFunc func(text string) error
 
 // PayloadSamples represents the samples payload
 type PayloadSamples struct {
-	SampleRate      int     `json:"sample_rate"`
-	Samples         []int32 `json:"samples"`
-	SignificantBits int     `json:"significant_bits"`
+	SampleRate           int     `json:"sample_rate"`
+	Samples              []int32 `json:"samples"`
+	SignificantBits      int     `json:"significant_bits"`
+	SilenceMaxAudioLevel float64 `json:"silence_max_audio_level"`
 }
 
 // NewInterface creates a new interface
@@ -34,22 +35,23 @@ func (i *Interface) Name() string {
 	return Name
 }
 
-// CmdSamples creates a samples cmd
-func (i *Interface) Samples(samples []int32, sampleRate, significantBits int) *astibob.Cmd {
+// Samples creates a samples cmd
+func (i *Interface) Samples(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) *astibob.Cmd {
 	return &astibob.Cmd{
 		AbilityName: Name,
 		EventName:   websocketEventNameSamples,
 		Payload: PayloadSamples{
-			SampleRate:      sampleRate,
-			Samples:         samples,
-			SignificantBits: significantBits,
+			SampleRate:           sampleRate,
+			Samples:              samples,
+			SignificantBits:      significantBits,
+			SilenceMaxAudioLevel: silenceMaxAudioLevel,
 		},
 	}
 }
 
-// OnAnalysis set the callback executed upon receiving an analysis
+// OnAnalysis adds a callback executed upon receiving an analysis
 func (i *Interface) OnAnalysis(fn AnalysisFunc) {
-	i.onAnalysis = fn
+	i.onAnalysis = append(i.onAnalysis, fn)
 }
 
 // WebsocketListeners implements the astibob.WebsocketListener interface
@@ -74,10 +76,11 @@ func (i *Interface) websocketListenerAnalysis(c *astiws.Client, eventName string
 		return nil
 	}
 
-	// Execute callback
-	if err := i.onAnalysis(p); err != nil {
-		astilog.Error(errors.Wrap(err, "astiunderstanding: executing analysis callback failed"))
-		return nil
+	// Execute callbacks
+	for _, fn := range i.onAnalysis {
+		if err := fn(p); err != nil {
+			astilog.Error(errors.Wrap(err, "astiunderstanding: executing analysis callback failed"))
+		}
 	}
 	return nil
 }

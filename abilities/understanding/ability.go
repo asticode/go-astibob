@@ -28,8 +28,8 @@ type Ability struct {
 
 // AbilityOptions represents ability options
 type AbilityOptions struct {
-	SamplesDirectoryPath *string `toml:"samples_directory_path"`
-	SilenceDetector      astiaudio.SilenceDetectorOptions
+	SamplesDirectoryPath *string                          `toml:"samples_directory_path"`
+	SilenceDetector      astiaudio.SilenceDetectorOptions `toml:"silence_detector"`
 }
 
 // NewAbility creates a new ability
@@ -54,16 +54,16 @@ func (a *Ability) Name() string {
 
 // Run implements the astibrain.Runnable interface
 func (a *Ability) Run(ctx context.Context) (err error) {
-	// Reset in channel
+	// Reset
 	a.ch = make(chan PayloadSamples)
+	a.sd.Reset()
 
 	// Listen
 	for {
 		select {
 		case p := <-a.ch:
 			// Add samples to silence detector and retrieve speech samples
-			// TODO Ease finding silence max audio level
-			speechSamples := a.sd.Add(p.Samples, p.SampleRate)
+			speechSamples := a.sd.Add(p.Samples, p.SampleRate, p.SilenceMaxAudioLevel)
 
 			// No speech samples
 			if len(speechSamples) <= 0 {
@@ -79,7 +79,6 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 			return
 		}
 	}
-	return
 }
 
 // processSamples processes samples
@@ -111,6 +110,10 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 }
 
 // storeSamples stores the samples for later validation
+// TODO Add option to stop storing samples from UI
+// TODO Split samples in 2 folders => to validate, and validated
+// TODO Add validation process in UI
+// TODO Store max quality samples (more than 16 000 sample rate)
 func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int) (path string, err error) {
 	// No need to store samples
 	if a.o.SamplesDirectoryPath == nil {

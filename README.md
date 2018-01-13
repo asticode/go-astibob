@@ -1,6 +1,7 @@
+[![GoReportCard](http://goreportcard.com/badge/github.com/asticode/go-astibob)](http://goreportcard.com/report/github.com/asticode/go-astibob)
 [![GoDoc](https://godoc.org/github.com/asticode/go-astibob?status.svg)](https://godoc.org/github.com/asticode/go-astibob)
 
-Bob is a distributed AI written in GO.
+Bob is a distributed AI that can listen, understand, speak back and anything else you want.
 
 # Overview
 
@@ -26,14 +27,28 @@ Bob is a distributed AI written in GO.
      |   - Ability #2 |     |   - Ability #4 |
      +----------------+     +----------------+
 ```
+      
+# Real-life examples
+
+Here's a list of awesome projects using `go-astibob` (if you're using `go-astibob` and want your project to be listed here please submit a PR):
+
+- [go-astibob-home](https://github.com/asticode/go-astibob-home)
               
 # Installation
 
 Run the following command:
 
-    $ go get -u github.com/asticode/go-astibob/...
+    $ go get github.com/asticode/go-astibob
+
+# Abilities
+
+Abilities are simple tasks audio recording, speech-to-text analysis, speech-synthesis, etc.
+
+`go-astibob` comes with pre-shipped abilities but you can add your own abilities.
+
+WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
     
-# Examples
+## Examples
 
 Every ability is demonstrated in an example located in `examples/<ability name>`.
 
@@ -51,13 +66,11 @@ To try any of the examples:
 
 ```$ go run examples/<ability name>/astibrain/main.go -v```
 
-WARNING: some abilities require specific libs installed on your system, please check the next section to see which ones.
+WARNING: some abilities require specific libs installed on your system, please check the ability's section to see which one(s).
 
-# Abilities
+## Adding your own ability
 
-Abilities are simple tasks audio recording, speech-to-text analysis, speech-synthesis, etc.
-
-WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
+TODO
 
 ## Hearing
 

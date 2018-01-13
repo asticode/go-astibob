@@ -141,6 +141,7 @@ func parseFile(filename string) (o file, err error) {
 func startSamples(bob *astibob.Bob, i *astiunderstanding.Interface, file file) {
 	// Reset ctx
 	ctxDispatch, cancelDispatch = context.WithCancel(context.Background())
+	defer cancelDispatch()
 
 	// Create ticker
 	t := time.NewTicker(time.Second)
@@ -177,7 +178,7 @@ func startSamples(bob *astibob.Bob, i *astiunderstanding.Interface, file file) {
 			}
 
 			// Send samples
-			bob.Exec(i.Samples(buf, file.sampleRate, file.significantBits))
+			bob.Exec(i.Samples(buf, file.sampleRate, file.significantBits, 1))
 		case <-ctxDispatch.Done():
 			return
 		}

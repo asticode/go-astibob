@@ -1,7 +1,9 @@
 package astihearing
 
-// Name
-const Name = "hearing"
+// Constants
+const (
+	Name = "hearing"
+)
 
 // SampleReader represents a sample reader
 type SampleReader interface {

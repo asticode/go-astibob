@@ -2,6 +2,8 @@ package astihearing
 
 import (
 	"context"
+	"math"
+	"time"
 
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
@@ -17,9 +19,10 @@ type Ability struct {
 
 // AbilityOptions represents ability options
 type AbilityOptions struct {
-	DispatchCount   int `toml:"dispatch_count"`
-	SampleRate      int `toml:"sample_rate"`
-	SignificantBits int `toml:"significant_bits"`
+	DispatchDuration     time.Duration `toml:"dispatch_duration"`
+	SampleRate           int           `toml:"sample_rate"`
+	SignificantBits      int           `toml:"significant_bits"`
+	SilenceMaxAudioLevel float64       `toml:"silence_max_audio_level"`
 }
 
 // NewAbility creates a new ability.
@@ -42,9 +45,10 @@ func (a *Ability) Name() string {
 
 // PayloadSamples represents the samples payload
 type PayloadSamples struct {
-	SampleRate      int     `json:"sample_rate"`
-	Samples         []int32 `json:"samples"`
-	SignificantBits int     `json:"significant_bits"`
+	SampleRate           int     `json:"sample_rate"`
+	Samples              []int32 `json:"samples"`
+	SignificantBits      int     `json:"significant_bits"`
+	SilenceMaxAudioLevel float64 `json:"silence_max_audio_level"`
 }
 
 // Run implements the astibrain.Runnable interface
@@ -68,9 +72,9 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 	}
 
 	// Get dispatch count
-	var dispatchCount = a.o.DispatchCount
-	if dispatchCount <= 0 {
-		dispatchCount = 1
+	var dispatchCount = a.o.SampleRate
+	if a.o.DispatchDuration > 0 {
+		dispatchCount = int(math.Floor(float64(a.o.SampleRate) * a.o.DispatchDuration.Seconds()))
 	}
 
 	// Read
@@ -101,12 +105,12 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 				AbilityName: Name,
 				Name:        websocketEventNameSamples,
 				Payload: PayloadSamples{
-					SampleRate:      a.o.SampleRate,
-					Samples:         dispatchBuf,
-					SignificantBits: a.o.SignificantBits,
+					SampleRate:           a.o.SampleRate,
+					Samples:              dispatchBuf,
+					SignificantBits:      a.o.SignificantBits,
+					SilenceMaxAudioLevel: a.o.SilenceMaxAudioLevel,
 				},
 			})
 		}
 	}
-	return
 }

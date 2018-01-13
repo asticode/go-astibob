@@ -9,12 +9,13 @@ import (
 )
 
 // Interface is the interface of the ability
+// TODO Add calibrate UI to get max audio level + silence max audio level
 type Interface struct {
-	onSamples SamplesFunc
+	onSamples []SamplesFunc
 }
 
 // SamplesFunc represents the callback executed upon receiving samples
-type SamplesFunc func(samples []int32, sampleRate, significantBits int) error
+type SamplesFunc func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error
 
 // NewInterface creates a new interface
 func NewInterface() *Interface {
@@ -26,9 +27,9 @@ func (i *Interface) Name() string {
 	return Name
 }
 
-// OnSamples set the callback executed upon receiving samples
+// OnSamples adds a callback executed upon receiving samples
 func (i *Interface) OnSamples(fn SamplesFunc) {
-	i.onSamples = fn
+	i.onSamples = append(i.onSamples, fn)
 }
 
 // WebsocketListeners implements the astibob.WebsocketListener interface
@@ -53,10 +54,11 @@ func (i *Interface) websocketListenerSamples(c *astiws.Client, eventName string,
 		return nil
 	}
 
-	// Execute callback
-	if err := i.onSamples(p.Samples, p.SampleRate, p.SignificantBits); err != nil {
-		astilog.Error(errors.Wrap(err, "astihearing: executing samples callback failed"))
-		return nil
+	// Execute callbacks
+	for _, fn := range i.onSamples {
+		if err := fn(p.Samples, p.SampleRate, p.SignificantBits, p.SilenceMaxAudioLevel); err != nil {
+			astilog.Error(errors.Wrap(err, "astihearing: executing samples callback failed"))
+		}
 	}
 	return nil
 }

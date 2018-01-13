@@ -44,7 +44,7 @@ type WebsocketListener interface {
 
 // AbilityOptions represents ability options
 type AbilityOptions struct {
-	AutoStart bool
+	AutoStart bool `toml:"autostart"`
 }
 
 // ability represents an ability.

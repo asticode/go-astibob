@@ -25,9 +25,9 @@ type Bob struct {
 
 // Options are Bob options.
 type Options struct {
-	BrainsServer       ServerOptions
-	ClientsServer      ServerOptions
-	ResourcesDirectory string
+	BrainsServer       ServerOptions `toml:"brains_server"`
+	ClientsServer      ServerOptions `toml:"clients_server"`
+	ResourcesDirectory string        `toml:"resources_directory"`
 }
 
 // New creates a new Bob.
@@ -114,7 +114,6 @@ func (b *Bob) Run(ctx context.Context) (err error) {
 		}
 		return
 	}
-	return
 }
 
 // stop stops Bob

@@ -1,7 +1,9 @@
 package astiunderstanding
 
-// Name
-const Name = "understanding"
+// Constants
+const (
+	Name = "understanding"
+)
 
 // SpeechParser represents an object capable of parsing speech and returning the corresponding text
 type SpeechParser interface {

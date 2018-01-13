@@ -37,9 +37,8 @@ func main() {
 	// Create understanding
 	understanding := astiunderstanding.NewAbility(p, astiunderstanding.AbilityOptions{
 		SilenceDetector: astiaudio.SilenceDetectorOptions{
-			AnalysisDuration:     300 * time.Millisecond,
-			SilenceMaxAudioLevel: 10000,
-			SilenceMinDuration:   time.Second,
+			AnalysisDuration:   300 * time.Millisecond,
+			SilenceMinDuration: time.Second,
 		},
 	})
 
