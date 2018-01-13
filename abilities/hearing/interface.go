@@ -32,15 +32,15 @@ func (i *Interface) OnSamples(fn SamplesFunc) {
 	i.onSamples = append(i.onSamples, fn)
 }
 
-// WebsocketListeners implements the astibob.WebsocketListener interface
-func (i *Interface) WebsocketListeners() map[string]astiws.ListenerFunc {
+// BrainWebsocketListeners implements the astibob.BrainWebsocketListener interface
+func (i *Interface) BrainWebsocketListeners() map[string]astiws.ListenerFunc {
 	return map[string]astiws.ListenerFunc{
-		websocketEventNameSamples: i.websocketListenerSamples,
+		websocketEventNameSamples: i.brainWebsocketListenerSamples,
 	}
 }
 
-// websocketListenerSamples listens to the samples websocket event
-func (i *Interface) websocketListenerSamples(c *astiws.Client, eventName string, payload json.RawMessage) error {
+// brainWebsocketListenerSamples listens to the samples brain websocket event
+func (i *Interface) brainWebsocketListenerSamples(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Unmarshal payload
 	var p PayloadSamples
 	if err := json.Unmarshal(payload, &p); err != nil {

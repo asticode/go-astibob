@@ -16,9 +16,9 @@ type APIHandler interface {
 	APIHandlers() map[string]http.Handler
 }
 
-// WebsocketListener represents an object that can listen to a websocket
-type WebsocketListener interface {
-	WebsocketListeners() map[string]astiws.ListenerFunc
+// BrainWebsocketListener represents an object that can listen to a brain websocket
+type BrainWebsocketListener interface {
+	BrainWebsocketListeners() map[string]astiws.ListenerFunc
 }
 
 // WebTemplater represents an object that can handle web templates

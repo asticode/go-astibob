@@ -91,13 +91,15 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 			// Add api handlers
 			if v, ok := i.(APIHandler); ok {
 				for path, h := range v.APIHandlers() {
-					a.apiHandlers[path] = h
+					if _, ok := a.apiHandlers[path]; !ok {
+						a.apiHandlers[path] = h
+					}
 				}
 			}
 
-			// Add custom websocket listeners
-			if v, ok := i.(WebsocketListener); ok {
-				for n, l := range v.WebsocketListeners() {
+			// Add custom brain websocket listeners
+			if v, ok := i.(BrainWebsocketListener); ok {
+				for n, l := range v.BrainWebsocketListeners() {
 					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l)
 				}
 			}

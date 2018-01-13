@@ -54,15 +54,15 @@ func (i *Interface) OnAnalysis(fn AnalysisFunc) {
 	i.onAnalysis = append(i.onAnalysis, fn)
 }
 
-// WebsocketListeners implements the astibob.WebsocketListener interface
-func (i *Interface) WebsocketListeners() map[string]astiws.ListenerFunc {
+// BrainWebsocketListeners implements the astibob.BrainWebsocketListener interface
+func (i *Interface) BrainWebsocketListeners() map[string]astiws.ListenerFunc {
 	return map[string]astiws.ListenerFunc{
-		websocketEventNameAnalysis: i.websocketListenerAnalysis,
+		websocketEventNameAnalysis: i.brainWebsocketListenerAnalysis,
 	}
 }
 
-// websocketListenerAnalysis listens to the analysis websocket event
-func (i *Interface) websocketListenerAnalysis(c *astiws.Client, eventName string, payload json.RawMessage) error {
+// brainWebsocketListenerAnalysis listens to the analysis brain websocket event
+func (i *Interface) brainWebsocketListenerAnalysis(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Unmarshal payload
 	var p string
 	if err := json.Unmarshal(payload, &p); err != nil {
