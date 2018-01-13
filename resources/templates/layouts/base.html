@@ -69,6 +69,11 @@
     <script src="/static/js/consts.js"></script>
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/base.js"></script>
+    <script>
+        {{ if .Ability }}base.ability = "{{ .Ability }}";{{ end }}
+        {{ if .APIBasePattern }}base.apiBasePattern = "{{ .APIBasePattern }}";{{ end }}
+        {{ if .Brain }}base.brain = "{{ .Brain }}";{{ end }}
+    </script>
 
     <!-- Custom JS -->
     {{ template "js" . }}

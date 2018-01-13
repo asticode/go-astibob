@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"regexp"
+
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/http"
@@ -109,7 +111,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 				// Loop through templates
 				for path, content := range v.WebTemplates() {
 					// Add full path
-					fullPath := s.webTemplatePath(b.key, a.key, path)
+					fullPath := s.abilityWebTemplatePath(b.key, a.key, path)
 
 					// Add template
 					if err := s.templater.Add(fullPath, content); err != nil {
@@ -120,7 +122,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 
 					// Update web homepage
 					if path == "/index" {
-						a.webHomepage = serverPatternWeb + s.webTemplatePattern(b.key, a.key, path)
+						a.webHomepage = serverPatternWeb + s.abilityWebTemplatePattern(b.key, a.key, path)
 					}
 				}
 			}
@@ -156,14 +158,17 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	return nil
 }
 
-// webTemplatePattern returns the web template pattern
-func (s *brainsServer) webTemplatePattern(brainKey, abilityKey, path string) string {
+// regexpAbilityWebTemplatePattern is the ability web template pattern regexp
+var regexpAbilityWebTemplatePattern = regexp.MustCompile("^\\/brains\\/([\\w]+)\\/abilities\\/([\\w]+)\\/")
+
+// abilityWebTemplatePattern returns the ability web template pattern
+func (s *brainsServer) abilityWebTemplatePattern(brainKey, abilityKey, path string) string {
 	return fmt.Sprintf("/brains/%s/abilities/%s%s", brainKey, abilityKey, path)
 }
 
-// webTemplatePath returns the web template path
-func (s *brainsServer) webTemplatePath(brainKey, abilityKey, path string) string {
-	return s.webTemplatePattern(brainKey, abilityKey, path) + ".html"
+// abilityWebTemplatePath returns the ability web template path
+func (s *brainsServer) abilityWebTemplatePath(brainKey, abilityKey, path string) string {
+	return s.abilityWebTemplatePattern(brainKey, abilityKey, path) + ".html"
 }
 
 // handleWebsocketDisconnected handles the disconnected websocket event

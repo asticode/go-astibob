@@ -111,13 +111,29 @@ func (s *clientsServer) handleWebGET(rw http.ResponseWriter, r *http.Request, p 
 	}
 }
 
+// TemplateDataAbilityWebTemplate represents ability web template data
+type TemplateDataAbilityWebTemplate struct {
+	Ability        string
+	APIBasePattern string
+	Brain          string
+}
+
 // templateData returns a template data.
 func (s *clientsServer) templateData(r *http.Request, p httprouter.Params, name *string, code *int) (data interface{}) {
 	// Switch on name
 	switch *name {
 	case "/errors/404.html":
 		*code = http.StatusNotFound
-	case "/index.html":
+	default:
+		// Ability web template
+		if matches := regexpAbilityWebTemplatePattern.FindAllStringSubmatch(*name, -1); len(matches) > 0 && len(matches[0]) >= 3 {
+			t := TemplateDataAbilityWebTemplate{
+				Ability: matches[0][2],
+				Brain:   matches[0][1],
+			}
+			t.APIBasePattern = fmt.Sprintf(serverPatternAPI+"/brains/%s/abilities/%s", t.Brain, t.Ability)
+			data = t
+		}
 	}
 	return
 }

@@ -1,4 +1,12 @@
 let base = {
+    // Attributes
+
+    ability: "",
+    apiBasePattern: "",
+    brain: "",
+
+    // Functions
+
     finish: function() {
         asticode.loader.hide();
     },
@@ -157,13 +165,6 @@ let base = {
         }
     },
     apiPattern: function(pattern) {
-        // TODO Inject in page instead
-        let items = window.location.pathname.split("/");
-        if (items.length >= 7) {
-            items[1] = "api";
-            items = items.splice(0, 6);
-            pattern = items.join("/") + pattern
-        }
-        return pattern;
+        return base.apiBasePattern + pattern
     }
 };
