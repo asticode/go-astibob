@@ -1,18 +1,67 @@
-#index {
-    display: flex;
-    flex-flow: row wrap;
+.index-brain-name {
+    border-bottom: solid 1px #333;
+    margin: 20px 20px 10px 20px;
+}
+
+.panel-wrapper {
     position: relative;
 }
 
 .panel {
     background-color: #fff;
-    border: solid 1px #e7e7e7;
+    border: solid 1px #dedee0;
     color: #5E6668;
-    margin: 20px;
+    margin-bottom: 20px;
     padding: 20px;
     position: relative;
-    min-width: 400px;
-    width: 20%;
+}
+
+@media screen and (max-width: 1024px) {
+    .panel-wrapper {
+        width: 100%;
+    }
+
+    .panel {
+        margin-left: 20px;
+        margin-right: 20px;
+    }
+}
+
+@media screen and (min-width: 1024px) and (max-width: 1600px) {
+    .panel-wrapper {
+        width: 50%;
+    }
+
+    .panel-wrapper:nth-child(2n) .panel {
+        margin-left: 10px;
+        margin-right: 20px;
+    }
+
+    .panel-wrapper:nth-child(2n+1) .panel {
+        margin-left: 20px;
+        margin-right: 10px;
+    }
+}
+
+@media screen and (min-width: 1600px) {
+    .panel-wrapper {
+        width: 33%;
+    }
+
+    .panel-wrapper:nth-child(3n) .panel {
+        margin-left: 20px;
+        margin-right: 10px;
+    }
+
+    .panel-wrapper:nth-child(3n+1) .panel {
+        margin-left: 20px;
+        margin-right: 10px;
+    }
+
+    .panel-wrapper:nth-child(3n+2) .panel {
+        margin-left: 10px;
+        margin-right: 10px;
+    }
 }
 
 .panel a {

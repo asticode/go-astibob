@@ -15,15 +15,6 @@ func (i *Interface) Name() string {
 	return Name
 }
 
-// Say creates a say cmd
-func (i *Interface) Say(s string) *astibob.Cmd {
-	return &astibob.Cmd{
-		AbilityName: Name,
-		EventName:   websocketEventNameSay,
-		Payload:     s,
-	}
-}
-
 // UI implements the astibob.UIDisplayer interface
 func (i *Interface) UI() *astibob.UI {
 	return &astibob.UI{
@@ -33,6 +24,15 @@ func (i *Interface) UI() *astibob.UI {
 		WebTemplates: map[string]string{
 			"/index": i.webTemplateIndex(),
 		},
+	}
+}
+
+// Say creates a say cmd
+func (i *Interface) Say(s string) *astibob.Cmd {
+	return &astibob.Cmd{
+		AbilityName: Name,
+		EventName:   websocketEventNameSay,
+		Payload:     s,
 	}
 }
 

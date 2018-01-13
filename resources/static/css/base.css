@@ -55,7 +55,7 @@ a {
 /* menu */
 
 #menu {
-    padding: 20px;
+    padding: 30px;
     vertical-align: top;
 }
 
@@ -63,15 +63,22 @@ a {
     margin-bottom: 20px;
 }
 
+.menu-brain-name {
+    border-bottom: solid 1px #e7e7e7;
+}
+
 .menu-brain > div:first-child {
     margin-bottom: 9px;
 }
 
-.menu-brain > div:last-child {
-    margin-left: 40px;
-}
-
 /* content */
+
 #content {
     vertical-align: top;
+}
+
+.flex {
+    display: flex;
+    flex-flow: row wrap;
+    position: relative;
 }

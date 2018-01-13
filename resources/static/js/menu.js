@@ -1,6 +1,7 @@
 let menu = {
     // Attributes
     brains: {},
+    brainsCount: 0,
 
     // Init
 
@@ -29,6 +30,9 @@ let menu = {
 
         // Append to pool
         menu.brains[brain.name] = brain;
+
+        // Update brains count
+        menu.updateBrainsCount(1);
     },
     newBrain: function(data) {
         // Init
@@ -42,7 +46,7 @@ let menu = {
         r.html.wrapper = $(`<div class="menu-brain"></div>`);
 
         // Create name
-        let name = $(`<div>` + data.name + `</div>`);
+        let name = $(`<div class="menu-brain-name">` + data.name + `</div>`);
         name.appendTo(r.html.wrapper);
 
         // Create table
@@ -58,10 +62,31 @@ let menu = {
         return r
     },
     removeBrain: function(data) {
+        // Fetch brain
         let brain = menu.brains[data.name];
+
+        // Brain exists
         if (typeof brain !== "undefined") {
+            // Remove HTML
             brain.html.wrapper.remove();
-            delete(menu.brains[data.name])
+
+            // Delete from pool
+            delete(menu.brains[data.name]);
+
+            // Update brains count
+            menu.updateBrainsCount(-1);
+        }
+    },
+    updateBrainsCount: function(delta) {
+        // Update brains count
+        menu.brainsCount += delta;
+
+        // Hide brain name
+        let sel = $(".menu-brain-name");
+        if (menu.brainsCount > 1) {
+            sel.show();
+        } else {
+            sel.hide();
         }
     },
 
@@ -126,12 +151,21 @@ let menu = {
         return r;
     },
     updateToggle: function(data) {
+        // Fetch brain
         let brain = menu.brains[data.brain_name];
+
+        // Brain exists
         if (typeof brain !== "undefined") {
+            // Fetch ability
             let ability = brain.abilities[data.name];
+
+            // Ability exists
             if (typeof ability !== "undefined") {
+                // Update class
                 ability.html.toggle.removeClass(data.is_on ? "off" : "on");
                 ability.html.toggle.addClass(data.is_on ? "on" : "off");
+
+                // Update attribute
                 ability.is_on = data.is_on;
             }
         }
