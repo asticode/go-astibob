@@ -10,6 +10,11 @@ func NewInterface() *Interface {
 	return &Interface{}
 }
 
+// Name implements the astibob.Interface interface
+func (i *Interface) Name() string {
+	return Name
+}
+
 // Say creates a say cmd
 func (i *Interface) Say(s string) *astibob.Cmd {
 	return &astibob.Cmd{
@@ -17,4 +22,39 @@ func (i *Interface) Say(s string) *astibob.Cmd {
 		EventName:   websocketEventNameSay,
 		Payload:     s,
 	}
+}
+
+// UI implements the astibob.UIDisplayer interface
+func (i *Interface) UI() *astibob.UI {
+	return &astibob.UI{
+		Description: "Says words to your audio output using speech synthesis",
+		Homepage:    "/index",
+		Title:       "Speaking",
+		WebTemplates: map[string]string{
+			"/index": i.webTemplateIndex(),
+		},
+	}
+}
+
+// webTemplateIndex returns the index web template
+func (i *Interface) webTemplateIndex() string {
+	return `{{ define "title" }}Speaking{{ end }}
+{{ define "css" }}{{ end }}
+{{ define "html" }}
+    caca
+{{ end }}
+{{ define "js" }}
+<script type="text/javascript">
+	let speaking = {
+		init: function() {
+			base.init(null, function(data) {
+				// Finish
+				base.finish();
+			});
+		}
+	}
+	speaking.init();
+</script>
+{{ end }}
+{{ template "base" . }}`
 }

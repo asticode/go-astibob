@@ -30,7 +30,7 @@ let base = {
                     menu.init(data);
 
                     // Custom function
-                    pageFunc();
+                    pageFunc(data);
                 }, function() {
                     asticode.loader.hide();
                 });
@@ -78,9 +78,8 @@ let base = {
                 };
                 base.ws.onmessage = function(event) {
                     let data = JSON.parse(event.data);
-                    if (!base.websocketFunc(data.event_name, data.payload)) {
-                        websocketFunc(data.event_name, data.payload);
-                    }
+                    base.websocketFunc(data.event_name, data.payload);
+                    websocketFunc(data.event_name, data.payload);
                 };
             },
         });
@@ -134,10 +133,7 @@ let base = {
             case consts.websocket.eventNames.brainRegistered:
                 menu.addBrain(payload);
                 break;
-            default:
-                return false;
         }
-        return true;
     },
     addInAlphabeticalOrder: function(rootSelector, data, map) {
         // Find proper key

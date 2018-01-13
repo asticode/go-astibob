@@ -32,6 +32,9 @@ func main() {
 		return false
 	})
 
+	// Declare interface
+	bob.Declare(speaking)
+
 	// Run Bob
 	if err = bob.Run(ctx); err != nil {
 		astilog.Fatal(errors.Wrap(err, "main: running bob failed"))

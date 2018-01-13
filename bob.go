@@ -3,7 +3,6 @@ package astibob
 import (
 	"context"
 	"path/filepath"
-	"text/template"
 
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/template"
@@ -21,6 +20,7 @@ type Bob struct {
 	dispatcher    *dispatcher
 	interfaces    *interfaces
 	o             Options
+	templater     *astitemplate.Templater
 }
 
 // Options are Bob options.
@@ -40,19 +40,17 @@ func New(o Options) (b *Bob, err error) {
 		o:          o,
 	}
 
-	// Parse templates
-	astilog.Debugf("astibob: parsing templates in %s", b.o.ResourcesDirectory)
-	var t map[string]*template.Template
-	if t, err = astitemplate.ParseDirectoryWithLayouts(filepath.Join(b.o.ResourcesDirectory, "templates", "pages"), filepath.Join(b.o.ResourcesDirectory, "templates", "layouts"), ".html"); err != nil {
-		err = errors.Wrapf(err, "astibob: parsing templates in resources directory %s failed", b.o.ResourcesDirectory)
+	// Create templater
+	if b.templater, err = astitemplate.NewTemplater(filepath.Join(b.o.ResourcesDirectory, "templates", "pages"), filepath.Join(b.o.ResourcesDirectory, "templates", "layouts"), ".html"); err != nil {
+		err = errors.Wrapf(err, "astibob: creating templater with resources directory %s failed", b.o.ResourcesDirectory)
 		return
 	}
 
 	// Create servers
 	brainsWs := astiws.NewManager(o.BrainsServer.MaxMessageSize)
 	clientsWs := astiws.NewManager(o.ClientsServer.MaxMessageSize)
-	b.clientsServer = newClientsServer(t, b.brains, clientsWs, b.stop, o)
-	b.brainsServer = newBrainsServer(b.brains, brainsWs, clientsWs, b.dispatcher, b.interfaces, o.BrainsServer)
+	b.clientsServer = newClientsServer(b.templater, b.brains, clientsWs, b.stop, o)
+	b.brainsServer = newBrainsServer(b.templater, b.brains, brainsWs, clientsWs, b.dispatcher, b.interfaces, o.BrainsServer)
 	return
 }
 

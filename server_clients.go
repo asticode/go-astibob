@@ -5,15 +5,21 @@ import (
 	"fmt"
 	"net/http"
 	"path/filepath"
-	"text/template"
 
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/http"
+	"github.com/asticode/go-astitools/template"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
+)
+
+// Server patterns
+const (
+	serverPatternAPI = "/api"
+	serverPatternWeb = "/web"
 )
 
 // Clients websocket events
@@ -30,17 +36,19 @@ const (
 // clientsServer is a server for the clients
 type clientsServer struct {
 	*server
-	brains   *brains
-	stopFunc func()
+	brains    *brains
+	stopFunc  func()
+	templater *astitemplate.Templater
 }
 
 // newClientsServer creates a new clients server.
-func newClientsServer(t map[string]*template.Template, brains *brains, clientsWs *astiws.Manager, stopFunc func(), o Options) (s *clientsServer) {
+func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager, stopFunc func(), o Options) (s *clientsServer) {
 	// Create server
 	s = &clientsServer{
-		brains:   brains,
-		server:   newServer("clients", clientsWs, o.ClientsServer),
-		stopFunc: stopFunc,
+		brains:    b,
+		server:    newServer("clients", cWs, o.ClientsServer),
+		stopFunc:  stopFunc,
+		templater: t,
 	}
 
 	// Init router
@@ -51,22 +59,22 @@ func newClientsServer(t map[string]*template.Template, brains *brains, clientsWs
 
 	// Web
 	r.GET("/", s.handleHomepageGET)
-	r.GET("/web/*page", s.handleWebGET(t))
+	r.GET(serverPatternWeb+"/*page", s.handleWebGET)
 
 	// Websockets
 	r.GET("/websocket", s.handleWebsocketGET)
 
 	// API
-	r.GET("/api/bob", s.handleAPIBobGET)
-	r.GET("/api/bob/stop", s.handleAPIBobStopGET)
-	r.GET("/api/ok", s.handleAPIOKGET)
-	r.GET("/api/references", s.handleAPIReferencesGET)
+	r.GET(serverPatternAPI+"/bob", s.handleAPIBobGET)
+	r.GET(serverPatternAPI+"/bob/stop", s.handleAPIBobStopGET)
+	r.GET(serverPatternAPI+"/ok", s.handleAPIOKGET)
+	r.GET(serverPatternAPI+"/references", s.handleAPIReferencesGET)
 
 	// Chain middlewares
 	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(o.ClientsServer.Username, o.ClientsServer.Password))
-	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{"/web/", "/api/"}, astihttp.MiddlewareTimeout(o.ClientsServer.Timeout))
-	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{"/web/"}, astihttp.MiddlewareContentType("text/html; charset=UTF-8"))
-	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{"/api/"}, astihttp.MiddlewareContentType("application/json"))
+	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternWeb + "/", serverPatternAPI + "/"}, astihttp.MiddlewareTimeout(o.ClientsServer.Timeout))
+	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternWeb + "/"}, astihttp.MiddlewareContentType("text/html; charset=UTF-8"))
+	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternAPI + "/"}, astihttp.MiddlewareContentType("application/json"))
 
 	// Set handler
 	s.setHandler(h)
@@ -75,31 +83,30 @@ func newClientsServer(t map[string]*template.Template, brains *brains, clientsWs
 
 // handleHomepageGET handles the homepage.
 func (s *clientsServer) handleHomepageGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	http.Redirect(rw, r, "/web/index", http.StatusPermanentRedirect)
+	http.Redirect(rw, r, serverPatternWeb+"/index", http.StatusPermanentRedirect)
 }
 
 // handleWebGET handles the Web pages.
-func (s *clientsServer) handleWebGET(t map[string]*template.Template) httprouter.Handle {
-	return func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		// Check if template exists
-		var name = p.ByName("page") + ".html"
-		if _, ok := t[name]; !ok {
-			name = "/errors/404.html"
-		}
+func (s *clientsServer) handleWebGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	// Check if template exists
+	var name = p.ByName("page") + ".html"
+	if _, ok := s.templater.Template(name); !ok {
+		name = "/errors/404.html"
+	}
 
-		// Get data
-		var code = http.StatusOK
-		var data interface{}
-		data = s.templateData(r, p, &name, &code)
+	// Get data
+	var code = http.StatusOK
+	var data interface{}
+	data = s.templateData(r, p, &name, &code)
 
-		// Write header
-		rw.WriteHeader(code)
+	// Write header
+	rw.WriteHeader(code)
 
-		// Execute template
-		if err := t[name].Execute(rw, data); err != nil {
-			astilog.Error(errors.Wrapf(err, "astibob: executing %s template with data %#v failed", name, data))
-			return
-		}
+	// Execute template
+	tpl, _ := s.templater.Template(name)
+	if err := tpl.Execute(rw, data); err != nil {
+		astilog.Error(errors.Wrapf(err, "astibob: executing %s template with data %#v failed", name, data))
+		return
 	}
 }
 

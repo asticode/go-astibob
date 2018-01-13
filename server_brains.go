@@ -8,6 +8,7 @@ import (
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/http"
+	"github.com/asticode/go-astitools/template"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
@@ -21,17 +22,19 @@ type brainsServer struct {
 	clientsWs  *astiws.Manager
 	dispatcher *dispatcher
 	interfaces *interfaces
+	templater  *astitemplate.Templater
 }
 
 // newBrainsServer creates a new brains server.
-func newBrainsServer(brains *brains, brainsWs *astiws.Manager, clientsWs *astiws.Manager, dispatcher *dispatcher, interfaces *interfaces, o ServerOptions) (s *brainsServer) {
+func newBrainsServer(t *astitemplate.Templater, b *brains, bWs *astiws.Manager, cWs *astiws.Manager, d *dispatcher, i *interfaces, o ServerOptions) (s *brainsServer) {
 	// Create server
 	s = &brainsServer{
-		brains:     brains,
-		clientsWs:  clientsWs,
-		dispatcher: dispatcher,
-		interfaces: interfaces,
-		server:     newServer("brains", brainsWs, o),
+		brains:     b,
+		clientsWs:  cWs,
+		dispatcher: d,
+		interfaces: i,
+		server:     newServer("brains", bWs, o),
+		templater:  t,
 	}
 
 	// Init router
@@ -90,6 +93,26 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l)
 				}
 			}
+
+			// Add UI
+			if v, ok := i.(UIDisplayer); ok {
+				// Set UI
+				a.ui = v.UI()
+
+				// Update homepage
+				if len(a.ui.Homepage) > 0 {
+					a.ui.Homepage = serverPatternWeb + s.webTemplatePattern(b.name, a.name, a.ui.Homepage)
+				}
+
+				// Add web templates
+				if a.ui.WebTemplates != nil {
+					for path, content := range a.ui.WebTemplates {
+						if err := s.templater.Add(s.webTemplatePath(b.name, a.name, path), content); err != nil {
+							astilog.Error(errors.Wrapf(err, "astibob: adding web template for brain %s, ability %s and path %s", b.name, a.name, path))
+						}
+					}
+				}
+			}
 		}
 
 		// Add ability
@@ -122,9 +145,30 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	return nil
 }
 
+// webTemplatePattern returns the web template pattern
+func (s *brainsServer) webTemplatePattern(brainName, abilityName, path string) string {
+	return fmt.Sprintf("/brains/%s/abilities/%s%s", brainName, abilityName, path)
+}
+
+// webTemplatePath returns the web template path
+func (s *brainsServer) webTemplatePath(brainName, abilityName, path string) string {
+	return s.webTemplatePattern(brainName, abilityName, path) + ".html"
+}
+
 // handleWebsocketDisconnected handles the disconnected websocket event
 func (s *brainsServer) handleWebsocketDisconnected(b *brain) astiws.ListenerFunc {
 	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
+		// Loop through abilities
+		b.abilities(func(a *ability) error {
+			// Remove web templates
+			if a.ui != nil && a.ui.WebTemplates != nil {
+				for path := range a.ui.WebTemplates {
+					s.templater.Del(s.webTemplatePath(b.name, a.name, path))
+				}
+			}
+			return nil
+		})
+
 		// Delete brain
 		s.brains.del(b)
 

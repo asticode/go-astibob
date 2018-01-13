@@ -89,13 +89,22 @@ let menu = {
             html: {},
             is_on: data.is_on,
             name: data.name,
+            ui: data.ui,
         };
 
+        // Create ui items
+        let description = data.name;
+        let title = data.name;
+        if (typeof r.ui !== "undefined") {
+            if (r.ui.title !== "") title = r.ui.title;
+            if (r.ui.description !== "") description = r.ui.description;
+        }
+
         // Create wrapper
-        r.html.wrapper = $(`<div class="row"></div>`);
+        r.html.wrapper = $(`<div class="row" title="` + description + `"></div>`);
 
         // Create name
-        let name = $(`<div class="cell" style="padding-right: 10px">` + data.name + `</div>`);
+        let name = $(`<div class="cell" style="padding-right: 10px">` + title + `</div>`);
         name.appendTo(r.html.wrapper);
 
         // Create toggle cell

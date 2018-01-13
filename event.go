@@ -57,9 +57,10 @@ func newEventBrain(b *brain) (o *EventBrain) {
 
 // EventAbility represents an ability event.
 type EventAbility struct {
-	BrainName string `json:"brain_name,omitempty"`
-	IsOn      bool   `json:"is_on"`
-	Name      string `json:"name"`
+	BrainName string   `json:"brain_name,omitempty"`
+	IsOn      bool     `json:"is_on"`
+	Name      string   `json:"name"`
+	UI        *EventUI `json:"ui,omitempty"`
 }
 
 // newEventAbility creates a new ability event
@@ -67,5 +68,25 @@ func newEventAbility(a *ability) *EventAbility {
 	return &EventAbility{
 		IsOn: a.isOn(),
 		Name: a.name,
+		UI:   newEventUI(a.ui),
+	}
+}
+
+// EventUI represents a UI event
+type EventUI struct {
+	Description string `json:"description"`
+	Homepage    string `json:"homepage"`
+	Title       string `json:"title"`
+}
+
+// newEventUI creates a new UI event
+func newEventUI(ui *UI) *EventUI {
+	if ui == nil {
+		return nil
+	}
+	return &EventUI{
+		Description: ui.Description,
+		Homepage:    ui.Homepage,
+		Title:       ui.Title,
 	}
 }

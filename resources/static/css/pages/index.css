@@ -1,0 +1,27 @@
+#index {
+    display: flex;
+    flex-flow: row wrap;
+    position: relative;
+}
+
+.panel {
+    background-color: #fff;
+    border: solid 1px #e7e7e7;
+    color: #5E6668;
+    margin: 20px;
+    padding: 20px;
+    position: relative;
+    min-width: 400px;
+    width: 20%;
+}
+
+.panel a {
+    color: #5E6668;
+}
+
+.panel .title {
+    color: #474F51;
+    font-size: 20px;
+    margin-bottom: 12px;
+    position: relative;
+}

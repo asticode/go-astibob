@@ -7,6 +7,15 @@ type ability struct {
 	o    bool
 	m    sync.Mutex
 	name string
+	ui   *UI
+}
+
+// UI represents the UI info
+type UI struct {
+	Description  string
+	Homepage     string
+	Title        string
+	WebTemplates map[string]string
 }
 
 // newAbility creates a new ability
