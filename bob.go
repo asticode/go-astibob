@@ -4,6 +4,9 @@ import (
 	"context"
 	"path/filepath"
 
+	"regexp"
+	"strings"
+
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/template"
 	"github.com/asticode/go-astiws"
@@ -137,4 +140,12 @@ func dispatchWsEventToClient(c *astiws.Client, name string, payload interface{})
 // On adds a listener to an event
 func (b *Bob) On(eventName string, l Listener) {
 	b.dispatcher.addListener(eventName, l)
+}
+
+// regexpKey represents the key regexp
+var regexpKey = regexp.MustCompile("[^\\w]+")
+
+// key creates a key based on a name
+func key(name string) string {
+	return regexpKey.ReplaceAllString(strings.ToLower(name), "-")
 }

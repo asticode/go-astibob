@@ -111,22 +111,21 @@ let menu = {
         // Create results
         let r = {
             brain_name: brain.name,
+            description: data.description,
             html: {},
             is_on: data.is_on,
             name: data.name,
-            ui: data.ui,
+            web_homepage: data.web_homepage,
         };
 
-        // Create ui items
-        let description = data.name;
-        let title = data.name;
-        if (typeof r.ui !== "undefined") {
-            if (r.ui.title !== "") title = r.ui.title;
-            if (r.ui.description !== "") description = r.ui.description;
-        }
-
         // Create wrapper
-        r.html.wrapper = $(`<div class="row" title="` + description + `"></div>`);
+        r.html.wrapper = $(`<div class="row" title="` + r.description + `"></div>`);
+
+        // Create title
+        let title = r.name;
+        if (typeof r.web_homepage !== "undefined") {
+            title = "<a href='" + r.web_homepage + "'>" + title + "</a>";
+        }
 
         // Create name
         let name = $(`<div class="cell" style="padding-right: 10px">` + title + `</div>`);

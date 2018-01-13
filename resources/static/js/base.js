@@ -79,7 +79,9 @@ let base = {
                 base.ws.onmessage = function(event) {
                     let data = JSON.parse(event.data);
                     base.websocketFunc(data.event_name, data.payload);
-                    websocketFunc(data.event_name, data.payload);
+                    if (websocketFunc !== null) {
+                        websocketFunc(data.event_name, data.payload);
+                    }
                 };
             },
         });
@@ -153,5 +155,15 @@ let base = {
         } else {
             rootSelector.append(data.html.wrapper);
         }
+    },
+    apiPattern: function(pattern) {
+        // TODO Inject in page instead
+        let items = window.location.pathname.split("/");
+        if (items.length >= 7) {
+            items[1] = "api";
+            items = items.splice(0, 6);
+            pattern = items.join("/") + pattern
+        }
+        return pattern;
     }
 };

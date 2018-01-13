@@ -2,7 +2,7 @@ package astispeaking
 
 // Constants
 const (
-	Name = "speaking"
+	Name = "Speaking"
 )
 
 // Websocket event names

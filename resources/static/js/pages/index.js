@@ -51,7 +51,7 @@ let index = {
         r.html.wrapper = $(`<div class="index-brain"></div>`);
 
         // Create name
-        let name = $(`<div class="index-brain-name">` + data.name + `</div>`);
+        let name = $(`<div class="index-brain-name header">` + data.name + `</div>`);
         name.appendTo(r.html.wrapper);
 
         // Create flex
@@ -84,11 +84,11 @@ let index = {
     },
     updateBrainsCount: function(delta) {
         // Update brains count
-        menu.brainsCount += delta;
+        index.brainsCount += delta;
 
         // Hide brain name
         let sel = $(".index-brain-name");
-        if (menu.brainsCount > 1) {
+        if (index.brainsCount > 1) {
             sel.show();
         } else {
             sel.hide();
@@ -116,35 +116,33 @@ let index = {
         // Create results
         let r = {
             brain_name: brain.name,
+            description: data.description,
             html: {},
             is_on: data.is_on,
             name: data.name,
-            ui: data.ui,
+            web_homepage: data.web_homepage,
         };
-
-        // Create ui items
-        let description = data.name;
-        let homepage = "";
-        let title = data.name;
-        if (typeof r.ui !== "undefined") {
-            if (r.ui.description !== "") description = r.ui.description;
-            if (r.ui.homepage !== "") homepage = "<a href='" + r.ui.homepage + "' style='position: absolute; right: 0;'><i class='fa fa-cog'></i></a>";
-            if (r.ui.title !== "") title = r.ui.title;
-        }
 
         // Create wrapper
         r.html.wrapper = $(`<div class="panel-wrapper"></div>`);
 
+        // Create link
+        let wrapper = r.html.wrapper;
+        if (typeof r.web_homepage !== "undefined") {
+            wrapper = $(`<a href="` + r.web_homepage + `"></a>`);
+            wrapper.appendTo(r.html.wrapper);
+        }
+
         // Create panel
         let panel = $(`<div class="panel"></div>`);
-        panel.appendTo(r.html.wrapper);
+        panel.appendTo(wrapper);
 
         // Create name
-        let name = $(`<div class="title">` + title + homepage + `</div>`);
+        let name = $(`<div class="title">` + r.name + `</div>`);
         name.appendTo(panel);
 
         // Create description
-        let cell = $(`<div class="description">` + description + `</div>`);
+        let cell = $(`<div class="description">` + r.description + `</div>`);
         cell.appendTo(panel);
         return r;
     },

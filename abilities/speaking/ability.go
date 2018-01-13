@@ -40,6 +40,11 @@ func (a *Ability) Name() string {
 	return Name
 }
 
+// Description implements the astibrain.Ability interface
+func (a *Ability) Description() string {
+	return "Says words to your audio output using speech synthesis"
+}
+
 // Activate implements the astibrain.Activable interface
 func (a *Ability) Activate(activated bool) {
 	a.m.Lock()

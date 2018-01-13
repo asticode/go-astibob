@@ -43,6 +43,11 @@ func (a *Ability) Name() string {
 	return Name
 }
 
+// Description implements the astibrain.Ability interface
+func (a *Ability) Description() string {
+	return "Listens to an audio input and dispatches audio samples"
+}
+
 // PayloadSamples represents the samples payload
 type PayloadSamples struct {
 	SampleRate           int     `json:"sample_rate"`

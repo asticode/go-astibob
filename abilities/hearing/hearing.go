@@ -2,7 +2,7 @@ package astihearing
 
 // Constants
 const (
-	Name = "hearing"
+	Name = "Hearing"
 )
 
 // SampleReader represents a sample reader

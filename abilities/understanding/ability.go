@@ -52,6 +52,11 @@ func (a *Ability) Name() string {
 	return Name
 }
 
+// Description implements the astibrain.Ability interface
+func (a *Ability) Description() string {
+	return "Executes a speech to text analysis on audio samples"
+}
+
 // Run implements the astibrain.Runnable interface
 func (a *Ability) Run(ctx context.Context) (err error) {
 	// Reset

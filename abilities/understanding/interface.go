@@ -35,14 +35,6 @@ func (i *Interface) Name() string {
 	return Name
 }
 
-// UI implements the astibob.UIDisplayer interface
-func (i *Interface) UI() *astibob.UI {
-	return &astibob.UI{
-		Description: "Executes a speech to text analysis on audio samples",
-		Title:       "Understanding",
-	}
-}
-
 // Samples creates a samples cmd
 func (i *Interface) Samples(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) *astibob.Cmd {
 	return &astibob.Cmd{

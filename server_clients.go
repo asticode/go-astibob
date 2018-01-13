@@ -69,6 +69,7 @@ func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager,
 	r.GET(serverPatternAPI+"/bob/stop", s.handleAPIBobStopGET)
 	r.GET(serverPatternAPI+"/ok", s.handleAPIOKGET)
 	r.GET(serverPatternAPI+"/references", s.handleAPIReferencesGET)
+	r.GET(serverPatternAPI+"/brains/:brain/abilities/:ability/*path", s.handleAPICustomGET)
 
 	// Chain middlewares
 	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(o.ClientsServer.Username, o.ClientsServer.Password))
@@ -193,8 +194,8 @@ type APIError struct {
 	Message string `json:"message"`
 }
 
-// apiWriteError writes an API error
-func apiWriteError(rw http.ResponseWriter, code int, err error) {
+// APIWriteError writes an API error
+func APIWriteError(rw http.ResponseWriter, code int, err error) {
 	rw.WriteHeader(code)
 	astilog.Error(err)
 	if err := json.NewEncoder(rw).Encode(APIError{Message: err.Error()}); err != nil {
@@ -202,17 +203,17 @@ func apiWriteError(rw http.ResponseWriter, code int, err error) {
 	}
 }
 
-// apiWrite writes API data
-func apiWrite(rw http.ResponseWriter, data interface{}) {
+// APIWrite writes API data
+func APIWrite(rw http.ResponseWriter, data interface{}) {
 	if err := json.NewEncoder(rw).Encode(data); err != nil {
-		apiWriteError(rw, http.StatusInternalServerError, errors.Wrap(err, "astibob: json encoding failed"))
+		APIWriteError(rw, http.StatusInternalServerError, errors.Wrap(err, "astibob: json encoding failed"))
 		return
 	}
 }
 
 // handleAPIBobGET returns Bob's information.
 func (s *clientsServer) handleAPIBobGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	apiWrite(rw, newEventBob(s.brains))
+	APIWrite(rw, newEventBob(s.brains))
 }
 
 // handleAPIBobStopGET stops Bob.
@@ -234,8 +235,38 @@ type APIReferences struct {
 
 // handleAPIReferencesGET returns the references.
 func (s *clientsServer) handleAPIReferencesGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	apiWrite(rw, APIReferences{
+	APIWrite(rw, APIReferences{
 		WsURL:        "ws://" + s.o.PublicAddr + "/websocket",
 		WsPingPeriod: int(astiws.PingPeriod.Seconds()),
 	})
+}
+
+// handleAPICustomGET returns the custom API handler
+func (s *clientsServer) handleAPICustomGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	// Fetch brain
+	b, ok := s.brains.brainByKey(p.ByName("brain"))
+	if !ok {
+		astilog.Errorf("astibob: unknown brain key %s", p.ByName("brain"))
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Fetch ability
+	a, ok := b.abilityByKey(p.ByName("ability"))
+	if !ok {
+		astilog.Errorf("astibob: unknown ability key %s for brain key %s", p.ByName("ability"), p.ByName("brain"))
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Fetch handler
+	h, ok := a.apiHandler(p.ByName("path"))
+	if !ok {
+		astilog.Errorf("astibob: unknown API handler %s for ability key %s and brain key %s", p.ByName("path"), p.ByName("ability"), p.ByName("brain"))
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Execute handler
+	h.ServeHTTP(rw, r)
 }

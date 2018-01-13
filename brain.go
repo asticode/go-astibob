@@ -8,8 +8,10 @@ import (
 
 // brain is a brain as Bob knows it
 type brain struct {
-	a    map[string]*ability
-	m    sync.Mutex // Locks a
+	k    map[string]*ability // Indexed by key
+	key  string
+	m    sync.Mutex          // Locks a
+	n    map[string]*ability // Indexed by name
 	name string
 	ws   *astiws.Client
 }
@@ -17,7 +19,9 @@ type brain struct {
 // newBrain creates a new brain
 func newBrain(name string, ws *astiws.Client) *brain {
 	return &brain{
-		a:    make(map[string]*ability),
+		k:    make(map[string]*ability),
+		key:  key(name),
+		n:    make(map[string]*ability),
 		name: name,
 		ws:   ws,
 	}
@@ -27,7 +31,15 @@ func newBrain(name string, ws *astiws.Client) *brain {
 func (b *brain) ability(name string) (a *ability, ok bool) {
 	b.m.Lock()
 	defer b.m.Unlock()
-	a, ok = b.a[name]
+	a, ok = b.n[name]
+	return
+}
+
+// abilityByKey returns a specific ability based on its key.
+func (b *brain) abilityByKey(key string) (a *ability, ok bool) {
+	b.m.Lock()
+	defer b.m.Unlock()
+	a, ok = b.k[key]
 	return
 }
 
@@ -36,7 +48,7 @@ func (b *brain) ability(name string) (a *ability, ok bool) {
 func (b *brain) abilities(fn func(a *ability) error) (err error) {
 	b.m.Lock()
 	defer b.m.Unlock()
-	for _, a := range b.a {
+	for _, a := range b.n {
 		if err = fn(a); err != nil {
 			return
 		}
@@ -48,5 +60,6 @@ func (b *brain) abilities(fn func(a *ability) error) (err error) {
 func (b *brain) set(a *ability) {
 	b.m.Lock()
 	defer b.m.Unlock()
-	b.a[a.name] = a
+	b.k[a.key] = a
+	b.n[a.name] = a
 }

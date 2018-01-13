@@ -1,29 +1,39 @@
 package astibob
 
-import "sync"
+import (
+	"sync"
+
+	"net/http"
+)
 
 // ability represents an ability
 type ability struct {
-	o    bool
-	m    sync.Mutex
-	name string
-	ui   *UI
-}
-
-// UI represents the UI info
-type UI struct {
-	Description  string
-	Homepage     string
-	Title        string
-	WebTemplates map[string]string
+	apiHandlers map[string]http.Handler
+	description string
+	key         string
+	o           bool
+	m           sync.Mutex
+	name        string
+	webHomepage    string
 }
 
 // newAbility creates a new ability
-func newAbility(name string, isOn bool) *ability {
+func newAbility(name, description string, isOn bool) *ability {
 	return &ability{
-		o:    isOn,
-		name: name,
+		apiHandlers: make(map[string]http.Handler),
+		description: description,
+		key:         key(name),
+		o:           isOn,
+		name:        name,
 	}
+}
+
+// apiHandler returns the API handler based on its path
+func (a *ability) apiHandler(path string) (h http.Handler, ok bool) {
+	a.m.Lock()
+	defer a.m.Unlock()
+	h, ok = a.apiHandlers[path]
+	return
 }
 
 // isOn returns whether the ability is on

@@ -74,11 +74,80 @@ a {
 /* content */
 
 #content {
+    padding: 20px;
     vertical-align: top;
+}
+
+#content .header {
+    border-bottom: solid 1px #333;
+    margin-bottom: 10px;
 }
 
 .flex {
     display: flex;
     flex-flow: row wrap;
+    position: relative;
+}
+
+.panel-wrapper {
+    position: relative;
+}
+
+.panel {
+    background-color: #fff;
+    border: solid 1px #dedee0;
+    color: #5E6668;
+    margin-bottom: 6px;
+    padding: 20px;
+    position: relative;
+}
+
+@media screen and (max-width: 1024px) {
+    .panel-wrapper {
+        width: 100%;
+    }
+}
+
+@media screen and (min-width: 1024px) and (max-width: 1600px) {
+    .panel-wrapper {
+        width: 50%;
+    }
+
+    .panel-wrapper:nth-child(2n) .panel {
+        margin-left: 3px;
+    }
+
+    .panel-wrapper:nth-child(2n+1) .panel {
+        margin-right: 3px;
+    }
+}
+
+@media screen and (min-width: 1600px) {
+    .panel-wrapper {
+        width: 33.333333333%;
+    }
+
+    .panel-wrapper:nth-child(3n) .panel {
+        margin-left: 3px;
+    }
+
+    .panel-wrapper:nth-child(3n+1) .panel {
+        margin-right: 3px;
+    }
+
+    .panel-wrapper:nth-child(3n+2) .panel {
+        margin-left: 3px;
+        margin-right: 3px;
+    }
+}
+
+.panel a {
+    color: #5E6668;
+}
+
+.panel .title {
+    color: #474F51;
+    font-size: 20px;
+    margin-bottom: 12px;
     position: relative;
 }

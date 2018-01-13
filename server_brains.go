@@ -80,13 +80,21 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	var b = newBrain(ip.Name, c)
 
 	// Loop through abilities
+	var webTemplatesPaths []string
 	for _, pa := range ip.Abilities {
 		// Create ability
-		var a = newAbility(pa.Name, pa.IsOn)
+		var a = newAbility(pa.Name, pa.Description, pa.IsOn)
 
 		// Check if interface has been declared for this ability
 		i, ok := s.interfaces.get(a.name)
 		if ok {
+			// Add api handlers
+			if v, ok := i.(APIHandler); ok {
+				for path, h := range v.APIHandlers() {
+					a.apiHandlers[path] = h
+				}
+			}
+
 			// Add custom websocket listeners
 			if v, ok := i.(WebsocketListener); ok {
 				for n, l := range v.WebsocketListeners() {
@@ -94,22 +102,23 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 				}
 			}
 
-			// Add UI
-			if v, ok := i.(UIDisplayer); ok {
-				// Set UI
-				a.ui = v.UI()
+			// Add web templates
+			if v, ok := i.(WebTemplater); ok {
+				// Loop through templates
+				for path, content := range v.WebTemplates() {
+					// Add full path
+					fullPath := s.webTemplatePath(b.key, a.key, path)
 
-				// Update homepage
-				if len(a.ui.Homepage) > 0 {
-					a.ui.Homepage = serverPatternWeb + s.webTemplatePattern(b.name, a.name, a.ui.Homepage)
-				}
+					// Add template
+					if err := s.templater.Add(fullPath, content); err != nil {
+						astilog.Error(errors.Wrapf(err, "astibob: adding web template for brain %s, ability %s and path %s", b.name, a.name, fullPath))
+					} else {
+						webTemplatesPaths = append(webTemplatesPaths, fullPath)
+					}
 
-				// Add web templates
-				if a.ui.WebTemplates != nil {
-					for path, content := range a.ui.WebTemplates {
-						if err := s.templater.Add(s.webTemplatePath(b.name, a.name, path), content); err != nil {
-							astilog.Error(errors.Wrapf(err, "astibob: adding web template for brain %s, ability %s and path %s", b.name, a.name, path))
-						}
+					// Update web homepage
+					if path == "/index" {
+						a.webHomepage = serverPatternWeb + s.webTemplatePattern(b.key, a.key, path)
 					}
 				}
 			}
@@ -123,7 +132,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	s.brains.set(b)
 
 	// Adapt ws client
-	c.AddListener(astiws.EventNameDisconnect, s.handleWebsocketDisconnected(b))
+	c.AddListener(astiws.EventNameDisconnect, s.handleWebsocketDisconnected(b, webTemplatesPaths))
 	c.AddListener(astibrain.WebsocketEventNameAbilityStarted, s.handleWebsocketAbilityToggle(b))
 	c.AddListener(astibrain.WebsocketEventNameAbilityStopped, s.handleWebsocketAbilityToggle(b))
 	c.AddListener(astibrain.WebsocketEventNameAbilityCrashed, s.handleWebsocketAbilityToggle(b))
@@ -146,28 +155,22 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 }
 
 // webTemplatePattern returns the web template pattern
-func (s *brainsServer) webTemplatePattern(brainName, abilityName, path string) string {
-	return fmt.Sprintf("/brains/%s/abilities/%s%s", brainName, abilityName, path)
+func (s *brainsServer) webTemplatePattern(brainKey, abilityKey, path string) string {
+	return fmt.Sprintf("/brains/%s/abilities/%s%s", brainKey, abilityKey, path)
 }
 
 // webTemplatePath returns the web template path
-func (s *brainsServer) webTemplatePath(brainName, abilityName, path string) string {
-	return s.webTemplatePattern(brainName, abilityName, path) + ".html"
+func (s *brainsServer) webTemplatePath(brainKey, abilityKey, path string) string {
+	return s.webTemplatePattern(brainKey, abilityKey, path) + ".html"
 }
 
 // handleWebsocketDisconnected handles the disconnected websocket event
-func (s *brainsServer) handleWebsocketDisconnected(b *brain) astiws.ListenerFunc {
+func (s *brainsServer) handleWebsocketDisconnected(b *brain, webTemplatesPaths []string) astiws.ListenerFunc {
 	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
-		// Loop through abilities
-		b.abilities(func(a *ability) error {
-			// Remove web templates
-			if a.ui != nil && a.ui.WebTemplates != nil {
-				for path := range a.ui.WebTemplates {
-					s.templater.Del(s.webTemplatePath(b.name, a.name, path))
-				}
-			}
-			return nil
-		})
+		// Loop through web templates
+		for _, path := range webTemplatesPaths {
+			s.templater.Del(path)
+		}
 
 		// Delete brain
 		s.brains.del(b)

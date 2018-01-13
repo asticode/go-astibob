@@ -11,6 +11,7 @@ import (
 
 // Ability represents required methods of an ability
 type Ability interface {
+	Description() string
 	Name() string
 }
 
@@ -49,26 +50,28 @@ type AbilityOptions struct {
 
 // ability represents an ability.
 type ability struct {
-	a          Ability
-	cancel     context.CancelFunc
-	chanDone   chan error
-	ctx        context.Context
-	isOnUnsafe bool
-	m          sync.Mutex // Locks attributes
-	mr         sync.Mutex // Locks when ability is running
-	name       string
-	o          AbilityOptions
-	ws         *websocket
+	a           Ability
+	cancel      context.CancelFunc
+	chanDone    chan error
+	ctx         context.Context
+	description string
+	isOnUnsafe  bool
+	m           sync.Mutex // Locks attributes
+	mr          sync.Mutex // Locks when ability is running
+	name        string
+	o           AbilityOptions
+	ws          *websocket
 }
 
 // newAbility creates a new ability.
 func newAbility(a Ability, ws *websocket, o AbilityOptions) *ability {
 	return &ability{
-		a:        a,
-		chanDone: make(chan error),
-		name:     a.Name(),
-		o:        o,
-		ws:       ws,
+		a:           a,
+		chanDone:    make(chan error),
+		description: a.Description(),
+		name:        a.Name(),
+		o:           o,
+		ws:          ws,
 	}
 }
 

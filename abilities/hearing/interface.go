@@ -3,7 +3,6 @@ package astihearing
 import (
 	"encoding/json"
 
-	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
@@ -26,14 +25,6 @@ func NewInterface() *Interface {
 // Name implements the astibob.Interface interface
 func (i *Interface) Name() string {
 	return Name
-}
-
-// UI implements the astibob.UIDisplayer interface
-func (i *Interface) UI() *astibob.UI {
-	return &astibob.UI{
-		Description: "Listens to an audio input and dispatches audio samples",
-		Title:       "Hearing",
-	}
 }
 
 // OnSamples adds a callback executed upon receiving samples
