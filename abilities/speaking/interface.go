@@ -63,7 +63,7 @@ func (i *Interface) Say(s string) *astibob.Cmd {
 // APIHandlers implements the astibob.APIHandle interface
 func (i *Interface) APIHandlers() map[string]http.Handler {
 	return map[string]http.Handler{
-		"/history": i.apiHandlerHistory(),
+		"/": i.apiHandlerIndex(),
 	}
 }
 
@@ -72,8 +72,8 @@ type APIBody struct {
 	History []string `json:"history,omitempty"`
 }
 
-// apiHandlerHistory handles the history api request
-func (i *Interface) apiHandlerHistory() http.Handler {
+// apiHandlerIndex handles the index api request
+func (i *Interface) apiHandlerIndex() http.Handler {
 	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
 		i.m.Lock()
 		defer i.m.Unlock()
@@ -94,19 +94,19 @@ func (i *Interface) WebTemplates() map[string]string {
 func (i *Interface) webTemplateIndex() string {
 	return `{{ define "title" }}Speaking{{ end }}
 {{ define "css" }}{{ end }}
-{{ define "html" }}{{ end }}
+{{ define "html" }}
+	<div class="header">History</div>
+	<div class="flex" id="history"></div>
+{{ end }}
 {{ define "js" }}
 <script type="text/javascript">
 	let speaking = {
 		init: function() {
 			base.init(speaking.websocketFunc, function(data) {
 				// Fetch history
-				base.sendHttp(base.abilityAPIPattern("/history"), "GET", function(data) {
+				base.sendHttp(base.abilityAPIPattern("/"), "GET", function(data) {
 					// Display history
-					$("#content").append("<div class='header'>History</div>");
-					speaking.flex = $("<div class='flex'></div>");
-					speaking.flex.appendTo($("#content"));
-					if (typeof data.history !== "undefined" && data.history.length > 0) {
+					if (typeof data.history !== "undefined") {
 						for (let idx = 0; idx < data.history.length; idx++) {
 							speaking.addHistory(data.history[idx]);
 						}
@@ -121,7 +121,7 @@ func (i *Interface) webTemplateIndex() string {
 		},
 		addHistory: function(history) {
 			let wrapper = $("<div class='panel-wrapper'></div>");
-			wrapper.appendTo(speaking.flex);
+			wrapper.appendTo($("#history"));
 			let panel = $("<div class='panel'></div>");
 			panel.appendTo(wrapper);
 			panel.append(history);

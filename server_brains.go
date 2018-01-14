@@ -124,6 +124,15 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 				})
 			}
 
+			// Add static handlers
+			if v, ok := i.(StaticHandler); ok {
+				for path, h := range v.StaticHandlers() {
+					if _, ok := a.staticHandlers[path]; !ok {
+						a.staticHandlers[path] = h
+					}
+				}
+			}
+
 			// Add web templates
 			if v, ok := i.(WebTemplater); ok {
 				// Loop through templates

@@ -7,16 +7,20 @@ import (
 	"path/filepath"
 	"time"
 
+	"fmt"
+
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/sync"
 	"github.com/asticode/go-astiws"
 	"github.com/cryptix/wav"
 	"github.com/pkg/errors"
+	"github.com/rs/xid"
 )
 
 // Ability represents an object capable of doing speech to text analysis
 type Ability struct {
+	c            AbilityConfiguration
 	ch           chan PayloadSamples
 	d            *astisync.Do
 	dispatchFunc astibrain.DispatchFunc
@@ -24,13 +28,30 @@ type Ability struct {
 	sd           SilenceDetector
 }
 
+// AbilityConfiguration represents an ability configuration
+type AbilityConfiguration struct {
+	SamplesDirectory string `toml:"samples_directory"`
+	StoreSamples     bool   `toml:"store_samples"`
+}
+
 // NewAbility creates a new ability
-func NewAbility(p SpeechParser, sd SilenceDetector) *Ability {
-	return &Ability{
+func NewAbility(p SpeechParser, sd SilenceDetector, c AbilityConfiguration) (a *Ability, err error) {
+	// Create
+	a = &Ability{
+		c:  c,
 		d:  astisync.NewDo(),
 		p:  p,
 		sd: sd,
 	}
+
+	// Absolute paths
+	if len(a.c.SamplesDirectory) > 0 {
+		if a.c.SamplesDirectory, err = filepath.Abs(a.c.SamplesDirectory); err != nil {
+			err = errors.Wrapf(err, "astiunderstanding: filepath abs of %s failed", a.c.SamplesDirectory)
+			return
+		}
+	}
+	return
 }
 
 // SetDispatchFunc implements the astibrain.Dispatcher interface
@@ -84,51 +105,95 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 		// Execute speech to text analysis
 		start := time.Now()
 		astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
-		s := a.p.SpeechToText(samples, len(samples), sampleRate, significantBits)
+		text := a.p.SpeechToText(samples, len(samples), sampleRate, significantBits)
 		astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
 
-		// Store everything for later validation
-		path, err := a.storeSamples(samples, sampleRate, significantBits)
-		if err != nil {
-			astilog.Error(errors.Wrap(err, "astiunderstanding: storing samples failed"))
-		}
-		if len(path) > 0 {
-			astilog.Debugf("astiunderstanding: samples have been stored to %s", path)
+		// Dispatch analysis
+		if len(text) > 0 {
+			a.dispatchFunc(astibrain.Event{
+				AbilityName: name,
+				Name:        websocketEventNameAnalysis,
+				Payload:     text,
+			})
 		}
 
-		// Dispatch
-		a.dispatchFunc(astibrain.Event{
-			AbilityName: name,
-			Name:        websocketEventNameAnalysis,
-			Payload:     s,
-		})
+		// Check if samples have to be stored
+		if a.c.StoreSamples && len(a.c.SamplesDirectory) > 0 {
+			// Store samples
+			id, err := a.storeSamples(text, samples, sampleRate, significantBits)
+			if err != nil {
+				astilog.Error(errors.Wrap(err, "astiunderstanding: storing samples failed"))
+			} else {
+				a.dispatchFunc(astibrain.Event{
+					AbilityName: name,
+					Name:        websocketEventNameSamplesStored,
+					Payload:     newPayloadStoredSamples(id, text),
+				})
+			}
+		}
 	})
 }
 
+// PayloadStoredSamples represents stored samples payload
+type PayloadStoredSamples struct {
+	ID            string `json:"id"`
+	Text          string `json:"text"`
+	WavStaticPath string `json:"wav_static_path"`
+}
+
+// newPayloadStoredSamples creates a new stored samples payload
+func newPayloadStoredSamples(id, text string) PayloadStoredSamples {
+	return PayloadStoredSamples{
+		ID:            id,
+		Text:          text,
+		WavStaticPath: fmt.Sprintf("/samples%s.wav", id),
+	}
+}
+
+// samplesToBeValidatedDirectory returns the directory containing samples to be validated
+func samplesToBeValidatedDirectory(samplesDirectory string) string {
+	return filepath.Join(samplesDirectory, "to_be_validated")
+}
+
+// samplesValidatedDirectory returns the directory containing validated samples
+func samplesValidatedDirectory(samplesDirectory string) string {
+	return filepath.Join(samplesDirectory, "validated")
+}
+
 // storeSamples stores the samples for later validation
-// TODO Add option to stop storing samples from UI
-// TODO Split samples in 2 folders => to validate, and validated
-// TODO Add validation process in UI
-func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int) (path string, err error) {
-	return
+func (a *Ability) storeSamples(text string, samples []int32, sampleRate, significantBits int) (id string, err error) {
+	// Create id
+	id = filepath.Join(time.Now().Format("2006-01-02"), xid.New().String())
 
-	// Create dir path
-	now := time.Now()
-	path = filepath.Join("TODO", now.Format("2006-01-02"))
-
-	// Make sure the dir exists
-	if err = os.MkdirAll(path, 0777); err != nil {
-		err = errors.Wrapf(err, "astiunderstanding: mkdirall %s failed", path)
+	// Store samples wav
+	if err = a.storeSamplesWav(id, samples, sampleRate, significantBits); err != nil {
+		err = errors.Wrap(err, "astiunderstanding: storing samples wav failed")
 		return
 	}
 
-	// Add filename to dir path
-	path = filepath.Join(path, now.Format("15-04-05")+".wav")
+	// Store samples txt
+	if err = a.storeSamplesTxt(id, text); err != nil {
+		err = errors.Wrap(err, "astiunderstanding: storing samples txt failed")
+		return
+	}
+	return
+}
 
-	// Create file
+// storeSamplesWav stores the samples as a wav file
+func (a *Ability) storeSamplesWav(id string, samples []int32, sampleRate, significantBits int) (err error) {
+	// Create wav path
+	wavPath := filepath.Join(samplesToBeValidatedDirectory(a.c.SamplesDirectory), id+".wav")
+
+	// Create dir
+	if err = os.MkdirAll(filepath.Dir(wavPath), 0755); err != nil {
+		err = errors.Wrapf(err, "astiunderstanding: mkdirall %s failed", filepath.Dir(wavPath))
+		return
+	}
+
+	// Create wav file
 	var f *os.File
-	if f, err = os.Create(path); err != nil {
-		err = errors.Wrapf(err, "astiunderstanding: creating %s failed", path)
+	if f, err = os.Create(wavPath); err != nil {
+		err = errors.Wrapf(err, "astiunderstanding: creating %s failed", wavPath)
 		return
 	}
 	defer f.Close()
@@ -139,19 +204,40 @@ func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int)
 		SampleRate:      uint32(sampleRate),
 		SignificantBits: uint16(significantBits),
 	}
-	var w *wav.Writer
-	if w, err = wf.NewWriter(f); err != nil {
+	var r *wav.Writer
+	if r, err = wf.NewWriter(f); err != nil {
 		err = errors.Wrap(err, "astiunderstanding: creating wav writer failed")
 		return
 	}
-	defer w.Close()
+	defer r.Close()
 
-	// Write
+	// Write wav samples
 	for _, sample := range samples {
-		if err = w.WriteInt32(sample); err != nil {
+		if err = r.WriteInt32(sample); err != nil {
 			err = errors.Wrap(err, "astiunderstanding: writing wav sample failed")
 			return
 		}
+	}
+	return
+}
+
+// storeSamplesTxt stores the samples information in a txt file
+func (a *Ability) storeSamplesTxt(id, text string) (err error) {
+	// Create txt path
+	txtPath := filepath.Join(samplesToBeValidatedDirectory(a.c.SamplesDirectory), id+".txt")
+
+	// Create txt file
+	var f *os.File
+	if f, err = os.Create(txtPath); err != nil {
+		err = errors.Wrapf(err, "astiunderstanding: creating %s failed", txtPath)
+		return
+	}
+	defer f.Close()
+
+	// Write data
+	if _, err = f.Write([]byte(text)); err != nil {
+		err = errors.Wrap(err, "astiunderstanding: writing text failed")
+		return
 	}
 	return
 }

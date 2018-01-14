@@ -3,6 +3,7 @@ let base = {
 
     abilityKey: "",
     abilityAPIBasePattern: "",
+    abilityStaticBasePattern: "",
     abilityWebsocketBaseEventName: "",
     brainKey: "",
 
@@ -95,8 +96,8 @@ let base = {
             },
         });
     },
-    sendHttp: function(url, method, successFunc, errorFunc) {
-        $.ajax({
+    sendHttp: function(url, method, successFunc, errorFunc, payload) {
+        let options = {
             url: url,
             type: method,
             dataType: "json",
@@ -124,7 +125,11 @@ let base = {
                     successFunc(data);
                 }
             }
-        });
+        };
+        if (typeof payload !== "undefined") {
+            options.data = JSON.stringify(payload);
+        }
+        $.ajax(options);
     },
     sendWs: function(event_name, payload) {
         base.ws.send(JSON.stringify({event_name: event_name, payload: payload}));
@@ -167,6 +172,9 @@ let base = {
     },
     abilityAPIPattern: function(pattern) {
         return base.abilityAPIBasePattern + pattern
+    },
+    abilityStaticPattern: function(pattern) {
+        return base.abilityStaticBasePattern + pattern
     },
     abilityWebsocketEventName: function(eventName) {
         return base.abilityWebsocketBaseEventName + "." + eventName

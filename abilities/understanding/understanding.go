@@ -18,6 +18,7 @@ type SpeechParser interface {
 
 // Websocket event names
 const (
-	websocketEventNameAnalysis = "analysis"
-	websocketEventNameSamples  = "samples"
+	websocketEventNameAnalysis      = "analysis"
+	websocketEventNameSamples       = "samples"
+	websocketEventNameSamplesStored = "samples.stored"
 )

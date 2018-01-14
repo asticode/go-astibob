@@ -8,23 +8,25 @@ import (
 
 // ability represents an ability
 type ability struct {
-	apiHandlers map[string]http.Handler
-	description string
-	key         string
-	o           bool
-	m           sync.Mutex
-	name        string
-	webHomepage string
+	apiHandlers    map[string]http.Handler
+	description    string
+	key            string
+	o              bool
+	m              sync.Mutex
+	name           string
+	staticHandlers map[string]http.Handler
+	webHomepage    string
 }
 
 // newAbility creates a new ability
 func newAbility(name, description string, isOn bool) *ability {
 	return &ability{
-		apiHandlers: make(map[string]http.Handler),
-		description: description,
-		key:         key(name),
-		o:           isOn,
-		name:        name,
+		apiHandlers:    make(map[string]http.Handler),
+		description:    description,
+		key:            key(name),
+		o:              isOn,
+		name:           name,
+		staticHandlers: make(map[string]http.Handler),
 	}
 }
 

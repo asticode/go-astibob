@@ -40,6 +40,11 @@ type Dispatcher interface {
 	SetDispatchFunc(DispatchFunc)
 }
 
+// StaticHandler represents an object that can handle static files
+type StaticHandler interface {
+	StaticHandlers() map[string]http.Handler
+}
+
 // WebTemplater represents an object that can handle web templates
 type WebTemplater interface {
 	WebTemplates() map[string]string

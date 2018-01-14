@@ -114,12 +114,6 @@ func (i *Interface) brainWebsocketListenerSamples(c *astiws.Client, eventName st
 		return nil
 	}
 
-	// No callback
-	if i.onSamples == nil {
-		astilog.Error("astihearing: onSamples is undefined")
-		return nil
-	}
-
 	// Execute callbacks
 	for _, fn := range i.onSamples {
 		if err := fn(p.Samples, p.SampleRate, p.SignificantBits, p.SilenceMaxAudioLevel); err != nil {
@@ -271,7 +265,7 @@ func (i *Interface) webTemplateIndex() string {
 {{ define "html" }}
 <div class='header'>Calibration</div>
 <p>Click "Calibrate" to retrieve the max audio level as well as the deduced silence max audio level appropriate to your audio device.</p>
-<button class="default" id="btn-calibrate">Calibrate</button>
+<button class="color-default-front" id="btn-calibrate">Calibrate</button>
 <p id="calibration-results"></p>
 {{ end }}
 {{ define "js" }}

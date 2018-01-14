@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"path/filepath"
 
+	"strings"
+
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/http"
@@ -18,8 +20,9 @@ import (
 
 // Server patterns
 const (
-	serverPatternAPI = "/api"
-	serverPatternWeb = "/web"
+	serverPatternAPI    = "/api"
+	serverPatternStatic = "/static"
+	serverPatternWeb    = "/web"
 )
 
 // Clients websocket events
@@ -57,7 +60,8 @@ func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager,
 	var r = httprouter.New()
 
 	// Static files
-	r.ServeFiles("/static/*filepath", http.Dir(filepath.Join(c.ResourcesDirectory, "static")))
+	r.ServeFiles(serverPatternStatic+"/bob/*filepath", http.Dir(filepath.Join(c.ResourcesDirectory, "static")))
+	r.GET(serverPatternStatic+"/brains/:brain/abilities/:ability/*path", s.handleStaticCustomGET)
 
 	// Web
 	r.GET("/", s.handleHomepageGET)
@@ -117,6 +121,7 @@ func (s *clientsServer) handleWebGET(rw http.ResponseWriter, r *http.Request, p 
 type TemplateDataAbilityWebTemplate struct {
 	AbilityKey                    string
 	AbilityAPIBasePattern         string
+	AbilityStaticBasePattern      string
 	AbilityWebsocketBaseEventName string
 	BrainKey                      string
 }
@@ -135,6 +140,7 @@ func (s *clientsServer) templateData(r *http.Request, p httprouter.Params, name 
 				BrainKey:   matches[0][1],
 			}
 			t.AbilityAPIBasePattern = fmt.Sprintf(serverPatternAPI+"/brains/%s/abilities/%s", t.BrainKey, t.AbilityKey)
+			t.AbilityStaticBasePattern = fmt.Sprintf(serverPatternStatic+"/brains/%s/abilities/%s", t.BrainKey, t.AbilityKey)
 			t.AbilityWebsocketBaseEventName = clientAbilityWebsocketBaseEventName(t.BrainKey, t.AbilityKey)
 			data = t
 		}
@@ -323,4 +329,44 @@ func (s *clientsServer) handleAPICustomGET(rw http.ResponseWriter, r *http.Reque
 
 	// Execute handler
 	h.ServeHTTP(rw, r)
+}
+
+// handleStaticCustomGET returns the custom static handler
+func (s *clientsServer) handleStaticCustomGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	// Fetch brain
+	b, ok := s.brains.brainByKey(p.ByName("brain"))
+	if !ok {
+		astilog.Errorf("astibob: unknown brain key %s", p.ByName("brain"))
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Fetch ability
+	a, ok := b.abilityByKey(p.ByName("ability"))
+	if !ok {
+		astilog.Errorf("astibob: unknown ability key %s for brain key %s", p.ByName("ability"), p.ByName("brain"))
+		rw.WriteHeader(http.StatusNotFound)
+		return
+	}
+
+	// Loop through handlers
+	path := p.ByName("path")
+	for n, h := range a.staticHandlers {
+		// Not the right one
+		if !strings.HasPrefix(path, n) {
+			continue
+		}
+
+		// Set request path
+		r.URL.Path = strings.TrimPrefix(path, n)
+
+		// Execute handler
+		h.ServeHTTP(rw, r)
+		return
+	}
+
+	// No handler
+	astilog.Errorf("astibob: unknown static handler %s for ability key %s and brain key %s", p.ByName("path"), p.ByName("ability"), p.ByName("brain"))
+	rw.WriteHeader(http.StatusNotFound)
+	return
 }
