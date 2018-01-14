@@ -118,8 +118,8 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 // TODO Add option to stop storing samples from UI
 // TODO Split samples in 2 folders => to validate, and validated
 // TODO Add validation process in UI
-// TODO Store max quality samples (more than 16 000 sample rate)
 func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int) (path string, err error) {
+	return
 	// No need to store samples
 	if a.o.SamplesDirectoryPath == nil {
 		return

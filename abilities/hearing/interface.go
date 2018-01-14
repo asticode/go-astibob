@@ -10,8 +10,10 @@ import (
 	"math"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astichartjs"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/audio"
+	"github.com/asticode/go-astitools/ptr"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
@@ -29,7 +31,7 @@ type Interface struct {
 
 // InterfaceOptions represents interface options
 type InterfaceOptions struct {
-	CalibrationMaxDuration  time.Duration `toml:"calibration_max_duration"`
+	CalibrationDuration     time.Duration `toml:"calibration_duration"`
 	CalibrationStepDuration time.Duration `toml:"calibration_step_duration"`
 }
 
@@ -72,12 +74,16 @@ func (i *Interface) onSamplesCalibration(samples []int32, sampleRate, significan
 	// Set sample rate
 	i.calibrationSampleRate = sampleRate
 
-	// Add samples
-	*i.calibrationBuf = append(*i.calibrationBuf, samples...)
+	// Get max number of samples
+	// We take one more step than requested
+	maxNumberOfSamples := int(float64(i.calibrationSampleRate)*i.o.CalibrationDuration.Seconds())+int(float64(i.calibrationSampleRate) *float64(i.o.CalibrationStepDuration.Seconds()))
 
-	// Check calibration max duration
-	if float64(len(*i.calibrationBuf))/float64(i.calibrationSampleRate) > i.o.CalibrationMaxDuration.Seconds() {
-		i.calibration()
+	// Add samples
+	if len(*i.calibrationBuf)+len(samples) <= maxNumberOfSamples {
+		*i.calibrationBuf = append(*i.calibrationBuf, samples...)
+	} else {
+		*i.calibrationBuf = append(*i.calibrationBuf, samples[:maxNumberOfSamples-len(*i.calibrationBuf)]...)
+		i.calibrate()
 	}
 	return nil
 }
@@ -117,7 +123,6 @@ func (i *Interface) brainWebsocketListenerSamples(c *astiws.Client, eventName st
 func (i *Interface) ClientWebsocketListeners() map[string]astiws.ListenerFunc {
 	return map[string]astiws.ListenerFunc{
 		"calibration.start": i.clientWebsocketListenerCalibrationStart,
-		"calibration.stop":  i.clientWebsocketListenerCalibrationStop,
 	}
 }
 
@@ -139,33 +144,51 @@ func (i *Interface) clientWebsocketListenerCalibrationStart(c *astiws.Client, ev
 }
 
 // CalibrationResults represents calibration results
-// TODO Add audio level graph
 type CalibrationResults struct {
-	MaxAudioLevel        float64 `json:"max_audio_level"`
-	SilenceMaxAudioLevel float64 `json:"silence_max_audio_level"`
+	Chart                astichartjs.Chart `json:"chart"`
+	MaxAudioLevel        float64           `json:"max_audio_level"`
+	SilenceMaxAudioLevel float64           `json:"silence_max_audio_level"`
 }
 
-// clientWebsocketListenerCalibrationStop listens to the calibration.stop client websocket event
-func (i *Interface) clientWebsocketListenerCalibrationStop(c *astiws.Client, eventName string, payload json.RawMessage) error {
-	// Lock
-	i.mc.Lock()
-	i.mc.Unlock()
-
-	// Not calibrating
-	if i.calibrationBuf == nil {
-		return nil
-	}
-
-	// Calibration
-	i.calibration()
-	return nil
-}
-
-// calibration processes the calibration buffer.
+// calibrate processes the calibration buffer.
 // Assumption is made that mc is locked
-func (i *Interface) calibration() {
+func (i *Interface) calibrate() {
 	// Create payload
-	p := CalibrationResults{}
+	p := CalibrationResults{
+		Chart: astichartjs.Chart{
+			Data: &astichartjs.Data{
+				Datasets: []astichartjs.Dataset{{
+					BackgroundColor: astichartjs.ChartBackgroundColorGreen,
+					BorderColor:     astichartjs.ChartBorderColorGreen,
+					Label:           "Audio level",
+				}},
+			},
+			Options: &astichartjs.Options{
+				Scales: &astichartjs.Scales{
+					XAxes: []astichartjs.Axis{
+						{
+							Position: astichartjs.ChartAxisPositionsBottom,
+							ScaleLabel: &astichartjs.ScaleLabel{
+								Display:     astiptr.Bool(true),
+								LabelString: "Duration (s)",
+							},
+							Type: astichartjs.ChartAxisTypesLinear,
+						},
+					},
+					YAxes: []astichartjs.Axis{
+						{
+							ScaleLabel: &astichartjs.ScaleLabel{
+								Display:     astiptr.Bool(true),
+								LabelString: "Audio level",
+							},
+						},
+					},
+				},
+				Title: &astichartjs.Title{Display: astiptr.Bool(true)},
+			},
+			Type: astichartjs.ChartTypeLine,
+		},
+	}
 
 	// Get number of samples per steps
 	numberOfSamplesPerStep := int(math.Ceil(float64(i.calibrationSampleRate) * i.o.CalibrationStepDuration.Seconds()))
@@ -174,6 +197,7 @@ func (i *Interface) calibration() {
 	numberOfSteps := int(math.Ceil(float64(len(*i.calibrationBuf)) / float64(numberOfSamplesPerStep)))
 
 	// Process buffer
+	var maxX float64
 	for idx := 0; idx < numberOfSteps; idx++ {
 		// Offsets
 		start := idx * numberOfSamplesPerStep
@@ -192,10 +216,26 @@ func (i *Interface) calibration() {
 
 		// Get max audio level
 		p.MaxAudioLevel = math.Max(p.MaxAudioLevel, audioLevel)
+
+		// Add data to chart
+		maxX = float64(numberOfSamplesPerStep) / float64(i.calibrationSampleRate) * float64(idx)
+		p.Chart.Data.Datasets[0].Data = append(p.Chart.Data.Datasets[0].Data, astichartjs.DataPoint{
+			X: maxX,
+			Y: audioLevel,
+		})
 	}
 
 	// Get silence max audio level
 	p.SilenceMaxAudioLevel = float64(1) * p.MaxAudioLevel / float64(3)
+
+	// Add data to chart
+	p.Chart.Data.Datasets = append(p.Chart.Data.Datasets, astichartjs.Dataset{
+		BackgroundColor: astichartjs.ChartBackgroundColorRed,
+		BorderColor:     astichartjs.ChartBorderColorRed,
+		Label:           "Silence max audio level",
+	})
+	p.Chart.Data.Datasets[1].Data = append(p.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: 0, Y: p.SilenceMaxAudioLevel})
+	p.Chart.Data.Datasets[1].Data = append(p.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: maxX, Y: p.SilenceMaxAudioLevel})
 
 	// Reset buffer
 	i.calibrationBuf = nil
@@ -237,22 +277,9 @@ func (i *Interface) webTemplateIndex() string {
 			});
 		},
 		handleClickCalibrate: function() {
-			// Create stop
-			let stop = document.createElement("button");
-			stop.className = "default";
-			stop.innerText = "Stop";
-			stop.onclick = function() {
-				// Send ws event
-				base.sendWs(base.abilityWebsocketEventName("calibration.stop"))
-
-				// Hide modal
-				asticode.modaler.hide();
-			};
-
 			// Create div
 			let div = document.createElement("div");
-			div.innerHTML = '<div style="margin-bottom:15px">Say something...</div>'
-			div.appendChild(stop);
+			div.innerHTML = 'Say something...';
 
 			// Show modal
 			asticode.modaler.setWidth("300px");
@@ -263,11 +290,18 @@ func (i *Interface) webTemplateIndex() string {
 			base.sendWs(base.abilityWebsocketEventName("calibration.start"))
 		},
 		addCalibrationResults: function(results) {
+			// Create html
 			let html = "<table><tbody>";
 			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Max audio level</td><td style='text-align: right'>" + Math.round(results.max_audio_level) + "</td></tr>";
 			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Silence max audio level</td><td style='text-align: right'>" + Math.round(results.silence_max_audio_level) + "</td></tr>";
 			html += "</tbody></table>";
+			html += "<canvas id='chart'></canvas>";
+
+			// Set html
 			$("#calibration-results").html(html);
+
+			// Add chart
+			new Chart(document.getElementById("chart"), results.chart);
 		},
     	websocketFunc: function(event_name, payload) {
 			switch (event_name) {
