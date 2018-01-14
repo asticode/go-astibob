@@ -40,7 +40,7 @@ func (a *Ability) SetDispatchFunc(fn astibrain.DispatchFunc) {
 
 // Name implements the astibrain.Ability interface
 func (a *Ability) Name() string {
-	return Name
+	return name
 }
 
 // Description implements the astibrain.Ability interface
@@ -107,7 +107,7 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 			copy(dispatchBuf, buf)
 			buf = buf[:0]
 			a.dispatchFunc(astibrain.Event{
-				AbilityName: Name,
+				AbilityName: name,
 				Name:        websocketEventNameSamples,
 				Payload: PayloadSamples{
 					SampleRate:           a.o.SampleRate,

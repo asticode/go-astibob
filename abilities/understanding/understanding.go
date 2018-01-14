@@ -2,7 +2,7 @@ package astiunderstanding
 
 // Constants
 const (
-	Name = "Understanding"
+	name = "Understanding"
 )
 
 // SpeechParser represents an object capable of parsing speech and returning the corresponding text

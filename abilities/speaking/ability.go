@@ -37,7 +37,7 @@ func NewAbility(o AbilityOptions) *Ability {
 
 // Name implements the astibrain.Ability interface
 func (a *Ability) Name() string {
-	return Name
+	return name
 }
 
 // Description implements the astibrain.Ability interface

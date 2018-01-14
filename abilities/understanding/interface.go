@@ -32,13 +32,13 @@ func NewInterface() *Interface {
 
 // Name implements the astibob.Interface interface
 func (i *Interface) Name() string {
-	return Name
+	return name
 }
 
 // Samples creates a samples cmd
 func (i *Interface) Samples(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) *astibob.Cmd {
 	return &astibob.Cmd{
-		AbilityName: Name,
+		AbilityName: name,
 		EventName:   websocketEventNameSamples,
 		Payload: PayloadSamples{
 			SampleRate:           sampleRate,

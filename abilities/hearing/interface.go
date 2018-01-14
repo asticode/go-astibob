@@ -17,7 +17,6 @@ import (
 )
 
 // Interface is the interface of the ability
-// TODO Add default options to all project options
 type Interface struct {
 	calibrateBuf        *[]int32
 	calibrateSampleRate int
@@ -45,7 +44,7 @@ func NewInterface(o InterfaceOptions) (i *Interface) {
 
 // Name implements the astibob.Interface interface
 func (i *Interface) Name() string {
-	return Name
+	return name
 }
 
 // SetDispatchFunc implements the astibob.Dispatcher interface

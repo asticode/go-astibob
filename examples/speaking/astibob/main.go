@@ -24,7 +24,7 @@ func main() {
 
 	// Add listeners
 	bob.On(astibob.EventNameAbilityStarted, func(e astibob.Event) bool {
-		if e.Ability != nil && e.Ability.Name == astispeaking.Name {
+		if e.Ability != nil && e.Ability.Name == speaking.Name() {
 			if err := bob.Exec(speaking.Say("I love you Bob")); err != nil {
 				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
 			}

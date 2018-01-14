@@ -21,7 +21,7 @@ func NewInterface() *Interface {
 
 // Name implements the astibob.Interface interface
 func (i *Interface) Name() string {
-	return Name
+	return name
 }
 
 // SetDispatchFunc implements the astibob.Dispatcher interface
@@ -54,7 +54,7 @@ func (i *Interface) addToHistory(s string) {
 func (i *Interface) Say(s string) *astibob.Cmd {
 	i.addToHistory(s)
 	return &astibob.Cmd{
-		AbilityName: Name,
+		AbilityName: name,
 		EventName:   websocketEventNameSay,
 		Payload:     s,
 	}
