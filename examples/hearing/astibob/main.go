@@ -35,8 +35,8 @@ func main() {
 
 	// Create hearing
 	hearing := astihearing.NewInterface(astihearing.InterfaceOptions{
-		CalibrateStepDuration: 100 * time.Millisecond,
-		CalibrateMaxDuration:  5 * time.Second,
+		CalibrationStepDuration: 100 * time.Millisecond,
+		CalibrationMaxDuration:  5 * time.Second,
 	})
 
 	// Handle samples

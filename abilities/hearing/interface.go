@@ -17,19 +17,20 @@ import (
 )
 
 // Interface is the interface of the ability
+// TODO Add default options
 type Interface struct {
-	calibrateBuf        *[]int32
-	calibrateSampleRate int
-	dispatchFunc        astibob.DispatchFunc
-	mc                  sync.Mutex // Lock calibrateBuf
-	o                   InterfaceOptions
-	onSamples           []SamplesFunc
+	calibrationBuf        *[]int32
+	calibrationSampleRate int
+	dispatchFunc          astibob.DispatchFunc
+	mc                    sync.Mutex // Lock calibrationBuf
+	o                     InterfaceOptions
+	onSamples             []SamplesFunc
 }
 
 // InterfaceOptions represents interface options
 type InterfaceOptions struct {
-	CalibrateMaxDuration  time.Duration `toml:"calibrate_max_duration"`
-	CalibrateStepDuration time.Duration `toml:"calibrate_step_duration"`
+	CalibrationMaxDuration  time.Duration `toml:"calibration_max_duration"`
+	CalibrationStepDuration time.Duration `toml:"calibration_step_duration"`
 }
 
 // SamplesFunc represents the callback executed upon receiving samples
@@ -38,7 +39,7 @@ type SamplesFunc func(samples []int32, sampleRate, significantBits int, silenceM
 // NewInterface creates a new interface
 func NewInterface(o InterfaceOptions) (i *Interface) {
 	i = &Interface{o: o}
-	i.onSamples = append(i.onSamples, i.onSamplesCalibrate)
+	i.onSamples = append(i.onSamples, i.onSamplesCalibration)
 	return
 }
 
@@ -57,26 +58,26 @@ func (i *Interface) OnSamples(fn SamplesFunc) {
 	i.onSamples = append(i.onSamples, fn)
 }
 
-// onSamplesCalibrate is the samples callback for the calibration
-func (i *Interface) onSamplesCalibrate(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
+// onSamplesCalibration is the samples callback for the calibration
+func (i *Interface) onSamplesCalibration(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
 	// Lock
 	i.mc.Lock()
 	defer i.mc.Unlock()
 
 	// Interface is not calibrating
-	if i.calibrateBuf == nil {
+	if i.calibrationBuf == nil {
 		return nil
 	}
 
 	// Set sample rate
-	i.calibrateSampleRate = sampleRate
+	i.calibrationSampleRate = sampleRate
 
 	// Add samples
-	*i.calibrateBuf = append(*i.calibrateBuf, samples...)
+	*i.calibrationBuf = append(*i.calibrationBuf, samples...)
 
-	// Check calibrate max duration
-	if float64(len(*i.calibrateBuf))/float64(i.calibrateSampleRate) > i.o.CalibrateMaxDuration.Seconds() {
-		i.calibrate()
+	// Check calibration max duration
+	if float64(len(*i.calibrationBuf))/float64(i.calibrationSampleRate) > i.o.CalibrationMaxDuration.Seconds() {
+		i.calibration()
 	}
 	return nil
 }
@@ -115,62 +116,62 @@ func (i *Interface) brainWebsocketListenerSamples(c *astiws.Client, eventName st
 // ClientWebsocketListeners implements the astibob.ClientWebsocketListener interface
 func (i *Interface) ClientWebsocketListeners() map[string]astiws.ListenerFunc {
 	return map[string]astiws.ListenerFunc{
-		"calibrate.start": i.clientWebsocketListenerCalibrateStart,
-		"calibrate.stop":  i.clientWebsocketListenerCalibrateStop,
+		"calibration.start": i.clientWebsocketListenerCalibrationStart,
+		"calibration.stop":  i.clientWebsocketListenerCalibrationStop,
 	}
 }
 
-// clientWebsocketListenerCalibrateStart listens to the calibrate.start client websocket event
+// clientWebsocketListenerCalibrationStart listens to the calibration.start client websocket event
 // TODO Make sure the ability is on
-func (i *Interface) clientWebsocketListenerCalibrateStart(c *astiws.Client, eventName string, payload json.RawMessage) error {
+func (i *Interface) clientWebsocketListenerCalibrationStart(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Lock
 	i.mc.Lock()
 	defer i.mc.Unlock()
 
 	// Already calibrating
-	if i.calibrateBuf != nil {
+	if i.calibrationBuf != nil {
 		return nil
 	}
 
 	// Reset buf
-	i.calibrateBuf = &[]int32{}
+	i.calibrationBuf = &[]int32{}
 	return nil
 }
 
-// CalibrateResults represents calibrate results
+// CalibrationResults represents calibration results
 // TODO Add audio level graph
-type CalibrateResults struct {
+type CalibrationResults struct {
 	MaxAudioLevel        float64 `json:"max_audio_level"`
 	SilenceMaxAudioLevel float64 `json:"silence_max_audio_level"`
 }
 
-// clientWebsocketListenerCalibrateStop listens to the calibrate.stop client websocket event
-func (i *Interface) clientWebsocketListenerCalibrateStop(c *astiws.Client, eventName string, payload json.RawMessage) error {
+// clientWebsocketListenerCalibrationStop listens to the calibration.stop client websocket event
+func (i *Interface) clientWebsocketListenerCalibrationStop(c *astiws.Client, eventName string, payload json.RawMessage) error {
 	// Lock
 	i.mc.Lock()
 	i.mc.Unlock()
 
 	// Not calibrating
-	if i.calibrateBuf == nil {
+	if i.calibrationBuf == nil {
 		return nil
 	}
 
-	// Calibrate
-	i.calibrate()
+	// Calibration
+	i.calibration()
 	return nil
 }
 
-// calibrate processes the calibrate buffer.
+// calibration processes the calibration buffer.
 // Assumption is made that mc is locked
-func (i *Interface) calibrate() {
+func (i *Interface) calibration() {
 	// Create payload
-	p := CalibrateResults{}
+	p := CalibrationResults{}
 
 	// Get number of samples per steps
-	numberOfSamplesPerStep := int(math.Ceil(float64(i.calibrateSampleRate) * i.o.CalibrateStepDuration.Seconds()))
+	numberOfSamplesPerStep := int(math.Ceil(float64(i.calibrationSampleRate) * i.o.CalibrationStepDuration.Seconds()))
 
 	// Get number of steps
-	numberOfSteps := int(math.Ceil(float64(len(*i.calibrateBuf)) / float64(numberOfSamplesPerStep)))
+	numberOfSteps := int(math.Ceil(float64(len(*i.calibrationBuf)) / float64(numberOfSamplesPerStep)))
 
 	// Process buffer
 	for idx := 0; idx < numberOfSteps; idx++ {
@@ -180,10 +181,10 @@ func (i *Interface) calibrate() {
 
 		// Get samples
 		var samples []int32
-		if len(*i.calibrateBuf) >= end {
-			samples = (*i.calibrateBuf)[start:end]
+		if len(*i.calibrationBuf) >= end {
+			samples = (*i.calibrationBuf)[start:end]
 		} else {
-			samples = (*i.calibrateBuf)[start:]
+			samples = (*i.calibrationBuf)[start:]
 		}
 
 		// Compute audio level
@@ -197,11 +198,11 @@ func (i *Interface) calibrate() {
 	p.SilenceMaxAudioLevel = float64(1) * p.MaxAudioLevel / float64(3)
 
 	// Reset buffer
-	i.calibrateBuf = nil
+	i.calibrationBuf = nil
 
 	// Dispatch to clients
 	i.dispatchFunc(astibob.ClientEvent{
-		Name:    "calibrate.results",
+		Name:    "calibration.results",
 		Payload: p,
 	})
 }
@@ -218,17 +219,17 @@ func (i *Interface) webTemplateIndex() string {
 	return `{{ define "title" }}Hearing{{ end }}
 {{ define "css" }}{{ end }}
 {{ define "html" }}
-<div class='header'>Calibrate</div>
+<div class='header'>Calibration</div>
 <p>Click "Calibrate" to retrieve the max audio level as well as the deduced silence max audio level appropriate to your audio device.</p>
 <button class="default" id="btn-calibrate">Calibrate</button>
-<p id="calibrate-results"></p>
+<p id="calibration-results"></p>
 {{ end }}
 {{ define "js" }}
 <script type="text/javascript">
 	let hearing = {
 		init: function() {
 			base.init(hearing.websocketFunc, function(data) {
-				// Handle calibrate
+				// Handle calibration
 				$("#btn-calibrate").click(hearing.handleClickCalibrate);
 
 				// Finish
@@ -242,7 +243,7 @@ func (i *Interface) webTemplateIndex() string {
 			stop.innerText = "Stop";
 			stop.onclick = function() {
 				// Send ws event
-				base.sendWs(base.abilityWebsocketEventName("calibrate.stop"))
+				base.sendWs(base.abilityWebsocketEventName("calibration.stop"))
 
 				// Hide modal
 				asticode.modaler.hide();
@@ -259,23 +260,23 @@ func (i *Interface) webTemplateIndex() string {
 			asticode.modaler.show();
 
 			// Send ws event
-			base.sendWs(base.abilityWebsocketEventName("calibrate.start"))
+			base.sendWs(base.abilityWebsocketEventName("calibration.start"))
 		},
-		addCalibrateResults: function(results) {
+		addCalibrationResults: function(results) {
 			let html = "<table><tbody>";
 			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Max audio level</td><td style='text-align: right'>" + Math.round(results.max_audio_level) + "</td></tr>";
 			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Silence max audio level</td><td style='text-align: right'>" + Math.round(results.silence_max_audio_level) + "</td></tr>";
 			html += "</tbody></table>";
-			$("#calibrate-results").html(html);
+			$("#calibration-results").html(html);
 		},
     	websocketFunc: function(event_name, payload) {
 			switch (event_name) {
-				case base.abilityWebsocketEventName("calibrate.results"):
+				case base.abilityWebsocketEventName("calibration.results"):
 					// Close modal
 					asticode.modaler.hide();
 
 					// Add results
-					hearing.addCalibrateResults(payload);
+					hearing.addCalibrationResults(payload);
 					break;
 			}
 		}
