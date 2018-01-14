@@ -125,31 +125,31 @@ func (ws *websocket) dial(ctx context.Context, name string) {
 
 // APIRegister is a register API payload
 type APIRegister struct {
-	Abilities   map[string]APIAbility `json:"abilities"`
-	Name        string                `json:"name"`
+	Abilities map[string]APIAbility `json:"abilities"`
+	Name      string                `json:"name"`
 }
 
 // APIAbility is an ability API payload
 type APIAbility struct {
-	IsOn bool   `json:"is_on"`
-	Description string                `json:"description"`
-	Name string `json:"name"`
+	IsOn        bool   `json:"is_on"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
 }
 
 // sendRegister sends a register event
 func (ws *websocket) sendRegister(name string) (err error) {
 	// Create payload
 	p := APIRegister{
-		Abilities:   make(map[string]APIAbility),
-		Name:        name,
+		Abilities: make(map[string]APIAbility),
+		Name:      name,
 	}
 
 	// Loop through abilities
 	ws.abilities.abilities(func(a *ability) error {
 		p.Abilities[a.name] = APIAbility{
 			Description: a.description,
-			IsOn: a.isOn(),
-			Name: a.name,
+			IsOn:        a.isOn(),
+			Name:        a.name,
 		}
 		return nil
 	})

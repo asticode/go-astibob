@@ -14,7 +14,7 @@ type ability struct {
 	o           bool
 	m           sync.Mutex
 	name        string
-	webHomepage    string
+	webHomepage string
 }
 
 // newAbility creates a new ability

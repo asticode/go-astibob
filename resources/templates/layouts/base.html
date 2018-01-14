@@ -70,9 +70,10 @@
     <script src="/static/js/menu.js"></script>
     <script src="/static/js/base.js"></script>
     <script>
-        {{ if .Ability }}base.ability = "{{ .Ability }}";{{ end }}
-        {{ if .APIBasePattern }}base.apiBasePattern = "{{ .APIBasePattern }}";{{ end }}
-        {{ if .Brain }}base.brain = "{{ .Brain }}";{{ end }}
+        {{ if .AbilityKey }}base.abilityKey = "{{ .AbilityKey }}";{{ end }}
+        {{ if .AbilityAPIBasePattern }}base.abilityAPIBasePattern = "{{ .AbilityAPIBasePattern }}";{{ end }}
+        {{ if .AbilityWebsocketBaseEventName }}base.abilityWebsocketBaseEventName = "{{ .AbilityWebsocketBaseEventName }}";{{ end }}
+        {{ if .BrainKey }}base.brainKey = "{{ .BrainKey }}";{{ end }}
     </script>
 
     <!-- Custom JS -->

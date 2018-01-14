@@ -9,8 +9,9 @@ import (
 
 // Interface is the interface of the ability
 type Interface struct {
-	history []string
-	m       sync.Mutex
+	dispatchFunc astibob.DispatchFunc
+	history      []string
+	m            sync.Mutex
 }
 
 // NewInterface creates a new interface
@@ -23,6 +24,11 @@ func (i *Interface) Name() string {
 	return Name
 }
 
+// SetDispatchFunc implements the astibob.Dispatcher interface
+func (i *Interface) SetDispatchFunc(fn astibob.DispatchFunc) {
+	i.dispatchFunc = fn
+}
+
 // addToHistory adds a sentence to the history while keeping it capped
 func (i *Interface) addToHistory(s string) {
 	i.m.Lock()
@@ -31,6 +37,10 @@ func (i *Interface) addToHistory(s string) {
 	if len(i.history) > 50 {
 		i.history = i.history[len(i.history)-50:]
 	}
+	i.dispatchFunc(astibob.ClientEvent{
+		Name:    "history",
+		Payload: s,
+	})
 }
 
 // Say creates a say cmd
@@ -82,9 +92,9 @@ func (i *Interface) webTemplateIndex() string {
 <script type="text/javascript">
 	let speaking = {
 		init: function() {
-			base.init(null, function(data) {
+			base.init(speaking.websocketFunc, function(data) {
 				// Fetch history
-				base.sendHttp(base.apiPattern("/history"), "GET", function(data) {
+				base.sendHttp(base.abilityAPIPattern("/history"), "GET", function(data) {
 					// Display history
 					$("#content").append("<div class='header'>History</div>");
 					speaking.flex = $("<div class='flex'></div>");
@@ -108,6 +118,13 @@ func (i *Interface) webTemplateIndex() string {
 			let panel = $("<div class='panel'></div>");
 			panel.appendTo(wrapper);
 			panel.append(history);
+		},
+    	websocketFunc: function(event_name, payload) {
+			switch (event_name) {
+				case base.abilityWebsocketEventName("history"):
+					speaking.addHistory(payload);
+					break;
+			}
 		}
 	}
 	speaking.init();

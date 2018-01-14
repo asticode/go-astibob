@@ -61,7 +61,7 @@ type EventAbility struct {
 	Description string `json:"description"`
 	IsOn        bool   `json:"is_on"`
 	Name        string `json:"name"`
-	WebHomepage    string `json:"web_homepage,omitempty"`
+	WebHomepage string `json:"web_homepage,omitempty"`
 }
 
 // newEventAbility creates a new ability event
@@ -70,6 +70,6 @@ func newEventAbility(a *ability) *EventAbility {
 		Description: a.description,
 		IsOn:        a.isOn(),
 		Name:        a.name,
-		WebHomepage:    a.webHomepage,
+		WebHomepage: a.webHomepage,
 	}
 }

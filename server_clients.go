@@ -113,9 +113,10 @@ func (s *clientsServer) handleWebGET(rw http.ResponseWriter, r *http.Request, p 
 
 // TemplateDataAbilityWebTemplate represents ability web template data
 type TemplateDataAbilityWebTemplate struct {
-	Ability        string
-	APIBasePattern string
-	Brain          string
+	AbilityKey                    string
+	AbilityAPIBasePattern         string
+	AbilityWebsocketBaseEventName string
+	BrainKey                      string
 }
 
 // templateData returns a template data.
@@ -128,14 +129,25 @@ func (s *clientsServer) templateData(r *http.Request, p httprouter.Params, name 
 		// Ability web template
 		if matches := regexpAbilityWebTemplatePattern.FindAllStringSubmatch(*name, -1); len(matches) > 0 && len(matches[0]) >= 3 {
 			t := TemplateDataAbilityWebTemplate{
-				Ability: matches[0][2],
-				Brain:   matches[0][1],
+				AbilityKey: matches[0][2],
+				BrainKey:   matches[0][1],
 			}
-			t.APIBasePattern = fmt.Sprintf(serverPatternAPI+"/brains/%s/abilities/%s", t.Brain, t.Ability)
+			t.AbilityAPIBasePattern = fmt.Sprintf(serverPatternAPI+"/brains/%s/abilities/%s", t.BrainKey, t.AbilityKey)
+			t.AbilityWebsocketBaseEventName = clientAbilityWebsocketBaseEventName(t.BrainKey, t.AbilityKey)
 			data = t
 		}
 	}
 	return
+}
+
+// clientAbilityWebsocketBaseEventName returns the client ability websocket base event name
+func clientAbilityWebsocketBaseEventName(brainKey, abilityKey string) string {
+	return fmt.Sprintf("brain.%s.ability.%s", brainKey, abilityKey)
+}
+
+// clientAbilityWebsocketEventName returns the client ability websocket event name
+func clientAbilityWebsocketEventName(brainKey, abilityKey, eventName string) string {
+	return fmt.Sprintf("%s.%s", clientAbilityWebsocketBaseEventName(brainKey, abilityKey), eventName)
 }
 
 // handleWebsocketGET handles the websockets.

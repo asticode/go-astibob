@@ -1,9 +1,10 @@
 let base = {
     // Attributes
 
-    ability: "",
-    apiBasePattern: "",
-    brain: "",
+    abilityKey: "",
+    abilityAPIBasePattern: "",
+    abilityWebsocketBaseEventName: "",
+    brainKey: "",
 
     // Functions
 
@@ -164,7 +165,10 @@ let base = {
             rootSelector.append(data.html.wrapper);
         }
     },
-    apiPattern: function(pattern) {
-        return base.apiBasePattern + pattern
+    abilityAPIPattern: function(pattern) {
+        return base.abilityAPIBasePattern + pattern
+    },
+    abilityWebsocketEventName: function(eventName) {
+        return base.abilityWebsocketBaseEventName + "." + eventName
     }
 };

@@ -99,6 +99,11 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 				}
 			}
 
+			// Set dispatch func
+			if v, ok := i.(Dispatcher); ok {
+				v.SetDispatchFunc(s.dispatchFunc(b.key, a.key))
+			}
+
 			// Add custom brain websocket listeners
 			if v, ok := i.(BrainWebsocketListener); ok {
 				for n, l := range v.BrainWebsocketListeners() {
@@ -156,6 +161,14 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	// Dispatch event to GO
 	s.dispatcher.dispatch(Event{Brain: e, Name: EventNameBrainRegistered})
 	return nil
+}
+
+// dispatchFunc returns the func that dispatches client events
+func (s *brainsServer) dispatchFunc(brainKey, abilityKey string) func(e ClientEvent) {
+	return func(e ClientEvent) {
+		// TODO Make sure this is non blocking
+		dispatchWsEventToManager(s.clientsWs, clientAbilityWebsocketEventName(brainKey, abilityKey, e.Name), e.Payload)
+	}
 }
 
 // regexpAbilityWebTemplatePattern is the ability web template pattern regexp

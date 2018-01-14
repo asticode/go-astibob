@@ -152,3 +152,11 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 	<-b.ctx.Done()
 	return
 }
+
+// dispatch dispatches an event to Bob
+func (b *Brain) dispatch(e Event) {
+	b.d.Do(func() {
+		// Send
+		b.ws.send(WebsocketAbilityEventName(e.AbilityName, e.Name), e.Payload)
+	})
+}
