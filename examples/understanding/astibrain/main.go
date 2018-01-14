@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/asticode/go-astibob/abilities/understanding"
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astibob/examples"
@@ -34,13 +32,11 @@ func main() {
 		WordCountWeight:      1.00,
 	})
 
+	// Create silence detector
+	sd := astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorConfiguration{})
+
 	// Create understanding
-	understanding := astiunderstanding.NewAbility(p, astiunderstanding.AbilityOptions{
-		SilenceDetector: astiaudio.SilenceDetectorOptions{
-			AnalysisDuration:   300 * time.Millisecond,
-			SilenceMinDuration: time.Second,
-		},
-	})
+	understanding := astiunderstanding.NewAbility(p, sd)
 
 	// Learn ability
 	brain.Learn(understanding, astiexamples.AbilityOptions)

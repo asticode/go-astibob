@@ -43,14 +43,15 @@ type WebsocketListener interface {
 	WebsocketListeners() map[string]astiws.ListenerFunc
 }
 
-// AbilityOptions represents ability options
-type AbilityOptions struct {
-	AutoStart bool `toml:"autostart"`
+// AbilityConfiguration represents an ability configuration
+type AbilityConfiguration struct {
+	AutoStart bool `toml:"auto_start"`
 }
 
 // ability represents an ability.
 type ability struct {
 	a           Ability
+	c           AbilityConfiguration
 	cancel      context.CancelFunc
 	chanDone    chan error
 	ctx         context.Context
@@ -59,18 +60,17 @@ type ability struct {
 	m           sync.Mutex // Locks attributes
 	mr          sync.Mutex // Locks when ability is running
 	name        string
-	o           AbilityOptions
 	ws          *websocket
 }
 
 // newAbility creates a new ability.
-func newAbility(a Ability, ws *websocket, o AbilityOptions) *ability {
+func newAbility(a Ability, ws *websocket, c AbilityConfiguration) *ability {
 	return &ability{
 		a:           a,
+		c:           c,
 		chanDone:    make(chan error),
 		description: a.Description(),
 		name:        a.Name(),
-		o:           o,
 		ws:          ws,
 	}
 }

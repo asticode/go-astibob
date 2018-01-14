@@ -13,17 +13,17 @@ import (
 // Brain is an object handling one or more abilities
 type Brain struct {
 	abilities *abilities
+	c         Configuration
 	cancel    context.CancelFunc
 	ctx       context.Context
 	d         *astisync.Do
-	o         Options
 	ws        *websocket
 }
 
-// Options are brain options
-type Options struct {
-	Name      string           `toml:"name"`
-	Websocket WebsocketOptions `toml:"websocket"`
+// Configuration is a brain configuration
+type Configuration struct {
+	Name      string                 `toml:"name"`
+	Websocket WebsocketConfiguration `toml:"websocket"`
 }
 
 // Event represents an event
@@ -34,16 +34,16 @@ type Event struct {
 }
 
 // New creates a new brain
-func New(o Options) (b *Brain) {
+func New(c Configuration) (b *Brain) {
 	// Create brain
 	b = &Brain{
 		abilities: newAbilities(),
+		c:         c,
 		d:         astisync.NewDo(),
-		o:         o,
 	}
 
 	// Add websocket
-	b.ws = newWebsocket(b.abilities, o.Websocket)
+	b.ws = newWebsocket(b.abilities, c.Websocket)
 	return
 }
 
@@ -87,12 +87,12 @@ func (b *Brain) Close() (err error) {
 }
 
 // Learn allows the brain to learn a new ability.
-func (b *Brain) Learn(a Ability, o AbilityOptions) {
+func (b *Brain) Learn(a Ability, c AbilityConfiguration) {
 	// Log
 	astilog.Debugf("astibrain: learning %s", a.Name())
 
 	// Add ability
-	b.abilities.set(newAbility(a, b.ws, o))
+	b.abilities.set(newAbility(a, b.ws, c))
 
 	// Set dispatch func
 	if v, ok := a.(Dispatcher); ok {
@@ -114,7 +114,7 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 	defer b.cancel()
 
 	// Get name
-	var name = b.o.Name
+	var name = b.c.Name
 	if len(name) == 0 {
 		// Get hostname
 		if name, err = os.Hostname(); err != nil {
@@ -139,7 +139,7 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 		}
 
 		// Auto start
-		if a.o.AutoStart {
+		if a.c.AutoStart {
 			a.on()
 		}
 		return

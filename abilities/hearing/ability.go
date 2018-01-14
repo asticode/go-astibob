@@ -12,13 +12,13 @@ import (
 
 // Ability represents an object capable of parsing an audio reader and dispatch n chunks.
 type Ability struct {
+	c            AbilityConfiguration
 	dispatchFunc astibrain.DispatchFunc
-	o            AbilityOptions
 	r            SampleReader
 }
 
-// AbilityOptions represents ability options
-type AbilityOptions struct {
+// AbilityConfiguration represents an ability configuration
+type AbilityConfiguration struct {
 	DispatchDuration     time.Duration `toml:"dispatch_duration"`
 	SampleRate           int           `toml:"sample_rate"`
 	SignificantBits      int           `toml:"significant_bits"`
@@ -26,11 +26,18 @@ type AbilityOptions struct {
 }
 
 // NewAbility creates a new ability.
-func NewAbility(r SampleReader, o AbilityOptions) *Ability {
-	return &Ability{
-		o: o,
+func NewAbility(r SampleReader, c AbilityConfiguration) *Ability {
+	// Create
+	a := &Ability{
+		c: c,
 		r: r,
 	}
+
+	// Default configuration values
+	if a.c.DispatchDuration == 0 {
+		a.c.DispatchDuration = 500 * time.Millisecond
+	}
+	return a
 }
 
 // SetDispatchFunc implements the astibrain.Dispatcher interface
@@ -77,9 +84,9 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 	}
 
 	// Get dispatch count
-	var dispatchCount = a.o.SampleRate
-	if a.o.DispatchDuration > 0 {
-		dispatchCount = int(math.Floor(float64(a.o.SampleRate) * a.o.DispatchDuration.Seconds()))
+	var dispatchCount = a.c.SampleRate
+	if a.c.DispatchDuration > 0 {
+		dispatchCount = int(math.Floor(float64(a.c.SampleRate) * a.c.DispatchDuration.Seconds()))
 	}
 
 	// Read
@@ -110,10 +117,10 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 				AbilityName: name,
 				Name:        websocketEventNameSamples,
 				Payload: PayloadSamples{
-					SampleRate:           a.o.SampleRate,
+					SampleRate:           a.c.SampleRate,
 					Samples:              dispatchBuf,
-					SignificantBits:      a.o.SignificantBits,
-					SilenceMaxAudioLevel: a.o.SilenceMaxAudioLevel,
+					SignificantBits:      a.c.SignificantBits,
+					SilenceMaxAudioLevel: a.c.SilenceMaxAudioLevel,
 				},
 			})
 		}

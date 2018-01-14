@@ -17,7 +17,7 @@ func main() {
 	defer brain.Close()
 
 	// Create speaking
-	speaking := astispeaking.NewAbility(astispeaking.AbilityOptions{})
+	speaking := astispeaking.NewAbility(astispeaking.AbilityConfiguration{})
 
 	// Learn ability
 	brain.Learn(speaking, astiexamples.AbilityOptions)

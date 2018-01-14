@@ -14,7 +14,7 @@ import (
 // Ability represents an object capable of saying words to an audio output.
 type Ability struct {
 	activated bool
-	o         AbilityOptions
+	c         AbilityConfiguration
 	m         sync.Mutex
 
 	// Windows
@@ -22,16 +22,16 @@ type Ability struct {
 	windowsIUnknown  *ole.IUnknown
 }
 
-// AbilityOptions represents ability options.
-type AbilityOptions struct {
+// AbilityOptions represents an ability configuration.
+type AbilityConfiguration struct {
 	BinaryDirPath string `toml:"binary_dir_path"`
 	Voice         string `toml:"voice"`
 }
 
 // NewAbility creates a new ability
-func NewAbility(o AbilityOptions) *Ability {
+func NewAbility(c AbilityConfiguration) *Ability {
 	return &Ability{
-		o: o,
+		c: c,
 	}
 }
 

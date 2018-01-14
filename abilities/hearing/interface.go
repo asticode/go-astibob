@@ -19,18 +19,17 @@ import (
 )
 
 // Interface is the interface of the ability
-// TODO Add default options
 type Interface struct {
+	c                     InterfaceConfiguration
 	calibrationBuf        *[]int32
 	calibrationSampleRate int
 	dispatchFunc          astibob.DispatchFunc
 	mc                    sync.Mutex // Lock calibrationBuf
-	o                     InterfaceOptions
 	onSamples             []SamplesFunc
 }
 
-// InterfaceOptions represents interface options
-type InterfaceOptions struct {
+// InterfaceConfiguration represents an interface configuration
+type InterfaceConfiguration struct {
 	CalibrationDuration     time.Duration `toml:"calibration_duration"`
 	CalibrationStepDuration time.Duration `toml:"calibration_step_duration"`
 }
@@ -39,9 +38,20 @@ type InterfaceOptions struct {
 type SamplesFunc func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error
 
 // NewInterface creates a new interface
-func NewInterface(o InterfaceOptions) (i *Interface) {
-	i = &Interface{o: o}
+func NewInterface(c InterfaceConfiguration) (i *Interface) {
+	// Create
+	i = &Interface{c: c}
+
+	// Add default callbacks
 	i.onSamples = append(i.onSamples, i.onSamplesCalibration)
+
+	// Default configuration values
+	if i.c.CalibrationDuration == 0 {
+		i.c.CalibrationDuration = 5 * time.Second
+	}
+	if i.c.CalibrationStepDuration == 0 {
+		i.c.CalibrationStepDuration = 40 * time.Millisecond
+	}
 	return
 }
 
@@ -76,7 +86,7 @@ func (i *Interface) onSamplesCalibration(samples []int32, sampleRate, significan
 
 	// Get max number of samples
 	// We take one more step than requested
-	maxNumberOfSamples := int(float64(i.calibrationSampleRate)*i.o.CalibrationDuration.Seconds())+int(float64(i.calibrationSampleRate) *float64(i.o.CalibrationStepDuration.Seconds()))
+	maxNumberOfSamples := int(float64(i.calibrationSampleRate)*i.c.CalibrationDuration.Seconds()) + int(float64(i.calibrationSampleRate)*float64(i.c.CalibrationStepDuration.Seconds()))
 
 	// Add samples
 	if len(*i.calibrationBuf)+len(samples) <= maxNumberOfSamples {
@@ -191,7 +201,7 @@ func (i *Interface) calibrate() {
 	}
 
 	// Get number of samples per steps
-	numberOfSamplesPerStep := int(math.Ceil(float64(i.calibrationSampleRate) * i.o.CalibrationStepDuration.Seconds()))
+	numberOfSamplesPerStep := int(math.Ceil(float64(i.calibrationSampleRate) * i.c.CalibrationStepDuration.Seconds()))
 
 	// Get number of steps
 	numberOfSteps := int(math.Ceil(float64(len(*i.calibrationBuf)) / float64(numberOfSamplesPerStep)))

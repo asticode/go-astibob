@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/brain"
@@ -18,34 +17,29 @@ var ctx, cancel = context.WithCancel(context.Background())
 
 // Options
 var (
-	AbilityOptions = astibrain.AbilityOptions{
+	AbilityOptions = astibrain.AbilityConfiguration{
 		AutoStart: true,
 	}
-	BobOptions = astibob.Options{
-		BrainsServer: astibob.ServerOptions{
-			ListenAddr:     "127.0.0.1:6970",
-			MaxMessageSize: 512 * 1024,
-			Password:       "admin",
-			PublicAddr:     "127.0.0.1:6970",
-			Timeout:        5 * time.Second,
-			Username:       "admin",
+	BobOptions = astibob.Configuration{
+		BrainsServer: astibob.ServerConfiguration{
+			ListenAddr: "127.0.0.1:6970",
+			Password:   "admin",
+			PublicAddr: "127.0.0.1:6970",
+			Username:   "admin",
 		},
-		ClientsServer: astibob.ServerOptions{
-			ListenAddr:     "127.0.0.1:6969",
-			MaxMessageSize: 4 * 1024,
-			Password:       "admin",
-			PublicAddr:     "127.0.0.1:6969",
-			Timeout:        5 * time.Second,
-			Username:       "admin",
+		ClientsServer: astibob.ServerConfiguration{
+			ListenAddr: "127.0.0.1:6969",
+			Password:   "admin",
+			PublicAddr: "127.0.0.1:6969",
+			Username:   "admin",
 		},
 		ResourcesDirectory: "resources",
 	}
-	BrainOptions = astibrain.Options{
-		Websocket: astibrain.WebsocketOptions{
-			MaxMessageSize: 512 * 1024,
-			Password:       "admin",
-			URL:            "ws://127.0.0.1:6970/websocket",
-			Username:       "admin",
+	BrainOptions = astibrain.Configuration{
+		Websocket: astibrain.WebsocketConfiguration{
+			Password: "admin",
+			URL:      "ws://127.0.0.1:6970/websocket",
+			Username: "admin",
 		},
 	}
 )

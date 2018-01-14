@@ -40,13 +40,13 @@ func main() {
 
 	// Add listeners
 	bob.On(astibob.EventNameAbilityStarted, func(e astibob.Event) bool {
-		if e.Ability != nil && e.Ability.Name == astiunderstanding.Name {
+		if e.Ability != nil && e.Ability.Name == understanding.Name() {
 			startSamples(bob, understanding, files[rand.Intn(len(files))])
 		}
 		return false
 	})
 	bob.On(astibob.EventNameAbilityStopped, func(e astibob.Event) bool {
-		if e.Ability != nil && e.Ability.Name == astiunderstanding.Name {
+		if e.Ability != nil && e.Ability.Name == understanding.Name() {
 			stopSamples()
 		}
 		return false

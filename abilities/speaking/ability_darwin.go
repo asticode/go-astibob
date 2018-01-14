@@ -13,15 +13,15 @@ import (
 func (a *Ability) say(i string) (err error) {
 	// Init args
 	var args []string
-	if len(a.o.Voice) > 0 {
-		args = append(args, "-v", a.o.Voice)
+	if len(a.c.Voice) > 0 {
+		args = append(args, "-v", a.c.Voice)
 	}
 	args = append(args, i)
 
 	// Binary path
 	var name = "say"
-	if len(a.o.BinaryDirPath) > 0 {
-		name = filepath.Join(a.o.BinaryDirPath, name)
+	if len(a.c.BinaryDirPath) > 0 {
+		name = filepath.Join(a.c.BinaryDirPath, name)
 	}
 
 	// Init cmd

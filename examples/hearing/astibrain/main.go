@@ -1,8 +1,6 @@
 package main
 
 import (
-	"time"
-
 	"github.com/asticode/go-astibob/abilities/hearing"
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astibob/examples"
@@ -37,8 +35,7 @@ func main() {
 	defer brain.Close()
 
 	// Create hearing
-	hearing := astihearing.NewAbility(s, astihearing.AbilityOptions{
-		DispatchDuration:     time.Second,
+	hearing := astihearing.NewAbility(s, astihearing.AbilityConfiguration{
 		SampleRate:           16000,
 		SignificantBits:      24,
 		SilenceMaxAudioLevel: 10000,

@@ -28,14 +28,14 @@ type brainsServer struct {
 }
 
 // newBrainsServer creates a new brains server.
-func newBrainsServer(t *astitemplate.Templater, b *brains, bWs *astiws.Manager, cWs *astiws.Manager, d *dispatcher, i *interfaces, o ServerOptions) (s *brainsServer) {
+func newBrainsServer(t *astitemplate.Templater, b *brains, bWs *astiws.Manager, cWs *astiws.Manager, d *dispatcher, i *interfaces, c ServerConfiguration) (s *brainsServer) {
 	// Create server
 	s = &brainsServer{
 		brains:     b,
 		clientsWs:  cWs,
 		dispatcher: d,
 		interfaces: i,
-		server:     newServer("brains", bWs, o),
+		server:     newServer("brains", bWs, c),
 		templater:  t,
 	}
 
@@ -46,7 +46,7 @@ func newBrainsServer(t *astitemplate.Templater, b *brains, bWs *astiws.Manager, 
 	r.GET("/websocket", s.handleWebsocketGET)
 
 	// Chain middlewares
-	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(o.Username, o.Password))
+	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(s.c.Username, s.c.Password))
 
 	// Set handler
 	s.setHandler(h)

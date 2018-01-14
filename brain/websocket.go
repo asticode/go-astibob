@@ -30,34 +30,34 @@ const (
 type websocket struct {
 	abilities   *abilities
 	c           *astiws.Client
+	cfg         WebsocketConfiguration
 	isConnected bool
 	h           http.Header
 	m           sync.Mutex
-	o           WebsocketOptions
 	q           []astiws.BodyMessage
 }
 
-// WebsocketOptions are websocket options
-type WebsocketOptions struct {
-	MaxMessageSize int    `toml:"max_message_size"`
-	Password       string `toml:"password"`
-	URL            string `toml:"url"`
-	Username       string `toml:"username"`
+// WebsocketConfiguration is a websocket configuration
+type WebsocketConfiguration struct {
+	Client   astiws.ClientConfiguration `toml:"client"`
+	Password string                     `toml:"password"`
+	URL      string                     `toml:"url"`
+	Username string                     `toml:"username"`
 }
 
 // newWebsocket creates a new websocket wrapper
-func newWebsocket(abilities *abilities, o WebsocketOptions) (ws *websocket) {
+func newWebsocket(abilities *abilities, c WebsocketConfiguration) (ws *websocket) {
 	// Create websocket
 	ws = &websocket{
 		abilities: abilities,
-		c:         astiws.NewClient(o.MaxMessageSize),
+		c:         astiws.NewClient(c.Client),
+		cfg:       c,
 		h:         make(http.Header),
-		o:         o,
 	}
 
 	// Set headers
-	if len(o.Username) > 0 && len(o.Password) > 0 {
-		ws.h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(o.Username+":"+o.Password)))
+	if len(ws.cfg.Username) > 0 && len(ws.cfg.Password) > 0 {
+		ws.h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(ws.cfg.Username+":"+ws.cfg.Password)))
 	}
 
 	// Add default listeners
@@ -94,7 +94,7 @@ func (ws *websocket) dial(ctx context.Context, name string) {
 		}
 
 		// Dial
-		if err := ws.c.DialWithHeaders(ws.o.URL, ws.h); err != nil {
+		if err := ws.c.DialWithHeaders(ws.cfg.URL, ws.h); err != nil {
 			astilog.Error(errors.Wrap(err, "astibrain: dialing websocket failed"))
 			time.Sleep(sleepError)
 			continue

@@ -17,43 +17,43 @@ import (
 type Bob struct {
 	brains        *brains
 	brainsServer  *brainsServer
+	c             Configuration
 	cancel        context.CancelFunc
 	clientsServer *clientsServer
 	ctx           context.Context
 	dispatcher    *dispatcher
 	interfaces    *interfaces
-	o             Options
 	templater     *astitemplate.Templater
 }
 
-// Options are Bob options.
-type Options struct {
-	BrainsServer       ServerOptions `toml:"brains_server"`
-	ClientsServer      ServerOptions `toml:"clients_server"`
-	ResourcesDirectory string        `toml:"resources_directory"`
+// Configuration represents a Bob configuration.
+type Configuration struct {
+	BrainsServer       ServerConfiguration `toml:"brains_server"`
+	ClientsServer      ServerConfiguration `toml:"clients_server"`
+	ResourcesDirectory string              `toml:"resources_directory"`
 }
 
 // New creates a new Bob.
-func New(o Options) (b *Bob, err error) {
+func New(c Configuration) (b *Bob, err error) {
 	// Create bob
 	b = &Bob{
 		brains:     newBrains(),
+		c:          c,
 		dispatcher: newDispatcher(),
 		interfaces: newInterfaces(),
-		o:          o,
 	}
 
 	// Create templater
-	if b.templater, err = astitemplate.NewTemplater(filepath.Join(b.o.ResourcesDirectory, "templates", "pages"), filepath.Join(b.o.ResourcesDirectory, "templates", "layouts"), ".html"); err != nil {
-		err = errors.Wrapf(err, "astibob: creating templater with resources directory %s failed", b.o.ResourcesDirectory)
+	if b.templater, err = astitemplate.NewTemplater(filepath.Join(b.c.ResourcesDirectory, "templates", "pages"), filepath.Join(b.c.ResourcesDirectory, "templates", "layouts"), ".html"); err != nil {
+		err = errors.Wrapf(err, "astibob: creating templater with resources directory %s failed", b.c.ResourcesDirectory)
 		return
 	}
 
 	// Create servers
-	brainsWs := astiws.NewManager(o.BrainsServer.MaxMessageSize)
-	clientsWs := astiws.NewManager(o.ClientsServer.MaxMessageSize)
-	b.clientsServer = newClientsServer(b.templater, b.brains, clientsWs, b.interfaces, b.stop, o)
-	b.brainsServer = newBrainsServer(b.templater, b.brains, brainsWs, clientsWs, b.dispatcher, b.interfaces, o.BrainsServer)
+	brainsWs := astiws.NewManager(c.BrainsServer.Ws)
+	clientsWs := astiws.NewManager(c.BrainsServer.Ws)
+	b.brainsServer = newBrainsServer(b.templater, b.brains, brainsWs, clientsWs, b.dispatcher, b.interfaces, c.BrainsServer)
+	b.clientsServer = newClientsServer(b.templater, b.brains, clientsWs, b.interfaces, b.stop, c)
 	return
 }
 

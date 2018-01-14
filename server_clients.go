@@ -43,12 +43,12 @@ type clientsServer struct {
 }
 
 // newClientsServer creates a new clients server.
-func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager, interfaces *interfaces, stopFunc func(), o Options) (s *clientsServer) {
+func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager, interfaces *interfaces, stopFunc func(), c Configuration) (s *clientsServer) {
 	// Create server
 	s = &clientsServer{
 		brains:     b,
 		interfaces: interfaces,
-		server:     newServer("clients", cWs, o.ClientsServer),
+		server:     newServer("clients", cWs, c.ClientsServer),
 		stopFunc:   stopFunc,
 		templater:  t,
 	}
@@ -57,7 +57,7 @@ func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager,
 	var r = httprouter.New()
 
 	// Static files
-	r.ServeFiles("/static/*filepath", http.Dir(filepath.Join(o.ResourcesDirectory, "static")))
+	r.ServeFiles("/static/*filepath", http.Dir(filepath.Join(c.ResourcesDirectory, "static")))
 
 	// Web
 	r.GET("/", s.handleHomepageGET)
@@ -74,8 +74,8 @@ func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager,
 	r.GET(serverPatternAPI+"/brains/:brain/abilities/:ability/*path", s.handleAPICustomGET)
 
 	// Chain middlewares
-	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(o.ClientsServer.Username, o.ClientsServer.Password))
-	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternWeb + "/", serverPatternAPI + "/"}, astihttp.MiddlewareTimeout(o.ClientsServer.Timeout))
+	var h = astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(s.c.Username, s.c.Password))
+	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternWeb + "/", serverPatternAPI + "/"}, astihttp.MiddlewareTimeout(s.c.Timeout))
 	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternWeb + "/"}, astihttp.MiddlewareContentType("text/html; charset=UTF-8"))
 	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{serverPatternAPI + "/"}, astihttp.MiddlewareContentType("application/json"))
 
@@ -290,7 +290,7 @@ type APIReferences struct {
 // handleAPIReferencesGET returns the references.
 func (s *clientsServer) handleAPIReferencesGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	APIWrite(rw, APIReferences{
-		WsURL:        "ws://" + s.o.PublicAddr + "/websocket",
+		WsURL:        "ws://" + s.c.PublicAddr + "/websocket",
 		WsPingPeriod: int(astiws.PingPeriod.Seconds()),
 	})
 }

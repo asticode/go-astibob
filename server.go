@@ -12,35 +12,41 @@ import (
 
 // server represents a server
 type server struct {
+	c    ServerConfiguration
 	name string
-	o    ServerOptions
 	s    *http.Server
 	ws   *astiws.Manager
 }
 
-// ServerOptions are server options
-type ServerOptions struct {
-	ListenAddr     string        `toml:"listen_addr"`
-	MaxMessageSize int           `toml:"max_message_size"`
-	Password       string        `toml:"password"`
-	PublicAddr     string        `toml:"public_addr"`
-	Timeout        time.Duration `toml:"timeout"`
-	URL            string        `toml:"url"`
-	Username       string        `toml:"username"`
+// ServerConfiguration is a server configuration
+type ServerConfiguration struct {
+	ListenAddr string                      `toml:"listen_addr"`
+	Password   string                      `toml:"password"`
+	PublicAddr string                      `toml:"public_addr"`
+	Timeout    time.Duration               `toml:"timeout"`
+	Username   string                      `toml:"username"`
+	Ws         astiws.ManagerConfiguration `toml:"ws"`
 }
 
 // newServer creates a new server
-func newServer(name string, ws *astiws.Manager, o ServerOptions) *server {
-	return &server{
+func newServer(name string, ws *astiws.Manager, c ServerConfiguration) *server {
+	// Create
+	s := &server{
+		c:    c,
 		name: name,
-		o:    o,
 		ws:   ws,
 	}
+
+	// Default configuration values
+	if s.c.Timeout == 0 {
+		s.c.Timeout = 5 * time.Second
+	}
+	return s
 }
 
 // setHandler sets the handler
 func (s *server) setHandler(h http.Handler) {
-	s.s = &http.Server{Addr: s.o.ListenAddr, Handler: h}
+	s.s = &http.Server{Addr: s.c.ListenAddr, Handler: h}
 }
 
 // Close implements the io.Closer interface

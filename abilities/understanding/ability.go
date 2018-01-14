@@ -9,7 +9,6 @@ import (
 
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
-	"github.com/asticode/go-astitools/audio"
 	"github.com/asticode/go-astitools/sync"
 	"github.com/asticode/go-astiws"
 	"github.com/cryptix/wav"
@@ -21,24 +20,16 @@ type Ability struct {
 	ch           chan PayloadSamples
 	d            *astisync.Do
 	dispatchFunc astibrain.DispatchFunc
-	o            AbilityOptions
 	p            SpeechParser
-	sd           *astiaudio.SilenceDetector
-}
-
-// AbilityOptions represents ability options
-type AbilityOptions struct {
-	SamplesDirectoryPath *string                          `toml:"samples_directory_path"`
-	SilenceDetector      astiaudio.SilenceDetectorOptions `toml:"silence_detector"`
+	sd           SilenceDetector
 }
 
 // NewAbility creates a new ability
-func NewAbility(p SpeechParser, o AbilityOptions) *Ability {
+func NewAbility(p SpeechParser, sd SilenceDetector) *Ability {
 	return &Ability{
 		d:  astisync.NewDo(),
-		o:  o,
 		p:  p,
-		sd: astiaudio.NewSilenceDetector(o.SilenceDetector),
+		sd: sd,
 	}
 }
 
@@ -120,14 +111,10 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 // TODO Add validation process in UI
 func (a *Ability) storeSamples(samples []int32, sampleRate, significantBits int) (path string, err error) {
 	return
-	// No need to store samples
-	if a.o.SamplesDirectoryPath == nil {
-		return
-	}
 
 	// Create dir path
 	now := time.Now()
-	path = filepath.Join(*a.o.SamplesDirectoryPath, now.Format("2006-01-02"))
+	path = filepath.Join("TODO", now.Format("2006-01-02"))
 
 	// Make sure the dir exists
 	if err = os.MkdirAll(path, 0777); err != nil {
