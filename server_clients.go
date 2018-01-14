@@ -36,19 +36,21 @@ const (
 // clientsServer is a server for the clients
 type clientsServer struct {
 	*server
-	brains    *brains
-	stopFunc  func()
-	templater *astitemplate.Templater
+	brains     *brains
+	interfaces *interfaces
+	stopFunc   func()
+	templater  *astitemplate.Templater
 }
 
 // newClientsServer creates a new clients server.
-func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager, stopFunc func(), o Options) (s *clientsServer) {
+func newClientsServer(t *astitemplate.Templater, b *brains, cWs *astiws.Manager, interfaces *interfaces, stopFunc func(), o Options) (s *clientsServer) {
 	// Create server
 	s = &clientsServer{
-		brains:    b,
-		server:    newServer("clients", cWs, o.ClientsServer),
-		stopFunc:  stopFunc,
-		templater: t,
+		brains:     b,
+		interfaces: interfaces,
+		server:     newServer("clients", cWs, o.ClientsServer),
+		stopFunc:   stopFunc,
+		templater:  t,
 	}
 
 	// Init router
@@ -140,16 +142,6 @@ func (s *clientsServer) templateData(r *http.Request, p httprouter.Params, name 
 	return
 }
 
-// clientAbilityWebsocketBaseEventName returns the client ability websocket base event name
-func clientAbilityWebsocketBaseEventName(brainKey, abilityKey string) string {
-	return fmt.Sprintf("brain.%s.ability.%s", brainKey, abilityKey)
-}
-
-// clientAbilityWebsocketEventName returns the client ability websocket event name
-func clientAbilityWebsocketEventName(brainKey, abilityKey, eventName string) string {
-	return fmt.Sprintf("%s.%s", clientAbilityWebsocketBaseEventName(brainKey, abilityKey), eventName)
-}
-
 // handleWebsocketGET handles the websockets.
 func (s *clientsServer) handleWebsocketGET(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if err := s.ws.ServeHTTP(rw, r, s.adaptWebsocketClient); err != nil {
@@ -160,13 +152,47 @@ func (s *clientsServer) handleWebsocketGET(rw http.ResponseWriter, r *http.Reque
 	}
 }
 
+// clientAbilityWebsocketBaseEventName returns the client ability websocket base event name
+func clientAbilityWebsocketBaseEventName(brainKey, abilityKey string) string {
+	return fmt.Sprintf("brain.%s.ability.%s", brainKey, abilityKey)
+}
+
+// clientAbilityWebsocketEventName returns the client ability websocket event name
+func clientAbilityWebsocketEventName(brainKey, abilityKey, eventName string) string {
+	return fmt.Sprintf("%s.%s", clientAbilityWebsocketBaseEventName(brainKey, abilityKey), eventName)
+}
+
 // ClientAdapter returns the client adapter.
 func (s *clientsServer) adaptWebsocketClient(c *astiws.Client) {
+	// Register client
 	s.ws.AutoRegisterClient(c)
+
+	// Add default listeners
 	c.AddListener(astiws.EventNameDisconnect, s.handleWebsocketDisconnected)
 	c.AddListener(clientsWebsocketEventNameAbilityStart, s.handleWebsocketAbilityToggle)
 	c.AddListener(clientsWebsocketEventNameAbilityStop, s.handleWebsocketAbilityToggle)
 	c.AddListener(clientsWebsocketEventNamePing, s.handleWebsocketPing)
+
+	// Loop through brains
+	s.brains.brains(func(b *brain) error {
+		// Loop through abilities
+		b.abilities(func(a *ability) error {
+			// Fetch interface
+			i, ok := s.interfaces.get(a.name)
+			if !ok {
+				return nil
+			}
+
+			// Add client websocket listener
+			if v, ok := i.(ClientWebsocketListener); ok {
+				for n, l := range v.ClientWebsocketListeners() {
+					c.AddListener(clientAbilityWebsocketEventName(b.key, a.key, n), l)
+				}
+			}
+			return nil
+		})
+		return nil
+	})
 }
 
 // handleWebsocketDisconnected handles the disconnected websocket event

@@ -4,6 +4,8 @@ import (
 	"io/ioutil"
 	"os"
 
+	"time"
+
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/abilities/hearing"
 	"github.com/asticode/go-astibob/examples"
@@ -32,7 +34,10 @@ func main() {
 	defer w.Close()
 
 	// Create hearing
-	hearing := astihearing.NewInterface()
+	hearing := astihearing.NewInterface(astihearing.InterfaceOptions{
+		CalibrateStepDuration: 100 * time.Millisecond,
+		CalibrateMaxDuration:  5 * time.Second,
+	})
 
 	// Handle samples
 	hearing.OnSamples(func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {

@@ -21,6 +21,11 @@ type BrainWebsocketListener interface {
 	BrainWebsocketListeners() map[string]astiws.ListenerFunc
 }
 
+// ClientWebsocketListener represents an object that can listen to a client websocket
+type ClientWebsocketListener interface {
+	ClientWebsocketListeners() map[string]astiws.ListenerFunc
+}
+
 // ClientEvent represents a client event
 type ClientEvent struct {
 	Name    string

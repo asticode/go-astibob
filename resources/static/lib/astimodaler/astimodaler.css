@@ -6,6 +6,7 @@
     position: fixed;
     top: 0;
     width: 100%;
+    z-index: 1;
 }
 .astimodaler-background {
     background-color: #000;
@@ -32,10 +33,11 @@
     vertical-align: middle;
     width: 100%;
 }
-.astimodaler-body {
+#astimodaler-body {
     background-color: #f1f1f1;
     border-radius: 5px;
     color: #333;
+    margin: auto;
     padding: 2em;
     position: relative;
 }

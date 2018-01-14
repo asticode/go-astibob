@@ -31,12 +31,19 @@ func (i *Interface) SetDispatchFunc(fn astibob.DispatchFunc) {
 
 // addToHistory adds a sentence to the history while keeping it capped
 func (i *Interface) addToHistory(s string) {
+	// Lock
 	i.m.Lock()
 	defer i.m.Unlock()
+
+	// Append
 	i.history = append(i.history, s)
+
+	// Only keep last 50 items
 	if len(i.history) > 50 {
 		i.history = i.history[len(i.history)-50:]
 	}
+
+	// Dispatch to clients
 	i.dispatchFunc(astibob.ClientEvent{
 		Name:    "history",
 		Payload: s,

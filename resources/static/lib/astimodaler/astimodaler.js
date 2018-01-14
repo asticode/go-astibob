@@ -16,7 +16,7 @@ asticode.modaler = {
             <div class="astimodaler-background"></div>
             <div class="astimodaler-table">
                 <div class="astimodaler-wrapper">
-                    <div class="astimodaler-body">
+                    <div id="astimodaler-body">
                         <i class="fa fa-close astimodaler-close" onclick="asticode.modaler.close()"></i>
                         <div id="astimodaler-content"></div>
                     </div>
@@ -27,6 +27,9 @@ asticode.modaler = {
     setContent: function(content) {
         document.getElementById("astimodaler-content").innerHTML = '';
         document.getElementById("astimodaler-content").appendChild(content);
+    },
+    setWidth: function(width) {
+        document.getElementById("astimodaler-body").style.width = width;
     },
     show: function() {
         document.getElementById("astimodaler").style.display = "block";

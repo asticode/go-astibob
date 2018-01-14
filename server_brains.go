@@ -82,7 +82,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	var b = newBrain(ip.Name, c)
 
 	// Loop through abilities
-	var webTemplatesPaths []string
+	var clientWebsocketListeners, webTemplatesPaths []string
 	for _, pa := range ip.Abilities {
 		// Create ability
 		var a = newAbility(pa.Name, pa.Description, pa.IsOn)
@@ -104,11 +104,24 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 				v.SetDispatchFunc(s.dispatchFunc(b.key, a.key))
 			}
 
-			// Add custom brain websocket listeners
+			// Add brain websocket listeners
 			if v, ok := i.(BrainWebsocketListener); ok {
 				for n, l := range v.BrainWebsocketListeners() {
 					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l)
 				}
+			}
+
+			// Add client websocket listeners
+			if v, ok := i.(ClientWebsocketListener); ok {
+				// Loop through clients
+				s.clientsWs.Clients(func(k interface{}, c *astiws.Client) error {
+					for n, l := range v.ClientWebsocketListeners() {
+						eventName := clientAbilityWebsocketEventName(b.key, a.key, n)
+						clientWebsocketListeners = append(clientWebsocketListeners, eventName)
+						c.AddListener(eventName, l)
+					}
+					return nil
+				})
 			}
 
 			// Add web templates
@@ -141,7 +154,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 	s.brains.set(b)
 
 	// Adapt ws client
-	c.AddListener(astiws.EventNameDisconnect, s.handleWebsocketDisconnected(b, webTemplatesPaths))
+	c.AddListener(astiws.EventNameDisconnect, s.handleWebsocketDisconnected(b, clientWebsocketListeners, webTemplatesPaths))
 	c.AddListener(astibrain.WebsocketEventNameAbilityStarted, s.handleWebsocketAbilityToggle(b))
 	c.AddListener(astibrain.WebsocketEventNameAbilityStopped, s.handleWebsocketAbilityToggle(b))
 	c.AddListener(astibrain.WebsocketEventNameAbilityCrashed, s.handleWebsocketAbilityToggle(b))
@@ -185,9 +198,17 @@ func (s *brainsServer) abilityWebTemplatePath(brainKey, abilityKey, path string)
 }
 
 // handleWebsocketDisconnected handles the disconnected websocket event
-func (s *brainsServer) handleWebsocketDisconnected(b *brain, webTemplatesPaths []string) astiws.ListenerFunc {
+func (s *brainsServer) handleWebsocketDisconnected(b *brain, clientWebsocketListeners, webTemplatesPaths []string) astiws.ListenerFunc {
 	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
-		// Loop through web templates
+		// Remove client websocket listeners
+		s.clientsWs.Clients(func(k interface{}, c *astiws.Client) error {
+			for _, n := range clientWebsocketListeners {
+				c.DelListener(n)
+			}
+			return nil
+		})
+
+		// Remove web templates
 		for _, path := range webTemplatesPaths {
 			s.templater.Del(path)
 		}
