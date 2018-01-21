@@ -3,17 +3,18 @@ package astispeechtotext
 import (
 	"github.com/asticode/go-astideepspeech"
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/audio"
 	"github.com/pkg/errors"
 )
 
 // SpeechToText represents an object capable of doing speech to text operations
 type SpeechToText struct {
 	m *astideepspeech.Model
-	o Options
+	c Configuration
 }
 
-// Options represents options
-type Options struct {
+// Configuration represents a configuration
+type Configuration struct {
 	AlphabetConfigPath   string  `toml:"alphabet_config_path"`
 	BeamWidth            int     `toml:"beam_width"`
 	LMPath               string  `toml:"lm_path"`
@@ -27,16 +28,16 @@ type Options struct {
 }
 
 // New creates a new speech to text parser
-func New(o Options) (s *SpeechToText) {
+func New(c Configuration) (s *SpeechToText) {
 	// Create speech to text
 	s = &SpeechToText{
-		m: astideepspeech.New(o.ModelPath, o.NCep, o.NContext, o.AlphabetConfigPath, o.BeamWidth),
-		o: o,
+		m: astideepspeech.New(c.ModelPath, c.NCep, c.NContext, c.AlphabetConfigPath, c.BeamWidth),
+		c: c,
 	}
 
 	// Enable decoder with lm
-	if len(o.LMPath) > 0 {
-		s.m.EnableDecoderWithLM(o.AlphabetConfigPath, o.LMPath, o.TriePath, o.LMWeight, o.WordCountWeight, o.ValidWordCountWeight)
+	if len(c.LMPath) > 0 {
+		s.m.EnableDecoderWithLM(c.AlphabetConfigPath, c.LMPath, c.TriePath, c.LMWeight, c.WordCountWeight, c.ValidWordCountWeight)
 	}
 	return
 }
@@ -52,24 +53,28 @@ func (s *SpeechToText) Close() error {
 }
 
 // SpeechToText implements the astiunderstanding.SpeechToText interface
-func (s *SpeechToText) SpeechToText(buffer []int32, bufferSize, sampleRate, significantBits int) string {
-	// TODO Convert sample rate as well
+func (s *SpeechToText) SpeechToText(samples []int32, sampleRate, significantBits int) (text string, err error) {
+	// Convert sample rate
+	if samples, err = astiaudio.ConvertSampleRate(samples, sampleRate, 16000); err != nil {
+		err = errors.Wrap(err, "astispeechtotext: converting sample rate failed")
+		return
+	}
 
-	// Convert to 16 bits
-	// TODO Move to astiaudio
-	var samples = make([]int16, bufferSize)
-	var sample int16
-	for idx := 0; idx < bufferSize; idx++ {
-		if significantBits == 16 {
-			sample = int16(buffer[idx])
-		} else if significantBits > 16 {
-			sample = int16(buffer[idx] >> uint((significantBits - 16)))
-		} else {
-			sample = int16(buffer[idx] << uint((16 - significantBits)))
+	// Loop through samples
+	var samples16 = make([]int16, len(samples))
+	for idx := 0; idx < len(samples); idx++ {
+		// Convert bit depth
+		var sample int32
+		if sample, err = astiaudio.ConvertBitDepth(samples[idx], significantBits, 16); err != nil {
+			err = errors.Wrap(err, "astispeechtotext: converting bit depth failed")
+			return
 		}
-		samples[idx] = sample
+
+		// Append sample
+		samples16[idx] = int16(sample)
 	}
 
 	// Speech to text
-	return s.m.SpeechToText(samples, bufferSize, sampleRate)
+	text = s.m.SpeechToText(samples16, len(samples16), 16000)
+	return
 }

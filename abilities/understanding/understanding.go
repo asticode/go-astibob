@@ -13,7 +13,7 @@ type SilenceDetector interface {
 
 // SpeechParser represents an object capable of parsing speech and returning the corresponding text
 type SpeechParser interface {
-	SpeechToText(buffer []int32, bufferSize, sampleRate, significantBits int) string
+	SpeechToText(samples []int32, sampleRate, significantBits int) (string, error)
 }
 
 // Websocket event names

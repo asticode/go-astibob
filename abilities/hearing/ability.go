@@ -113,16 +113,18 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 			dispatchBuf := make([]int32, len(buf))
 			copy(dispatchBuf, buf)
 			buf = buf[:0]
-			a.dispatchFunc(astibrain.Event{
-				AbilityName: name,
-				Name:        websocketEventNameSamples,
-				Payload: PayloadSamples{
-					SampleRate:           a.c.SampleRate,
-					Samples:              dispatchBuf,
-					SignificantBits:      a.c.SignificantBits,
-					SilenceMaxAudioLevel: a.c.SilenceMaxAudioLevel,
-				},
-			})
+			if a.dispatchFunc != nil {
+				a.dispatchFunc(astibrain.Event{
+					AbilityName: name,
+					Name:        websocketEventNameSamples,
+					Payload: PayloadSamples{
+						SampleRate:           a.c.SampleRate,
+						Samples:              dispatchBuf,
+						SignificantBits:      a.c.SignificantBits,
+						SilenceMaxAudioLevel: a.c.SilenceMaxAudioLevel,
+					},
+				})
+			}
 		}
 	}
 }

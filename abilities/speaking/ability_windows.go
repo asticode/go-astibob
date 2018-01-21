@@ -50,16 +50,6 @@ func (a *Ability) Close() (err error) {
 
 // say says words
 func (a *Ability) say(i string) (err error) {
-	// Get muted attribute
-	a.m.Lock()
-	m := a.isMuted
-	a.m.Unlock()
-
-	// Do nothing if muted
-	if m {
-		return
-	}
-
 	// Init has not been executed
 	if a.windowsIDispatch == nil {
 		err = errors.New("astispeaking: the Init() method should be called before running anything else")

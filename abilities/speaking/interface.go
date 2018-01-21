@@ -44,10 +44,12 @@ func (i *Interface) addToHistory(s string) {
 	}
 
 	// Dispatch to clients
-	i.dispatchFunc(astibob.ClientEvent{
-		Name:    "history",
-		Payload: s,
-	})
+	if i.dispatchFunc != nil {
+		i.dispatchFunc(astibob.ClientEvent{
+			Name:    "history",
+			Payload: s,
+		})
+	}
 }
 
 // Say creates a say cmd

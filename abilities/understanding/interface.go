@@ -100,7 +100,9 @@ func (i *Interface) OnSamplesStored(fn SamplesStoredFunc) {
 
 // onSamplesStoredDispatch is the samples stored callback for the dispatch
 func (i *Interface) onSamplesStoredDispatch(id, text string) error {
-	i.dispatchFunc(astibob.ClientEvent{Name: "samples.stored", Payload: newPayloadStoredSamples(id, text)})
+	if i.dispatchFunc != nil {
+		i.dispatchFunc(astibob.ClientEvent{Name: "samples.stored", Payload: newPayloadStoredSamples(id, text)})
+	}
 	return nil
 }
 
@@ -208,7 +210,9 @@ func (i *Interface) ClientWebsocketListenerHandleSamples(reward string) astiws.L
 		defer func(err *error) {
 			if *err != nil {
 				astilog.Error(*err)
-				i.dispatchFunc(astibob.ClientEvent{Name: "error", Payload: (*err).Error()})
+				if i.dispatchFunc != nil {
+					i.dispatchFunc(astibob.ClientEvent{Name: "error", Payload: (*err).Error()})
+				}
 			}
 		}(&err)
 
@@ -254,7 +258,9 @@ func (i *Interface) ClientWebsocketListenerHandleSamples(reward string) astiws.L
 		}
 
 		// Dispatch to clients
-		i.dispatchFunc(astibob.ClientEvent{Name: "samples." + reward, Payload: p})
+		if i.dispatchFunc != nil {
+			i.dispatchFunc(astibob.ClientEvent{Name: "samples." + reward, Payload: p})
+		}
 		return nil
 	}
 }

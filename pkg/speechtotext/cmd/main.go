@@ -2,18 +2,20 @@ package main
 
 import (
 	"bytes"
+	"encoding/csv"
 	"flag"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 
-	"encoding/csv"
-
-	"strconv"
+	"io"
 
 	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astitools/audio"
+	"github.com/cryptix/wav"
 	"github.com/pkg/errors"
 )
 
@@ -56,6 +58,12 @@ func main() {
 	_, errStat := os.Stat(csvPath)
 	if errStat != nil && !os.IsNotExist(errStat) {
 		astilog.Fatal(errors.Wrapf(err, "stating %s failed", csvPath))
+	}
+
+	// Create csv dir
+	dirPath := filepath.Dir(csvPath)
+	if err = os.MkdirAll(dirPath, 0755); err != nil {
+		astilog.Fatal(errors.Wrapf(err, "mkdirall %s failed", dirPath))
 	}
 
 	// Open csv
@@ -112,12 +120,11 @@ func main() {
 
 		// Get id
 		id := strings.TrimSuffix(strings.TrimPrefix(path, inputPath), ".wav")
-		astilog.Debugf("processing %s", id)
 
 		// ID has already been processed
 		wavOutputPath := filepath.Join(outputPath, id+".wav")
 		if _, ok := indexedWavFilenames[wavOutputPath]; ok {
-			astilog.Debugf("%s found, skipping...", wavOutputPath)
+			astilog.Debugf("skipping %s", id)
 			return nil
 		}
 
@@ -125,20 +132,25 @@ func main() {
 		var transcript []byte
 		txtPath := filepath.Join(inputPath, id+".txt")
 		if transcript, err = retrieveTranscript(txtPath); err != nil {
-			return errors.Wrapf(err, "retrieving transcript from %s failed", txtPath)
+			astilog.Error(errors.Wrapf(err, "retrieving transcript from %s failed", txtPath))
+			return nil
 		}
-		astilog.Debugf("transcript is %s", transcript)
 
 		// Convert wav file
 		wavInputPath := filepath.Join(inputPath, id+".wav")
 		if err = convertWavFile(wavInputPath, wavOutputPath); err != nil {
-			return errors.Wrapf(err, "converting wav file from %s to %s failed", wavInputPath, wavOutputPath)
+			astilog.Error(errors.Wrapf(err, "converting wav file from %s to %s failed", wavInputPath, wavOutputPath))
+			return nil
 		}
 
 		// Append to csv
 		if err = appendToCSV(w, wavOutputPath, string(transcript)); err != nil {
-			return errors.Wrapf(err, "appending %s with transcript %s to csv failed", wavOutputPath, transcript)
+			astilog.Error(errors.Wrapf(err, "appending %s with transcript %s to csv failed", wavOutputPath, transcript))
+			return nil
 		}
+
+		// Log
+		astilog.Infof("added %s", id)
 		return nil
 	}); err != nil {
 		astilog.Fatal(errors.Wrapf(err, "walking through %s failed", inputPath))
@@ -160,9 +172,85 @@ func retrieveTranscript(txtPath string) (transcript []byte, err error) {
 }
 
 func convertWavFile(src, dst string) (err error) {
-	// TODO convert to 16 bits
+	// Stat src
+	var fi os.FileInfo
+	if fi, err = os.Stat(src); err != nil {
+		return errors.Wrapf(err, "stating %s failed", src)
+	}
 
-	// TODO convert to 16 000 samples
+	// Open src
+	var srcFile *os.File
+	if srcFile, err = os.Open(src); err != nil {
+		return errors.Wrapf(err, "opening %s failed", src)
+	}
+	defer srcFile.Close()
+
+	// Create wav reader
+	var r *wav.Reader
+	if r, err = wav.NewReader(srcFile, fi.Size()); err != nil {
+		return errors.Wrap(err, "creating wav reader failed")
+	}
+
+	// Get samples
+	var samples []int32
+	var sample int32
+	for {
+		// Read sample
+		if sample, err = r.ReadSample(); err != nil {
+			if err != io.EOF {
+				return errors.Wrap(err, "reading wav sample failed")
+			}
+			break
+		}
+
+		// Append sample
+		samples = append(samples, sample)
+	}
+
+	// Create dst dir
+	dstDir := filepath.Dir(dst)
+	if err = os.MkdirAll(dstDir, 0755); err != nil {
+		return errors.Wrapf(err, "mkdirall %s failed", dstDir)
+	}
+
+	// Create dst file
+	var dstFile *os.File
+	if dstFile, err = os.Create(dst); err != nil {
+		return errors.Wrapf(err, "creating %s failed", dst)
+	}
+	defer dstFile.Close()
+
+	// Create wav file
+	wavFile := wav.File{
+		Channels:        1,
+		SampleRate:      16000,
+		SignificantBits: 16,
+	}
+
+	// Create wav writer
+	var w *wav.Writer
+	if w, err = wavFile.NewWriter(dstFile); err != nil {
+		return errors.Wrap(err, "creating wav writer failed")
+	}
+	defer w.Close()
+
+	// Convert sample rate
+	if samples, err = astiaudio.ConvertSampleRate(samples, int(r.GetFile().SampleRate), int(wavFile.SampleRate)); err != nil {
+		return errors.Wrap(err, "converting sample rate failed")
+	}
+
+	// Loop through samples
+	for _, sample := range samples {
+		// Convert bit depth
+		if sample, err = astiaudio.ConvertBitDepth(sample, int(r.GetFile().SignificantBits), int(wavFile.SignificantBits)); err != nil {
+			return errors.Wrap(err, "converting bit depth failed")
+		}
+
+		// Write
+		if err = w.WriteSample([]byte{byte(sample&0xff), byte(sample>>8&0xff)}); err != nil {
+			return errors.Wrap(err, "writing wav sample failed")
+		}
+	}
 	return
 }
 

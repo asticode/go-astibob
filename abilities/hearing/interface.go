@@ -245,10 +245,12 @@ func (i *Interface) calibrate() {
 	i.calibrationBuf = nil
 
 	// Dispatch to clients
-	i.dispatchFunc(astibob.ClientEvent{
-		Name:    "calibration.results",
-		Payload: p,
-	})
+	if i.dispatchFunc != nil {
+		i.dispatchFunc(astibob.ClientEvent{
+			Name:    "calibration.results",
+			Payload: p,
+		})
+	}
 }
 
 // WebTemplates implements the astibob.WebTemplater interface

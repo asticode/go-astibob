@@ -106,11 +106,15 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 		// Execute speech to text analysis
 		start := time.Now()
 		astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
-		text := a.p.SpeechToText(samples, len(samples), sampleRate, significantBits)
+		text, err := a.p.SpeechToText(samples, sampleRate, significantBits)
+		if err != nil {
+			astilog.Error(errors.Wrap(err, "astiunderstanding: speech to text analysis failed"))
+			return
+		}
 		astilog.Debugf("astiunderstanding: speech to text analysis done in %s", time.Now().Sub(start))
 
 		// Dispatch analysis
-		if len(text) > 0 {
+		if len(text) > 0 && a.dispatchFunc != nil {
 			a.dispatchFunc(astibrain.Event{
 				AbilityName: name,
 				Name:        websocketEventNameAnalysis,
@@ -124,7 +128,7 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 			id, err := a.storeSamples(text, samples, sampleRate, significantBits)
 			if err != nil {
 				astilog.Error(errors.Wrap(err, "astiunderstanding: storing samples failed"))
-			} else {
+			} else if a.dispatchFunc != nil  {
 				a.dispatchFunc(astibrain.Event{
 					AbilityName: name,
 					Name:        websocketEventNameSamplesStored,
