@@ -80,6 +80,7 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 		select {
 		case p := <-a.ch:
 			// Add samples to silence detector and retrieve speech samples
+			// TODO Apply human voice filter
 			speechSamples := a.sd.Add(p.Samples, p.SampleRate, p.SilenceMaxAudioLevel)
 
 			// No speech samples
