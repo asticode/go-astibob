@@ -35,7 +35,7 @@ type InterfaceConfiguration struct {
 }
 
 // SamplesFunc represents the callback executed upon receiving samples
-type SamplesFunc func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error
+type SamplesFunc func(brainName string, samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error
 
 // NewInterface creates a new interface
 func NewInterface(c InterfaceConfiguration) (i *Interface) {
@@ -71,7 +71,7 @@ func (i *Interface) OnSamples(fn SamplesFunc) {
 }
 
 // onSamplesCalibration is the samples callback for the calibration
-func (i *Interface) onSamplesCalibration(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
+func (i *Interface) onSamplesCalibration(brainName string, samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
 	// Lock
 	i.mc.Lock()
 	defer i.mc.Unlock()
@@ -99,28 +99,30 @@ func (i *Interface) onSamplesCalibration(samples []int32, sampleRate, significan
 }
 
 // BrainWebsocketListeners implements the astibob.BrainWebsocketListener interface
-func (i *Interface) BrainWebsocketListeners() map[string]astiws.ListenerFunc {
-	return map[string]astiws.ListenerFunc{
+func (i *Interface) BrainWebsocketListeners() map[string]astibob.BrainWebsocketListenerFunc {
+	return map[string]astibob.BrainWebsocketListenerFunc{
 		websocketEventNameSamples: i.brainWebsocketListenerSamples,
 	}
 }
 
 // brainWebsocketListenerSamples listens to the samples brain websocket event
-func (i *Interface) brainWebsocketListenerSamples(c *astiws.Client, eventName string, payload json.RawMessage) error {
-	// Unmarshal payload
-	var p PayloadSamples
-	if err := json.Unmarshal(payload, &p); err != nil {
-		astilog.Error(errors.Wrapf(err, "astihearing: json unmarshaling %s into %#v failed", payload, p))
+func (i *Interface) brainWebsocketListenerSamples(brainName string) astiws.ListenerFunc {
+	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
+		// Unmarshal payload
+		var p PayloadSamples
+		if err := json.Unmarshal(payload, &p); err != nil {
+			astilog.Error(errors.Wrapf(err, "astihearing: json unmarshaling %s into %#v failed", payload, p))
+			return nil
+		}
+
+		// Execute callbacks
+		for _, fn := range i.onSamples {
+			if err := fn(brainName, p.Samples, p.SampleRate, p.SignificantBits, p.SilenceMaxAudioLevel); err != nil {
+				astilog.Error(errors.Wrap(err, "astihearing: executing samples callback failed"))
+			}
+		}
 		return nil
 	}
-
-	// Execute callbacks
-	for _, fn := range i.onSamples {
-		if err := fn(p.Samples, p.SampleRate, p.SignificantBits, p.SilenceMaxAudioLevel); err != nil {
-			astilog.Error(errors.Wrap(err, "astihearing: executing samples callback failed"))
-		}
-	}
-	return nil
 }
 
 // ClientWebsocketListeners implements the astibob.ClientWebsocketListener interface
@@ -236,7 +238,7 @@ func (i *Interface) calibrate() {
 	p.Chart.Data.Datasets = append(p.Chart.Data.Datasets, astichartjs.Dataset{
 		BackgroundColor: astichartjs.ChartBackgroundColorRed,
 		BorderColor:     astichartjs.ChartBorderColorRed,
-		Label:           "Silence max audio level",
+		Label:           "Suggested silence max audio level",
 	})
 	p.Chart.Data.Datasets[1].Data = append(p.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: 0, Y: p.SilenceMaxAudioLevel})
 	p.Chart.Data.Datasets[1].Data = append(p.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: maxX, Y: p.SilenceMaxAudioLevel})
@@ -266,7 +268,7 @@ func (i *Interface) webTemplateIndex() string {
 {{ define "css" }}{{ end }}
 {{ define "html" }}
 <div class='header'>Calibration</div>
-<p>Click "Calibrate" to retrieve the max audio level as well as the deduced silence max audio level appropriate to your audio device.</p>
+<p>Click "Calibrate" to retrieve the max audio level as well as the suggested silence max audio level appropriate to your audio device.</p>
 <button class="color-default-front" id="btn-calibrate">Calibrate</button>
 <p id="calibration-results"></p>
 {{ end }}
@@ -299,7 +301,7 @@ func (i *Interface) webTemplateIndex() string {
 			// Create html
 			let html = "<table><tbody>";
 			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Max audio level</td><td style='text-align: right'>" + Math.round(results.max_audio_level) + "</td></tr>";
-			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Silence max audio level</td><td style='text-align: right'>" + Math.round(results.silence_max_audio_level) + "</td></tr>";
+			html += "<tr><td style='font-weight: bold; padding-right: 10px; text-align: left'>Suggested silence max audio level</td><td style='text-align: right'>" + Math.round(results.silence_max_audio_level) + "</td></tr>";
 			html += "</tbody></table>";
 			html += "<canvas id='chart'></canvas>";
 

@@ -38,6 +38,9 @@ func newServer(name string, ws *astiws.Manager, c ServerConfiguration) *server {
 	}
 
 	// Default configuration values
+	if len(s.c.PublicAddr) == 0 {
+		s.c.PublicAddr = s.c.ListenAddr
+	}
 	if s.c.Timeout == 0 {
 		s.c.Timeout = 5 * time.Second
 	}

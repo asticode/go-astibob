@@ -16,9 +16,12 @@ type APIHandler interface {
 	APIHandlers() map[string]http.Handler
 }
 
+// BrainWebsocketListenerFunc represents a brain websocket listener func
+type BrainWebsocketListenerFunc func(brainName string) astiws.ListenerFunc
+
 // BrainWebsocketListener represents an object that can listen to a brain websocket
 type BrainWebsocketListener interface {
-	BrainWebsocketListeners() map[string]astiws.ListenerFunc
+	BrainWebsocketListeners() map[string]BrainWebsocketListenerFunc
 }
 
 // ClientWebsocketListener represents an object that can listen to a client websocket

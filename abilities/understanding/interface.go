@@ -33,7 +33,7 @@ type InterfaceConfiguration struct {
 }
 
 // AnalysisFunc represents the callback executed upon receiving results of an analysis
-type AnalysisFunc func(text string) error
+type AnalysisFunc func(brainName, text string) error
 
 // PayloadSamples represents the samples payload
 type PayloadSamples struct {
@@ -44,7 +44,7 @@ type PayloadSamples struct {
 }
 
 // SamplesStoredFunc represents the callback executed when samples have been stored
-type SamplesStoredFunc func(id, text string) error
+type SamplesStoredFunc func(brainName, id, text string) error
 
 // NewInterface creates a new interface
 func NewInterface(c InterfaceConfiguration) (i *Interface, err error) {
@@ -99,7 +99,7 @@ func (i *Interface) OnSamplesStored(fn SamplesStoredFunc) {
 }
 
 // onSamplesStoredDispatch is the samples stored callback for the dispatch
-func (i *Interface) onSamplesStoredDispatch(id, text string) error {
+func (i *Interface) onSamplesStoredDispatch(brainName, id, text string) error {
 	if i.dispatchFunc != nil {
 		i.dispatchFunc(astibob.ClientEvent{Name: "samples.stored", Payload: newPayloadStoredSamples(id, text)})
 	}
@@ -107,47 +107,51 @@ func (i *Interface) onSamplesStoredDispatch(id, text string) error {
 }
 
 // BrainWebsocketListeners implements the astibob.BrainWebsocketListener interface
-func (i *Interface) BrainWebsocketListeners() map[string]astiws.ListenerFunc {
-	return map[string]astiws.ListenerFunc{
+func (i *Interface) BrainWebsocketListeners() map[string]astibob.BrainWebsocketListenerFunc {
+	return map[string]astibob.BrainWebsocketListenerFunc{
 		websocketEventNameAnalysis:      i.brainWebsocketListenerAnalysis,
 		websocketEventNameSamplesStored: i.brainWebsocketListenerSamplesStored,
 	}
 }
 
 // brainWebsocketListenerAnalysis listens to the analysis brain websocket event
-func (i *Interface) brainWebsocketListenerAnalysis(c *astiws.Client, eventName string, payload json.RawMessage) error {
-	// Unmarshal payload
-	var p string
-	if err := json.Unmarshal(payload, &p); err != nil {
-		astilog.Error(errors.Wrapf(err, "astiunderstanding: json unmarshaling %s into %#v failed", payload, p))
+func (i *Interface) brainWebsocketListenerAnalysis(brainName string) astiws.ListenerFunc {
+	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
+		// Unmarshal payload
+		var p string
+		if err := json.Unmarshal(payload, &p); err != nil {
+			astilog.Error(errors.Wrapf(err, "astiunderstanding: json unmarshaling %s into %#v failed", payload, p))
+			return nil
+		}
+
+		// Execute callbacks
+		for _, fn := range i.onAnalysis {
+			if err := fn(brainName, p); err != nil {
+				astilog.Error(errors.Wrap(err, "astiunderstanding: executing analysis callback failed"))
+			}
+		}
 		return nil
 	}
-
-	// Execute callbacks
-	for _, fn := range i.onAnalysis {
-		if err := fn(p); err != nil {
-			astilog.Error(errors.Wrap(err, "astiunderstanding: executing analysis callback failed"))
-		}
-	}
-	return nil
 }
 
 // brainWebsocketListenerSamplesStored listens to the samples.stored brain websocket event
-func (i *Interface) brainWebsocketListenerSamplesStored(c *astiws.Client, eventName string, payload json.RawMessage) error {
-	// Unmarshal payload
-	var p PayloadStoredSamples
-	if err := json.Unmarshal(payload, &p); err != nil {
-		astilog.Error(errors.Wrapf(err, "astiunderstanding: json unmarshaling %s into %#v failed", payload, p))
+func (i *Interface) brainWebsocketListenerSamplesStored(brainName string) astiws.ListenerFunc {
+	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
+		// Unmarshal payload
+		var p PayloadStoredSamples
+		if err := json.Unmarshal(payload, &p); err != nil {
+			astilog.Error(errors.Wrapf(err, "astiunderstanding: json unmarshaling %s into %#v failed", payload, p))
+			return nil
+		}
+
+		// Execute callbacks
+		for _, fn := range i.onSamplesStored {
+			if err := fn(brainName, p.ID, p.Text); err != nil {
+				astilog.Error(errors.Wrap(err, "astiunderstanding: executing samples stored callback failed"))
+			}
+		}
 		return nil
 	}
-
-	// Execute callbacks
-	for _, fn := range i.onSamplesStored {
-		if err := fn(p.ID, p.Text); err != nil {
-			astilog.Error(errors.Wrap(err, "astiunderstanding: executing samples stored callback failed"))
-		}
-	}
-	return nil
 }
 
 // APIHandlers implements the astibob.APIHandle interface

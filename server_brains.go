@@ -107,7 +107,7 @@ func (s *brainsServer) handleWebsocketRegistered(c *astiws.Client, eventName str
 			// Add brain websocket listeners
 			if v, ok := i.(BrainWebsocketListener); ok {
 				for n, l := range v.BrainWebsocketListeners() {
-					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l)
+					c.AddListener(astibrain.WebsocketAbilityEventName(a.name, n), l(b.name))
 				}
 			}
 
@@ -194,7 +194,7 @@ func (s *brainsServer) dispatchFunc(brainKey, abilityKey string) func(e ClientEv
 }
 
 // regexpAbilityWebTemplatePattern is the ability web template pattern regexp
-var regexpAbilityWebTemplatePattern = regexp.MustCompile("^\\/brains\\/([\\w]+)\\/abilities\\/([\\w]+)\\/")
+var regexpAbilityWebTemplatePattern = regexp.MustCompile("^\\/brains\\/([\\w-]+)\\/abilities\\/([\\w-]+)\\/")
 
 // abilityWebTemplatePattern returns the ability web template pattern
 func (s *brainsServer) abilityWebTemplatePattern(brainKey, abilityKey, path string) string {

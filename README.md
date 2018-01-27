@@ -1,215 +1,313 @@
 [![GoReportCard](http://goreportcard.com/badge/github.com/asticode/go-astibob)](http://goreportcard.com/report/github.com/asticode/go-astibob)
 [![GoDoc](https://godoc.org/github.com/asticode/go-astibob?status.svg)](https://godoc.org/github.com/asticode/go-astibob)
 
-Bob is a distributed AI that can listen, understand, speak back and anything else you want.
+Bob is a distributed AI that can learn to understand your voice, speak back, interact with your computer and anything else you want.
 
-# Overview
+It's strongly recommended to use [DeepSpeech](https://github.com/mozilla/DeepSpeech) and [PortAudio](http://www.portaudio.com) with shipped abilities.
+
+- [I want to learn more about Bob](https://github.com/asticode/go-astibob#i-want-to-learn-more-about-bob)
+- [I want to see some code](https://github.com/asticode/go-astibob#i-want-to-see-some-code)
+- [I want to run an example](https://github.com/asticode/go-astibob#i-want-to-run-an-example)
+- TODO [I want to learn how to add my own ability]()
+
+# I want to learn more about Bob
+
+## Overview
+
+```
+                            +----------------+
++-----------+               | Brain #1       |
+| Client #1 |-----+   +-----|   - Ability #1 |
++-----------+     |   |     |   - Ability #2 |
+                 +-----+    +----------------+
+                 | Bob |
+                 +-----+    +----------------+
++-----------+     |   |     | Brain #2       |
+| Client #2 |-----+   +-----|   - Ability #3 |
++-----------+               |   - Ability #4 |
+                            +----------------+
+```
+
+## Vocabulary
 
 - an **ability** is a simple task such as audio recording, speech-to-text analysis, speech-synthesis, etc.
 - a **brain** has one or more **abilities**
 - **Bob** is connected to one or more **brains**
-- **clients** connect to **Bob** to interact with **brains** and **abilities**
+- **clients** connect to **Bob** to interact with **brains** and **abilities** through the **Web UI**
 
+## Shipped abilities
+
+- **hearing**: listen to an audio input and dispatch audio samples (audio recording).
+- **speaking**: say words to your audio output (speech synthesis).
+- **understanding**: detect spoken words in audio samples and execute a speech-to-text analysis on them (speech-to-text analysis).
+
+But you can [add your own abilities]()!
+
+## FAQ
+
+- Why split abilities in several brains?
+
+    Because abilities may need to run on different machines, for instance if you want to set up the **hearing** ability
+    (audio recording) in different rooms of your house.
+
+# I want to see some code
+
+WARNING: the code below doesn't handle errors or configurations for readability purposes, however you SHOULD!
+
+## Bob
+
+```go
+// Create Bob
+bob, _ := astibob.New(astibob.Configuration{})
+defer bob.Close()
+
+// Create interfaces of the following abilities:
+// - hearing (audio recording)
+// - speaking (speech synthesis)
+// - understanding (speech-to-text analysis)
+hearing := astihearing.NewInterface(astihearing.InterfaceConfiguration{})
+speaking := astispeaking.NewInterface()
+understanding, _ := astiunderstanding.NewInterface(astiunderstanding.InterfaceConfiguration{})
+
+// Declare interfaces in Bob
+bob.Declare(hearing)
+bob.Declare(speaking)
+bob.Declare(understanding)
+
+// Make sure the speaking ability says "Hello" whenever it's turned on
+bob.On(astibob.EventNameAbilityStarted, func(e astibob.Event) bool {
+    if e.Ability != nil && e.Ability.Name == speaking.Name() {
+         bob.Exec(speaking.Say("Hello"))
+    }
+    return false
+})
+
+// Make sure Bob sends the audio samples to the understanding ability whenever the hearing ability has recorded some
+hearing.OnSamples(func(brainName string, samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
+    bob.Exec(understanding.Samples(samples, sampleRate, significantBits, silenceMaxAudioLevel))
+    return nil
+})
+
+// Handle the results of the speech-to-text analysis made by the understanding ability
+understanding.OnAnalysis(func(brainName, text string) error {
+    astilog.Debugf("main: processing analysis <%s>", text)
+    return nil
+})
+
+// Run Bob
+bob.Run(context.Background())
 ```
-          +-----------+     +-----------+
-          | Client #1 |     | Client #2 |
-          +-----------+     +-----------+
-                     \       /
-                      \     /
-                      +-----+
-                      | Bob |
-                      +-----+
-                      /     \
-                     /       \
-     +----------------+     +----------------+
-     | Brain #1       |     | Brain #2       |
-     |   - Ability #1 |     |   - Ability #3 |
-     |   - Ability #2 |     |   - Ability #4 |
-     +----------------+     +----------------+
+
+## Brain
+
+```go
+// Create portaudio
+p, _ := astiportaudio.New()
+defer p.Close()
+
+// Create portaudio stream
+s, _ := p.NewDefaultStream(make([]int32, 192), astiportaudio.StreamOptions{})
+defer s.Close()
+
+// Create silence detector
+sd := astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorConfiguration{})
+
+// Create speech to text
+stt := astispeechtotext.New(astispeechtotext.Configuration{})
+
+// Create brain
+brain := astibrain.New(astibrain.Configuration{})
+defer brain.Close()
+
+// Create hearing ability
+hearing := astihearing.NewAbility(s, astihearing.AbilityConfiguration{})
+
+// Create speaking ability
+speaking := astispeaking.NewAbility(astispeaking.AbilityConfiguration{})
+
+// Create understanding ability
+understanding, _ := astiunderstanding.NewAbility(stt, sd, astiunderstanding.AbilityConfiguration)
+
+// Learn abilities
+brain.Learn(hearing, astibrain.AbilityConfiguration{})
+brain.Learn(speaking, astibrain.AbilityConfiguration{})
+brain.Learn(understanding, astibrain.AbilityConfiguration{})
+
+// Run the brain
+brain.Run(context.Background())
 ```
-      
-# Real-life examples
 
-Here's a list of awesome projects using `go-astibob` (if you're using `go-astibob` and want your project to be listed here please submit a PR):
+# I want to run an example
 
-- [go-astibob-home](https://github.com/asticode/go-astibob-home)
-              
-# Installation
+## Installation
+
+### Bob
 
 Run the following command:
 
-    $ go get github.com/asticode/go-astibob
+    $ go get -u github.com/asticode/go-astibob
 
-# Abilities
+### Espeak
 
-Abilities are simple tasks audio recording, speech-to-text analysis, speech-synthesis, etc.
+**Only for Linux users**, visit [the official website](http://espeak.sourceforge.net/).
 
-`go-astibob` comes with pre-shipped abilities but you can add your own abilities.
+### DeepSpeech
 
-WARNING: the code below doesn't handle errors for readibility purposes. However you SHOULD!
-    
-## Examples
+2 solutions:
 
-Every ability is demonstrated in an example located in `examples/<ability name>`.
+- follow [this unofficial guide](https://github.com/asticode/go-astideepspeech#install-deepspeech)
+- visit [the official website](https://github.com/mozilla/DeepSpeech)
 
-To try any of the examples:
+### PortAudio
 
-- make sure you're in `go-astibob` directory:
+Visit [the official website](http://www.portaudio.com).
 
-```$ cd $GOPATH/src/github.com/asticode/go-astibob```
+## Run Bob
 
-- run the following command to start **Bob**:
+Run the following commands:
 
-```$ go run examples/<ability name>/astibob/main.go -v```
+    $ cd $GOPATH/src/github.com/asticode/go-astibob
+    $ go run example/bob/main.go -v
 
-- run the following command to start a **brain**:
+Open your browser and go to `http://127.0.0.1:6969` with username `admin` and password `admin`. You should see something like this:
 
-```$ go run examples/<ability name>/astibrain/main.go -v```
+![Bob is now running!](screenshots/1.png)
 
-WARNING: some abilities require specific libs installed on your system, please check the ability's section to see which one(s).
+**Nice job, Bob is now running and waiting for brains to connect!**
 
-## Adding your own ability
+## Run Brain #1
 
-TODO
+Run the following commands:
 
-## Hearing
+    $ cd $GOPATH/src/github.com/asticode/go-astibob
+    $ go run example/brains/1/main.go -v
 
-This ability listens to an audio input and dispatches audio samples.
+If everything went according to plan, you should now see something like this in your browser:
 
-### Recommendations
+![Brain #1 is now running!](screenshots/2.png)
 
-It requires the following interface:
+**Nice job, Brain #1 is now running and has connected to Bob!**
 
-```go
-type SampleReader interface {
-	ReadSample() (int32, error)
-}
-```
+## Start the speaking ability
 
-which is best fulfilled with [PortAudio](http://www.portaudio.com/). However you can choose any other solution that fulfill that interface.
+The toggle in the menu is red which means that the **speaking** ability is not started. Ability are stopped by default.
 
-The example needs [PortAudio](http://www.portaudio.com/) to be set up on your system and shows you how to use it.
+If you want one of your ability to start when the brain starts you can use the `AutoStart` attribute of `astibrain.AbilityConfiguration`.
 
-### In your code
-#### Brain
+Start the **speaking** ability manually by clicking on the toggle next to its name: it should slide, turn green and you should hear "Hello".
 
-```go
-// Create sample reader
-var r astihearing.SampleReader
+You can turn it off anytime by clicking on the toggle again.
 
-// Create ability
-hearing := astihearing.NewAbility(r, astihearing.AbilityOptions{})
+**Nice job, the speaking ability is now started and it can now say words!**
 
-// Learn ability
-brain.Learn(hearing, astibrain.AbilityOptions{})
-```
+## Run Brain #2
 
-#### Bob
+Run the following commands:
 
-```go
-// Create interface
-hearing := astihearing.NewInterface()
+    $ cd $GOPATH/src/github.com/asticode/go-astibob
+    $ go run example/brains/2/main.go -v
 
-// Handle samples
-hearing.OnSamples(func(samples []int32, sampleRate, significantBits int) error {
-    // Do stuff with the samples
-    return nil
-})
+If everything went according to plan, you should now see something like this in your browser:
 
-// Declare interface
-bob.Declare(hearing)
-```
+![Brain #2 is now running!](screenshots/3.png)
 
-## Speaking
+**Nice job, Brain #2 is now running and has connected to Bob!**
 
-This ability says words to your audio output using speech synthesis.
+## Calibrate the hearing ability
 
-### Prerequisites
-#### Linux
+In order to detect spoken words, Bob needs to detect silences.
 
-- [espeak](http://espeak.sourceforge.net/)
+In order to detect silences, Bob needs to know the maximum audio level of a silence which is specific to your audio input.
 
-#### MacOSX
+Fortunately, the **Web UI** provides an easy way to do that.
 
-- [say](https://developer.apple.com/legacy/library/documentation/Darwin/Reference/ManPages/man1/say.1.html) which should be there by default
+First off, start the **hearing** ability.
 
-#### Windows
+Then in your browser click on `Hearing` in the menu, click on `Calibrate`, say something and wait less than 5 seconds. You should see something like this:
 
-N/A
+![Calibration information have appeared!](screenshots/4.png)
 
-### In your code
-#### Brain
+You can see that in my case the maximum audio level is **189140040** and the suggested silence maximum audio level is **63046680**.
 
-```go
-// Create ability
-speaking := astispeaking.NewAbility(astispeaking.AbilityOptions{})
+However based on the chart and what I've said, I'd rather set the silence maximum audio level to **35000000**.
 
-// Learn ability
-brain.Learn(speaking, astibrain.AbilityOptions{})
-```
+Now that you have the correct value you need to update you brain's configuration: set the `SilenceMaxAudioLevel` attribute of `astihearing.AbilityConfiguration` in `example/brains/2/main.go` to the silence maximum audio level you feel is best and restart the brain.
 
-##### Bob
+**Nice job, you've calibrated the hearing ability!**
 
-```go
-// Create interface
-speaking := astispeaking.NewInterface()
-	
-// Say something
-bob.Exec(speaking.Say("I love you Bob"))
-```
+## Build a DeepSpeech model for the understanding ability
 
-## Understanding
+In order to understand your voice, the **understanding** ability needs to use a [DeepSpeech](https://github.com/mozilla/DeepSpeech) model trained with samples of your voice.
 
-This ability executes a speech to text analysis on audio samples.
+We'll build one with the help of the **Web UI**.
 
-### Recommendations
+### Store recorded spoken words
 
-It requires the following interface:
+The first step is to tell Bob to store the spoken words it detects.
 
-```go
-type SpeechParser interface {
-	SpeechToText(buffer []int32, bufferSize, sampleRate, significantBits int) string
-}
-```
+For that, you need to set the `StoreSamples` attribute of `astiunderstanding.AbilityConfiguration` in `example/brains/2/main.go` to `true` and restart the brain.
 
-which is best fulfilled with [DeepSpeech](https://github.com/mozilla/DeepSpeech). However you can choose any other solution that fulfill that interface.
+It will store the audio samples as wav files in the directory specified by the `SamplesDirectory` attribute (`"example/tmp/understanding"` in our case).
 
-The example requires [DeepSpeech](https://github.com/asticode/go-astideepspeech#install-deepspeech) to be set up on your system and shows you how to use it.
+Now that everything is set up, return to your browser, click on `Understanding` in the menu and start the **understanding** ability. Say "Bob", pause 2 seconds and repeat 2 times. Then stop the **understanding** ability.
 
-### In your code
-#### Brain
+You should now see something like this:
 
-```go
-// Create speech parser
-var p astiunderstanding.SpeechParser
+![Samples ready for validation have appeared!](screenshots/6.png)
 
-// Create ability
-understanding := astiunderstanding.NewAbility(p, , astiunderstanding.AbilityOptions{})
+### Manually add transcripts for recorded spoken words
 
-// Learn ability
-brain.Learn(understanding, astibrain.AbilityOptions{})
-```
+Now that spoken words have been recorded, you need to manually add their transcript.
 
-#### Bob
+For that, click on the first input box: it should play the spoken words. If it doesn't, make sure the browser you're using can read 32 bits wav file (which Chrome does but Firefox unfortunately doesn't for instance).
 
-```go
-// Create interface
-understanding := astiunderstanding.NewInterface()
+Write the exact words you've said (in our case "Bob") and press "ENTER" for each and every recorded audio. If you're not happy with what has been recorded you can press "CTRL+ENTER" and it will remove the audio samples.
 
-// Handle analysis
-understanding.OnAnalysis(func(text string) error {
-    // Do stuff with the text
-    return nil
-})
+You should now see your `wav` files with their transcript in `example/tmp/understanding/validated/<date>`.
 
-// Send samples
-bob.Exec(understanding.Samples(samples, sampleRate, significantBits))
-```
+### Prepare the data for the DeepSpeech model training
 
-# Events
+Now that transcripts have been added, you need to prepare the data for the [DeepSpeech](https://github.com/mozilla/DeepSpeech) model training.
 
-// TODO
+For that, run the following command:
 
-# Roadmap
+    $ go run pkg/speechtotext/cmd/main.go -v -i example/tmp/understanding/validated -o example/tmp/understanding/prepared
 
-// TODO
+You should now see an `example/tmp/understanding/prepared` directory containing the proper training data.
+
+### Train your DeepSpeech model
+
+WARNING: I'm not a DeepSpeech nor a deep learning expert so the command below may not be the best one. Please direct your questions to the [DeepSpeech project](https://github.com/mozilla/DeepSpeech/issues).
+
+Now that the training data is ready, you need to train your DeepSpeech model.
+
+For that, visit [the official repo](https://github.com/mozilla/DeepSpeech#training) and follow the guide to train a model.
+
+Here's a simple command to train a model:
+
+    $ python -u ${DEEPSPEECH_SRC}/DeepSpeech.py \
+      	--train_files example/tmp/understanding/prepared/index.csv \
+      	--dev_files example/tmp/understanding/prepared/index.csv \
+      	--test_files example/tmp/understanding/prepared/index.csv \
+      	--train_batch_size 1 \
+      	--dev_batch_size 1 \
+      	--test_batch_size 1 \
+      	--n_hidden 494 \
+      	--epoch 50 \
+      	--checkpoint_dir example/tmp/understanding/deepspeech/checkpoint \
+      	--export_dir example/tmp/understanding/deepspeech/export \
+      	--alphabet_config_path example/alphabet.txt \
+      	--lm_binary_path ${DEEPSPEECH_SRC}/data/lm/lm.binary \
+      	--lm_trie_path ${DEEPSPEECH_SRC}/data/lm/trie
+
+where `${DEEPSPEECH_SRC}` is the path to your local DeepSpeech repository.
+
+You should now have an `example/tmp/deepspeech/export/output_graph.pb` file.
+
+### Test your DeepSpeech model
+
+Disable the `StoreSamples` attribute and restart the brain.
+
+Then turn on the **hearing** and **understanding** abilities and simply say "Bob": yeah you're not mistaken, Bob has responded "Yes"!
+
+**Congratulations, Bob can now understand you and speak back to you!**

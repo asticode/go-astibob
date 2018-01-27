@@ -5,6 +5,7 @@ import (
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/audio"
 	"github.com/pkg/errors"
+	"os"
 )
 
 // SpeechToText represents an object capable of doing speech to text operations
@@ -30,14 +31,19 @@ type Configuration struct {
 // New creates a new speech to text parser
 func New(c Configuration) (s *SpeechToText) {
 	// Create speech to text
-	s = &SpeechToText{
-		m: astideepspeech.New(c.ModelPath, c.NCep, c.NContext, c.AlphabetConfigPath, c.BeamWidth),
-		c: c,
-	}
+	s = &SpeechToText{c: c}
 
-	// Enable decoder with lm
-	if len(c.LMPath) > 0 {
-		s.m.EnableDecoderWithLM(c.AlphabetConfigPath, c.LMPath, c.TriePath, c.LMWeight, c.WordCountWeight, c.ValidWordCountWeight)
+	// Only do the following if the model exists
+	if _, err := os.Stat(c.ModelPath); err == nil {
+		// Create model
+		s.m = astideepspeech.New(c.ModelPath, c.NCep, c.NContext, c.AlphabetConfigPath, c.BeamWidth)
+
+		// Enable decoder with lm
+		if len(c.LMPath) > 0 {
+			s.m.EnableDecoderWithLM(c.AlphabetConfigPath, c.LMPath, c.TriePath, c.LMWeight, c.WordCountWeight, c.ValidWordCountWeight)
+		}
+	} else {
+		astilog.Debugf("astispeechtotext: %s doesn't exist, skipping model creation", c.ModelPath)
 	}
 	return
 }
@@ -45,15 +51,22 @@ func New(c Configuration) (s *SpeechToText) {
 // Close implements the io.Closer interface
 func (s *SpeechToText) Close() error {
 	// Close model
-	astilog.Debugf("astispeechtotext: closing model")
-	if err := s.m.Close(); err != nil {
-		astilog.Error(errors.Wrap(err, "astispeechtotext: closing model failed"))
+	if s.m != nil {
+		astilog.Debugf("astispeechtotext: closing model")
+		if err := s.m.Close(); err != nil {
+			astilog.Error(errors.Wrap(err, "astispeechtotext: closing model failed"))
+		}
 	}
 	return nil
 }
 
 // SpeechToText implements the astiunderstanding.SpeechToText interface
 func (s *SpeechToText) SpeechToText(samples []int32, sampleRate, significantBits int) (text string, err error) {
+	// Model has not been set
+	if s.m == nil {
+		return
+	}
+
 	// Convert sample rate
 	if samples, err = astiaudio.ConvertSampleRate(samples, sampleRate, 16000); err != nil {
 		err = errors.Wrap(err, "astispeechtotext: converting sample rate failed")
