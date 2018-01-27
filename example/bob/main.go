@@ -11,10 +11,13 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/abilities/hearing"
+	"github.com/asticode/go-astibob/abilities/keyboarding"
+	"github.com/asticode/go-astibob/abilities/mousing"
 	"github.com/asticode/go-astibob/abilities/speaking"
 	"github.com/asticode/go-astibob/abilities/understanding"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
+	"cloud.google.com/go/trace/testdata/helloworld"
 )
 
 // Context
@@ -49,6 +52,8 @@ func main() {
 
 	// Create interfaces
 	hearing := astihearing.NewInterface(astihearing.InterfaceConfiguration{})
+	keyboarding := astikeyboarding.NewInterface()
+	mousing := astimousing.NewInterface()
 	speaking := astispeaking.NewInterface()
 	understanding, err := astiunderstanding.NewInterface(astiunderstanding.InterfaceConfiguration{SamplesDirectory: "example/tmp/understanding"})
 	if err != nil {
@@ -57,6 +62,8 @@ func main() {
 
 	// Declare interfaces
 	bob.Declare(hearing)
+	bob.Declare(keyboarding)
+	bob.Declare(mousing)
 	bob.Declare(speaking)
 	bob.Declare(understanding)
 
@@ -81,7 +88,18 @@ func main() {
 	understanding.OnAnalysis(func(brainName, text string) error {
 		astilog.Debugf("main: processing analysis <%s>", text)
 		if strings.TrimSpace(text) == "bob" {
+			// Say "Yes"
 			if err := bob.Exec(speaking.Say("Yes")); err != nil {
+				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
+			}
+
+			// Move mouse
+			if err := bob.Exec(mousing.Move(200,200)); err != nil {
+				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
+			}
+
+			// Type on keyboard
+			if err := bob.Exec(keyboarding.Type("Hello\nMy name is Bob\n")); err != nil {
 				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
 			}
 		}

@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"syscall"
 
+	"github.com/asticode/go-astibob/abilities/keyboarding"
 	"github.com/asticode/go-astibob/abilities/mousing"
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astibob/pkg/robotgo"
@@ -36,13 +37,20 @@ func main() {
 	})
 	defer brain.Close()
 
+	// Create keyboarder
+	keyboarder := astirobotgo.NewKeyboarder()
+
 	// Create mouser
 	mouser := astirobotgo.NewMouser()
+
+	// Create keyboarding
+	keyboarding := astikeyboarding.NewAbility(keyboarder)
 
 	// Create mousing
 	mousing := astimousing.NewAbility(mouser)
 
 	// Learn abilities
+	brain.Learn(keyboarding, astibrain.AbilityConfiguration{})
 	brain.Learn(mousing, astibrain.AbilityConfiguration{})
 
 	// Run the brain

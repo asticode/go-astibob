@@ -1,25 +1,27 @@
-package astimousing
+package astikeyboarding
 
 import (
 	"encoding/json"
 	"sync"
+
+	"strings"
 
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
 
-// Ability represents an object capable of interacting with a mouse.
+// Ability represents an object capable of interacting with a keyboard.
 type Ability struct {
 	activated bool
+	k         Keyboarder
 	m         sync.Mutex
-	ms        Mouser
 }
 
 // NewAbility creates a new ability
-func NewAbility(ms Mouser) *Ability {
+func NewAbility(k Keyboarder) *Ability {
 	return &Ability{
-		ms: ms,
+		k: k,
 	}
 }
 
@@ -30,7 +32,7 @@ func (a *Ability) Name() string {
 
 // Description implements the astibrain.Ability interface
 func (a *Ability) Description() string {
-	return "Interacts with your mouse"
+	return "Interacts with your keyboard"
 }
 
 // Activate implements the astibrain.Activable interface
@@ -54,39 +56,27 @@ func (a *Ability) websocketListenerAction(c *astiws.Client, eventName string, pa
 	activated := a.activated
 	a.m.Unlock()
 	if !activated {
-		astilog.Error("astimousing: ability is not activated")
+		astilog.Error("astikeyboarding: ability is not activated")
 		return nil
 	}
 
 	// Unmarshal payload
 	var p PayloadAction
 	if err := json.Unmarshal(payload, &p); err != nil {
-		astilog.Error(errors.Wrapf(err, "astimousing: json unmarshaling %s into %#v failed", payload, p))
+		astilog.Error(errors.Wrapf(err, "astikeyboarding: json unmarshaling %s into %#v failed", payload, p))
 		return nil
 	}
 
 	// Switch on action
 	switch p.Action {
-	case actionClickLeft:
-		astilog.Debugf("astimousing: clicking left mouse button with double %v", p.Double)
-		a.ms.ClickLeft(p.Double)
-	case actionClickMiddle:
-		astilog.Debugf("astimousing: clicking middle mouse button with double %v", p.Double)
-		a.ms.ClickMiddle(p.Double)
-	case actionClickRight:
-		astilog.Debugf("astimousing: clicking right mouse button with double %v", p.Double)
-		a.ms.ClickRight(p.Double)
-	case actionMove:
-		astilog.Debugf("astimousing: moving mouse to %dx%d", p.X, p.Y)
-		a.ms.Move(p.X, p.Y)
-	case actionScrollDown:
-		astilog.Debugf("astimousing: scrolling down with x %d", p.X)
-		a.ms.ScrollDown(p.X)
-	case actionScrollUp:
-		astilog.Debugf("astimousing: scrolling up with x %d", p.X)
-		a.ms.ScrollUp(p.X)
+	case actionPress:
+		astilog.Debugf("astikeyboarding: pressing %s", strings.Join(p.Keys, "/"))
+		a.k.Press(p.Keys...)
+	case actionType:
+		astilog.Debugf("astikeyboarding: typing %s", p.String)
+		a.k.Type(p.String)
 	default:
-		astilog.Errorf("astimousing: unknown action %s", p.Action)
+		astilog.Errorf("astikeyboarding: unknown action %s", p.Action)
 	}
 	return nil
 }

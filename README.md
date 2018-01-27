@@ -1,14 +1,14 @@
 [![GoReportCard](http://goreportcard.com/badge/github.com/asticode/go-astibob)](http://goreportcard.com/report/github.com/asticode/go-astibob)
 [![GoDoc](https://godoc.org/github.com/asticode/go-astibob?status.svg)](https://godoc.org/github.com/asticode/go-astibob)
 
-Bob is a distributed AI that can learn to understand your voice, speak back, interact with your computer and anything else you want.
+Bob is a distributed AI that can learn to understand your voice, speak back, interact with your mouse and keyboard, and anything else you want.
 
-It's strongly recommended to use [DeepSpeech](https://github.com/mozilla/DeepSpeech) and [PortAudio](http://www.portaudio.com) with shipped abilities.
+It's strongly recommended to use [DeepSpeech](https://github.com/mozilla/DeepSpeech), [PortAudio](http://www.portaudio.com) and [RobotGo](https://github.com/go-vgo/robotgo) with shipped abilities.
 
 - [I want to learn more about Bob](https://github.com/asticode/go-astibob#i-want-to-learn-more-about-bob)
 - [I want to see some code](https://github.com/asticode/go-astibob#i-want-to-see-some-code)
 - [I want to run an example](https://github.com/asticode/go-astibob#i-want-to-run-an-example)
-- TODO [I want to learn how to add my own ability]()
+- [I want to learn how to add my own ability](https://github.com/asticode/go-astibob#i-want-to-learn-how-to-add-my-own-ability)
 
 # I want to learn more about Bob
 
@@ -38,10 +38,12 @@ It's strongly recommended to use [DeepSpeech](https://github.com/mozilla/DeepSpe
 ## Shipped abilities
 
 - **hearing**: listen to an audio input and dispatch audio samples (audio recording).
+- **keyboarding**: interact with your keyboard.
+- **mousing**: interact with your mouse.
 - **speaking**: say words to your audio output (speech synthesis).
-- **understanding**: detect spoken words in audio samples and execute a speech-to-text analysis on them (speech-to-text analysis).
+- **understanding**: detect spoken words in audio samples and execute a speech-to-text analysis on them.
 
-But you can [add your own abilities]()!
+But you can also [add your own abilities](https://github.com/asticode/go-astibob#i-want-to-learn-how-to-add-my-own-ability)!
 
 ## FAQ
 
@@ -61,16 +63,17 @@ WARNING: the code below doesn't handle errors or configurations for readability 
 bob, _ := astibob.New(astibob.Configuration{})
 defer bob.Close()
 
-// Create interfaces of the following abilities:
-// - hearing (audio recording)
-// - speaking (speech synthesis)
-// - understanding (speech-to-text analysis)
+// Create interfaces for the abilities:
 hearing := astihearing.NewInterface(astihearing.InterfaceConfiguration{})
+keyboarding := astikeyboarding.NewInterface()
+mousing := astimousing.NewInterface()
 speaking := astispeaking.NewInterface()
 understanding, _ := astiunderstanding.NewInterface(astiunderstanding.InterfaceConfiguration{})
 
 // Declare interfaces in Bob
 bob.Declare(hearing)
+bob.Declare(keyboarding)
+bob.Declare(mousing)
 bob.Declare(speaking)
 bob.Declare(understanding)
 
@@ -90,7 +93,17 @@ hearing.OnSamples(func(brainName string, samples []int32, sampleRate, significan
 
 // Handle the results of the speech-to-text analysis made by the understanding ability
 understanding.OnAnalysis(func(brainName, text string) error {
+    // Log
     astilog.Debugf("main: processing analysis <%s>", text)
+
+    // Say something
+    bob.Exec(speaking.Say("Yes"))
+
+    // Type something
+    bob.Exec(keyboarding.Type("Hello world!\n"))
+
+    // Move the mouse
+    bob.Exec(mousing.Move(200, 200))
     return nil
 })
 
@@ -115,12 +128,24 @@ sd := astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorConfiguration{})
 // Create speech to text
 stt := astispeechtotext.New(astispeechtotext.Configuration{})
 
+// Create keyboarder
+keyboarder := astirobotgo.NewKeyboarder()
+
+// Create mouser
+mouser := astirobotgo.NewMouser()
+
 // Create brain
 brain := astibrain.New(astibrain.Configuration{})
 defer brain.Close()
 
 // Create hearing ability
 hearing := astihearing.NewAbility(s, astihearing.AbilityConfiguration{})
+
+// Create keyboarding ability
+keyboarding := astikeyboarding.NewAbility(keyboarder)
+
+// Create mousing ability
+mousing := astimousing.NewAbility(mouser)
 
 // Create speaking ability
 speaking := astispeaking.NewAbility(astispeaking.AbilityConfiguration{})
@@ -130,6 +155,8 @@ understanding, _ := astiunderstanding.NewAbility(stt, sd, astiunderstanding.Abil
 
 // Learn abilities
 brain.Learn(hearing, astibrain.AbilityConfiguration{})
+brain.Learn(keyboarding, astibrain.AbilityConfiguration{})
+brain.Learn(mousing, astibrain.AbilityConfiguration{})
 brain.Learn(speaking, astibrain.AbilityConfiguration{})
 brain.Learn(understanding, astibrain.AbilityConfiguration{})
 
@@ -141,26 +168,30 @@ brain.Run(context.Background())
 
 ## Installation
 
-### Bob
+### Install Bob
 
 Run the following command:
 
     $ go get -u github.com/asticode/go-astibob
 
-### Espeak
+### Install Espeak (LINUX ONLY)
 
-**Only for Linux users**, visit [the official website](http://espeak.sourceforge.net/).
+Visit [the official website](http://espeak.sourceforge.net/).
 
-### DeepSpeech
+### Install DeepSpeech
 
 2 solutions:
 
 - follow [this unofficial guide](https://github.com/asticode/go-astideepspeech#install-deepspeech)
 - visit [the official website](https://github.com/mozilla/DeepSpeech)
 
-### PortAudio
+### Install PortAudio
 
 Visit [the official website](http://www.portaudio.com).
+
+### Install RobotGo
+
+Visit [the official website](https://github.com/go-vgo/robotgo).
 
 ## Run Bob
 
@@ -311,3 +342,22 @@ Disable the `StoreSamples` attribute and restart the brain.
 Then turn on the **hearing** and **understanding** abilities and simply say "Bob": yeah you're not mistaken, Bob has responded "Yes"!
 
 **Congratulations, Bob can now understand you and speak back to you!**
+
+## Interact with your mouse and keyboard
+
+Run the following commands to start Brain #3:
+
+    $ cd $GOPATH/src/github.com/asticode/go-astibob
+    $ go run example/brains/3/main.go -v
+
+Start the **keyboarding** and **mousing** abilities and say "Bob" again: in addition to saying "Yes", Bob has now moved your mouse and typed a message!
+
+**Congratulations, Bob can now interact with your mouse and keyboard!**
+
+ # I want to learn how to add my own ability
+
+ TODO
+
+ # Roadmap
+
+ TODO
