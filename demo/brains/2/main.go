@@ -20,7 +20,7 @@ import (
 // Constants
 const (
 	sampleRate             = 44100
-	understandingDirectory = "example/tmp/understanding"
+	understandingDirectory = "demo/tmp/understanding"
 )
 
 // Context
@@ -58,7 +58,7 @@ func main() {
 
 	// Create speech to text
 	stt := astispeechtotext.New(astispeechtotext.Configuration{
-		AlphabetConfigPath: "example/alphabet.txt",
+		AlphabetConfigPath: "demo/alphabet.txt",
 		BeamWidth:          500,
 		ModelPath:          understandingDirectory + "/deepspeech/export/output_graph.pb",
 		NCep:               26,

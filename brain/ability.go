@@ -15,11 +15,6 @@ type Ability interface {
 	Name() string
 }
 
-// Initializable represents an object that can be initialized.
-type Initializable interface {
-	Init() error
-}
-
 // Activable represents an object that can be activated.
 type Activable interface {
 	Activate(a bool)

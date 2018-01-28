@@ -2,7 +2,6 @@ package astibrain
 
 import (
 	"context"
-	"io"
 	"os"
 
 	"github.com/asticode/go-astilog"
@@ -60,13 +59,6 @@ func (b *Brain) Close() (err error) {
 		// Wait for the ability to be really off
 		a.mr.Lock()
 		a.mr.Unlock()
-
-		// Close
-		if v, ok := a.a.(io.Closer); ok {
-			if err := v.Close(); err != nil {
-				astilog.Error(errors.Wrapf(err, "astibrain: closing ability %s failed", a.name))
-			}
-		}
 		return nil
 	})
 
@@ -128,16 +120,6 @@ func (b *Brain) Run(ctx context.Context) (err error) {
 
 	// Loop through abilities
 	if err = b.abilities.abilities(func(a *ability) (err error) {
-		// Initialize
-		if v, ok := a.a.(Initializable); ok {
-			astilog.Debugf("astibrain: initializing %s", a.name)
-			if err = v.Init(); err != nil {
-				err = errors.Wrapf(err, "astibrain: initializing %s failed", a.name)
-				return
-			}
-
-		}
-
 		// Auto start
 		if a.c.AutoStart {
 			a.on()

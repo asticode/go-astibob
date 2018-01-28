@@ -53,7 +53,7 @@ func main() {
 	keyboarding := astikeyboarding.NewInterface()
 	mousing := astimousing.NewInterface()
 	speaking := astispeaking.NewInterface()
-	understanding, err := astiunderstanding.NewInterface(astiunderstanding.InterfaceConfiguration{SamplesDirectory: "example/tmp/understanding"})
+	understanding, err := astiunderstanding.NewInterface(astiunderstanding.InterfaceConfiguration{SamplesDirectory: "demo/tmp/understanding"})
 	if err != nil {
 		astilog.Fatal(errors.Wrap(err, "main: creating understanding failed"))
 	}
@@ -68,7 +68,7 @@ func main() {
 	// Handle ability start
 	bob.On(astibob.EventNameAbilityStarted, func(e astibob.Event) bool {
 		if e.Ability != nil && e.Ability.Name == speaking.Name() {
-			if err := bob.Exec(speaking.Say("Hello")); err != nil {
+			if err := bob.Exec(speaking.Say("Hello world")); err != nil {
 				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
 			}
 		}

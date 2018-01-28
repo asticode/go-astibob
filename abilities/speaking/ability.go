@@ -7,32 +7,19 @@ import (
 
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
-	"github.com/go-ole/go-ole"
 	"github.com/pkg/errors"
 )
 
 // Ability represents an object capable of saying words to an audio output.
 type Ability struct {
 	activated bool
-	c         AbilityConfiguration
 	m         sync.Mutex
-
-	// Windows
-	windowsIDispatch *ole.IDispatch
-	windowsIUnknown  *ole.IUnknown
-}
-
-// AbilityOptions represents an ability configuration.
-type AbilityConfiguration struct {
-	BinaryDirPath string `toml:"binary_dir_path"`
-	Voice         string `toml:"voice"`
+	s         Speaker
 }
 
 // NewAbility creates a new ability
-func NewAbility(c AbilityConfiguration) *Ability {
-	return &Ability{
-		c: c,
-	}
+func NewAbility(s Speaker) *Ability {
+	return &Ability{s: s}
 }
 
 // Name implements the astibrain.Ability interface
@@ -50,25 +37,6 @@ func (a *Ability) Activate(activated bool) {
 	a.m.Lock()
 	defer a.m.Unlock()
 	a.activated = activated
-}
-
-// Say says words
-func (a *Ability) Say(i string) (err error) {
-	// Not activated
-	a.m.Lock()
-	activated := a.activated
-	a.m.Unlock()
-	if !activated {
-		return
-	}
-
-	// Say
-	astilog.Debugf("astispeaking: saying \"%s\"", i)
-	if err = a.say(i); err != nil {
-		err = errors.Wrapf(err, "saying \"%s\" failed", i)
-		return
-	}
-	return
 }
 
 // WebsocketListeners implements the astibrain.WebsocketListener interface
@@ -97,7 +65,8 @@ func (a *Ability) websocketListenerSay(c *astiws.Client, eventName string, paylo
 	}
 
 	// Say
-	if err := a.Say(i); err != nil {
+	astilog.Debugf("astispeaking: saying %s", i)
+	if err := a.s.Say(i); err != nil {
 		astilog.Error(errors.Wrapf(err, "astispeaking: saying %s failed", i))
 		return nil
 	}

@@ -33,6 +33,9 @@ type Ability struct {
 }
 
 // AbilityConfiguration represents an ability configuration
+// TODO Add option in UI to enable/disable the StoreSamples option
+// TODO Add option in UI to prepare training data
+// TODO Add option in UI to train data
 type AbilityConfiguration struct {
 	SamplesDirectory string `toml:"samples_directory"`
 	StoreSamples     bool   `toml:"store_samples"`

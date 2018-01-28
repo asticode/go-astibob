@@ -11,6 +11,7 @@ import (
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
+	"github.com/asticode/go-astibob/pkg/speak"
 )
 
 // Context
@@ -35,8 +36,17 @@ func main() {
 	})
 	defer brain.Close()
 
+	// Create speaker
+	s := astispeak.New(astispeak.Configuration{})
+
+	// Init speaker
+	if err := s.Init(); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: initializing speaker failed"))
+	}
+	defer s.Close()
+
 	// Create speaking
-	speaking := astispeaking.NewAbility(astispeaking.AbilityConfiguration{})
+	speaking := astispeaking.NewAbility(s)
 
 	// Learn ability
 	brain.Learn(speaking, astibrain.AbilityConfiguration{})
