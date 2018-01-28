@@ -5,9 +5,8 @@ import (
 	"flag"
 	"os"
 	"os/signal"
-	"syscall"
-
 	"strings"
+	"syscall"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/abilities/hearing"
@@ -17,7 +16,6 @@ import (
 	"github.com/asticode/go-astibob/abilities/understanding"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
-	"cloud.google.com/go/trace/testdata/helloworld"
 )
 
 // Context
@@ -80,12 +78,12 @@ func main() {
 	// Handle samples
 	hearing.OnSamples(func(brainName string, samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error {
 		// Send samples
-		bob.Exec(understanding.Samples(samples, sampleRate, significantBits, silenceMaxAudioLevel))
+		bob.Exec(understanding.Samples(brainName, samples, sampleRate, significantBits, silenceMaxAudioLevel))
 		return nil
 	})
 
 	// Add analysis
-	understanding.OnAnalysis(func(brainName, text string) error {
+	understanding.OnAnalysis(func(analysisBrainName, audioBrainName, text string) error {
 		astilog.Debugf("main: processing analysis <%s>", text)
 		if strings.TrimSpace(text) == "bob" {
 			// Say "Yes"
@@ -94,7 +92,7 @@ func main() {
 			}
 
 			// Move mouse
-			if err := bob.Exec(mousing.Move(200,200)); err != nil {
+			if err := bob.Exec(mousing.Move(200, 200)); err != nil {
 				astilog.Error(errors.Wrap(err, "main: executing cmd failed"))
 			}
 

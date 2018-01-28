@@ -33,10 +33,11 @@ type InterfaceConfiguration struct {
 }
 
 // AnalysisFunc represents the callback executed upon receiving results of an analysis
-type AnalysisFunc func(brainName, text string) error
+type AnalysisFunc func(analysisBrainName, audioBrainName, text string) error
 
 // PayloadSamples represents the samples payload
 type PayloadSamples struct {
+	BrainName            string  `json:"brain_name"`
 	SampleRate           int     `json:"sample_rate"`
 	Samples              []int32 `json:"samples"`
 	SignificantBits      int     `json:"significant_bits"`
@@ -75,11 +76,12 @@ func (i *Interface) Name() string {
 }
 
 // Samples creates a samples cmd
-func (i *Interface) Samples(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) *astibob.Cmd {
+func (i *Interface) Samples(brainName string, samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) *astibob.Cmd {
 	return &astibob.Cmd{
 		AbilityName: name,
 		EventName:   websocketEventNameSamples,
 		Payload: PayloadSamples{
+			BrainName:            brainName,
 			SampleRate:           sampleRate,
 			Samples:              samples,
 			SignificantBits:      significantBits,
@@ -118,7 +120,7 @@ func (i *Interface) BrainWebsocketListeners() map[string]astibob.BrainWebsocketL
 func (i *Interface) brainWebsocketListenerAnalysis(brainName string) astiws.ListenerFunc {
 	return func(c *astiws.Client, eventName string, payload json.RawMessage) error {
 		// Unmarshal payload
-		var p string
+		var p PayloadAnalysis
 		if err := json.Unmarshal(payload, &p); err != nil {
 			astilog.Error(errors.Wrapf(err, "astiunderstanding: json unmarshaling %s into %#v failed", payload, p))
 			return nil
@@ -126,7 +128,7 @@ func (i *Interface) brainWebsocketListenerAnalysis(brainName string) astiws.List
 
 		// Execute callbacks
 		for _, fn := range i.onAnalysis {
-			if err := fn(brainName, p); err != nil {
+			if err := fn(brainName, p.BrainName, p.Text); err != nil {
 				astilog.Error(errors.Wrap(err, "astiunderstanding: executing analysis callback failed"))
 			}
 		}

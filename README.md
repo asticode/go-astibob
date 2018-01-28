@@ -1,7 +1,7 @@
 [![GoReportCard](http://goreportcard.com/badge/github.com/asticode/go-astibob)](http://goreportcard.com/report/github.com/asticode/go-astibob)
 [![GoDoc](https://godoc.org/github.com/asticode/go-astibob?status.svg)](https://godoc.org/github.com/asticode/go-astibob)
 
-Bob is a distributed AI that can learn to understand your voice, speak back, interact with your mouse and keyboard, and anything else you want.
+Bob is a framework for a distributed AI that can learn to understand your voice, speak back, interact with your mouse and keyboard, and anything else you want.
 
 It's strongly recommended to use [DeepSpeech](https://github.com/mozilla/DeepSpeech), [PortAudio](http://www.portaudio.com) and [RobotGo](https://github.com/go-vgo/robotgo) with shipped abilities.
 

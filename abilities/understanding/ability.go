@@ -9,6 +9,8 @@ import (
 
 	"fmt"
 
+	"sync"
+
 	"github.com/asticode/go-astibob/brain"
 	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astitools/sync"
@@ -24,8 +26,10 @@ type Ability struct {
 	ch           chan PayloadSamples
 	d            *astisync.Do
 	dispatchFunc astibrain.DispatchFunc
+	m            sync.Mutex // Locks sds
 	p            SpeechParser
-	sd           SilenceDetector
+	sd           func() SilenceDetector
+	sds          map[string]SilenceDetector // Indexed by brain name
 }
 
 // AbilityConfiguration represents an ability configuration
@@ -35,13 +39,14 @@ type AbilityConfiguration struct {
 }
 
 // NewAbility creates a new ability
-func NewAbility(p SpeechParser, sd SilenceDetector, c AbilityConfiguration) (a *Ability, err error) {
+func NewAbility(p SpeechParser, sd func() SilenceDetector, c AbilityConfiguration) (a *Ability, err error) {
 	// Create
 	a = &Ability{
-		c:  c,
-		d:  astisync.NewDo(),
-		p:  p,
-		sd: sd,
+		c:   c,
+		d:   astisync.NewDo(),
+		p:   p,
+		sd:  sd,
+		sds: make(map[string]SilenceDetector),
 	}
 
 	// Absolute paths
@@ -73,15 +78,26 @@ func (a *Ability) Description() string {
 func (a *Ability) Run(ctx context.Context) (err error) {
 	// Reset
 	a.ch = make(chan PayloadSamples)
-	a.sd.Reset()
+	a.m.Lock()
+	for _, sd := range a.sds {
+		sd.Reset()
+	}
+	a.m.Unlock()
 
 	// Listen
 	for {
 		select {
 		case p := <-a.ch:
+			// Create silence detector for the brain
+			a.m.Lock()
+			if _, ok := a.sds[p.BrainName]; !ok {
+				a.sds[p.BrainName] = a.sd()
+			}
+			a.m.Unlock()
+
 			// Add samples to silence detector and retrieve speech samples
 			// TODO Apply human voice filter
-			speechSamples := a.sd.Add(p.Samples, p.SampleRate, p.SilenceMaxAudioLevel)
+			speechSamples := a.sds[p.BrainName].Add(p.Samples, p.SampleRate, p.SilenceMaxAudioLevel)
 
 			// No speech samples
 			if len(speechSamples) <= 0 {
@@ -90,7 +106,7 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 
 			// Process samples
 			for _, samples := range speechSamples {
-				a.processSamples(samples, p.SampleRate, p.SignificantBits)
+				a.processSamples(p.BrainName, samples, p.SampleRate, p.SignificantBits)
 			}
 		case <-ctx.Done():
 			err = errors.Wrap(err, "astiunderstanding: context error")
@@ -100,12 +116,12 @@ func (a *Ability) Run(ctx context.Context) (err error) {
 }
 
 // processSamples processes samples
-func (a *Ability) processSamples(samples []int32, sampleRate, significantBits int) {
+func (a *Ability) processSamples(brainName string, samples []int32, sampleRate, significantBits int) {
 	// Make sure the following is not blocking but still executed in FIFO order
 	a.d.Do(func() {
 		// Execute speech to text analysis
 		start := time.Now()
-		astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples", len(samples))
+		astilog.Debugf("astiunderstanding: starting speech to text analysis on %d samples from brain %s", len(samples), brainName)
 		text, err := a.p.SpeechToText(samples, sampleRate, significantBits)
 		if err != nil {
 			astilog.Error(errors.Wrap(err, "astiunderstanding: speech to text analysis failed"))
@@ -118,7 +134,10 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 			a.dispatchFunc(astibrain.Event{
 				AbilityName: name,
 				Name:        websocketEventNameAnalysis,
-				Payload:     text,
+				Payload: PayloadAnalysis{
+					BrainName: brainName,
+					Text:      text,
+				},
 			})
 		}
 
@@ -128,7 +147,7 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 			id, err := a.storeSamples(text, samples, sampleRate, significantBits)
 			if err != nil {
 				astilog.Error(errors.Wrap(err, "astiunderstanding: storing samples failed"))
-			} else if a.dispatchFunc != nil  {
+			} else if a.dispatchFunc != nil {
 				a.dispatchFunc(astibrain.Event{
 					AbilityName: name,
 					Name:        websocketEventNameSamplesStored,
@@ -137,6 +156,12 @@ func (a *Ability) processSamples(samples []int32, sampleRate, significantBits in
 			}
 		}
 	})
+}
+
+// PayloadAnalysis represents an analysis payload
+type PayloadAnalysis struct {
+	BrainName string `json:"brain_name"`
+	Text      string `json:"text"`
 }
 
 // PayloadStoredSamples represents stored samples payload

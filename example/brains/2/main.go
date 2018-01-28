@@ -52,7 +52,9 @@ func main() {
 	defer s.Close()
 
 	// Create silence detector
-	sd := astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorConfiguration{})
+	sd := func() astiunderstanding.SilenceDetector {
+		return astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorConfiguration{})
+	}
 
 	// Create speech to text
 	stt := astispeechtotext.New(astispeechtotext.Configuration{
