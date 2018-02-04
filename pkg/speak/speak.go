@@ -1,6 +1,6 @@
 package astispeak
 
-import "github.com/mattn/go-ole"
+import "github.com/go-ole/go-ole"
 
 // Speaker represents a speaker
 type Speaker struct {

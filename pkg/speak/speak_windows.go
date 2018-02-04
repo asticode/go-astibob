@@ -49,7 +49,7 @@ func (s *Speaker) Close() (err error) {
 }
 
 // Say says words
-func (s *Speaker) say(i string) (err error) {
+func (s *Speaker) Say(i string) (err error) {
 	// Init has not been executed
 	if s.windowsIDispatch == nil {
 		err = errors.New("astispeak: the Init() method should be called before running anything else")
