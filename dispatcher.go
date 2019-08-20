@@ -1,65 +1,67 @@
 package astibob
 
-import "sync"
+import (
+	"sync"
 
-// Listener represents a listener executed when an event is dispatched
-type Listener func(e Event) (deleteListener bool)
+	"github.com/asticode/go-astilog"
+	"github.com/pkg/errors"
+)
 
-// dispatcher represents an object capable of dispatching events
-type dispatcher struct {
-	id int
-	f  map[string]map[int]Listener
-	m  sync.Mutex
+type MessageHandler func(m *Message) error
+
+type dispatcherHandler struct {
+	c DispatchConditions
+	h MessageHandler
 }
 
-// newDispatcher creates a new dispatcher
-func newDispatcher() *dispatcher {
-	return &dispatcher{f: make(map[string]map[int]Listener)}
+type Dispatcher struct {
+	hs []dispatcherHandler
+	m  *sync.Mutex
 }
 
-// addListener adds a listener
-func (d *dispatcher) addListener(eventName string, l Listener) {
+func NewDispatcher() *Dispatcher {
+	return &Dispatcher{m: &sync.Mutex{}}
+}
+
+type DispatchConditions struct {
+	Name *string
+}
+
+func (c DispatchConditions) match(m *Message) bool {
+	// Check name
+	if c.Name != nil && *c.Name != m.Name {
+		return false
+	}
+	return true
+}
+
+func (d *Dispatcher) Dispatch(m *Message) {
+	// Lock
 	d.m.Lock()
 	defer d.m.Unlock()
-	if _, ok := d.f[eventName]; !ok {
-		d.f[eventName] = make(map[int]Listener)
-	}
-	d.id++
-	d.f[eventName][d.id] = l
-}
 
-// delListener deletes a listener
-func (d *dispatcher) delListener(eventName string, id int) {
-	d.m.Lock()
-	defer d.m.Unlock()
-	if _, ok := d.f[eventName]; !ok {
-		return
-	}
-	delete(d.f[eventName], id)
-}
-
-// Dispatch dispatches an event
-func (d *dispatcher) dispatch(e Event) {
-	// needed so dispatches of events triggered in the listeners can be received without blocking
-	go func() {
-		for id, l := range d.listeners(e.Name) {
-			if l(e) {
-				d.delListener(e.Name, id)
-			}
+	// Loop through handlers
+	for _, h := range d.hs {
+		// No match
+		if !h.c.match(m) {
+			continue
 		}
-	}()
+
+		// Handle in a goroutine so that it's non blocking
+		go func(h MessageHandler) {
+			if err := h(m); err != nil {
+				astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
+				return
+			}
+		}(h.h)
+	}
 }
 
-// listeners returns the listeners for an event name
-func (d *dispatcher) listeners(eventName string) (ls map[int]Listener) {
+func (d *Dispatcher) On(c DispatchConditions, h MessageHandler) {
 	d.m.Lock()
 	defer d.m.Unlock()
-	ls = map[int]Listener{}
-	if _, ok := d.f[eventName]; !ok {
-		return
-	}
-	for k, v := range d.f[eventName] {
-		ls[k] = v
-	}
-	return
+	d.hs = append(d.hs, dispatcherHandler{
+		c: c,
+		h: h,
+	})
 }
