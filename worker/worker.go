@@ -1,13 +1,10 @@
 package worker
 
 import (
-	"encoding/json"
-
 	"github.com/asticode/go-astibob"
-	astiptr "github.com/asticode/go-astitools/ptr"
-	astiworker "github.com/asticode/go-astitools/worker"
+	"github.com/asticode/go-astitools/ptr"
+	"github.com/asticode/go-astitools/worker"
 	"github.com/asticode/go-astiws"
-	"github.com/pkg/errors"
 )
 
 type Options struct {
@@ -33,12 +30,12 @@ func New(name string, o Options) (w *Worker) {
 		ws:   astiws.NewClient(astiws.ClientConfiguration{}),
 	}
 
-	// Add websocket handler
-	w.ws.SetMessageHandler(w.handleIndexMessages)
+	// Add websocket message handler
+	w.ws.SetMessageHandler(w.handleIndexMessage)
 
 	// Add dispatcher handlers
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, w.sendWebsocketMessage)
+	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.IndexIdentifierType}}, w.sendMessageToIndex)
 	return
 }
 
@@ -50,17 +47,4 @@ func (w *Worker) HandleSignals() {
 // Wait waits for the index to be stopped
 func (w *Worker) Wait() {
 	w.w.Wait()
-}
-
-func (w *Worker) handleIndexMessages(p []byte) (err error) {
-	// Unmarshal
-	m := astibob.NewMessage()
-	if err = json.Unmarshal(p, m); err != nil {
-		err = errors.Wrap(err, "index: unmarshaling failed")
-		return
-	}
-
-	// Dispatch
-	w.d.Dispatch(m)
-	return
 }

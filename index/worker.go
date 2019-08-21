@@ -3,11 +3,14 @@ package index
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/asticode/go-astiws"
+	"github.com/gorilla/websocket"
+	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 )
 
@@ -21,6 +24,68 @@ func newWorker(name string, ws *astiws.Client) *worker {
 		name: name,
 		ws:   ws,
 	}
+}
+
+func (i *Index) listWorkers(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}
+
+func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
+	if err := i.ww.ServeHTTP(rw, r, func(c *astiws.Client) error {
+		c.SetMessageHandler(i.handleWorkerMessage(c))
+		return nil
+	}); err != nil {
+		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok || v.Code != websocket.CloseNormalClosure {
+			astilog.Error(errors.Wrap(err, "index: handling worker websocket failed"))
+		}
+		return
+	}
+}
+
+func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
+	return func(p []byte) (err error) {
+		// Log
+		astilog.Debugf("index: handling worker message %s", p)
+
+		// Unmarshal
+		m := astibob.NewMessage()
+		if err = json.Unmarshal(p, m); err != nil {
+			err = errors.Wrap(err, "index: unmarshaling failed")
+			return
+		}
+
+		// When the worker registers, we need to register the client
+		if m.Name == astibob.CmdWorkerRegisterMessage && m.From.Name != nil {
+			i.ww.RegisterClient(*m.From.Name, c)
+		}
+
+		// Dispatch
+		i.d.Dispatch(m)
+		return
+	}
+}
+
+func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
+	// Log
+	astilog.Debugf("index: sending %s message to worker", m.Name)
+
+	// No name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: to name is empty")
+		return
+	}
+
+	// Retrieve client from manager
+	c, ok := i.ww.Client(*m.To.Name)
+	if !ok {
+		err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
+		return
+	}
+
+	// Write
+	if err = c.WriteJSON(m); err != nil {
+		err = errors.Wrap(err, "worker: writing JSON message failed")
+		return
+	}
+	return
 }
 
 func (i *Index) addWorker(m *astibob.Message) (err error) {
@@ -94,27 +159,5 @@ func (i *Index) delWorker(m *astibob.Message) (err error) {
 
 	// Log
 	astilog.Infof("index: worker %s has disconnected", name)
-	return
-}
-
-func (i *Index) sendWebsocketMessage(m *astibob.Message) (err error) {
-	// No name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: to name is empty")
-		return
-	}
-
-	// Retrieve client from manager
-	c, ok := i.ww.Client(*m.To.Name)
-	if !ok {
-		err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
-		return
-	}
-
-	// Write
-	if err = c.WriteJSON(m); err != nil {
-		err = errors.Wrap(err, "worker: writing JSON message failed")
-		return
-	}
 	return
 }

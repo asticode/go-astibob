@@ -1,16 +1,10 @@
 package index
 
 import (
-	"encoding/json"
 	"net/http"
 
-	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
 	astihttp "github.com/asticode/go-astitools/http"
-	"github.com/asticode/go-astiws"
-	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 // Serve spawns the server
@@ -31,37 +25,3 @@ func (i *Index) Serve() {
 }
 
 func (i *Index) ok(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}
-
-func (i *Index) listWorkers(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}
-
-func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	if err := i.ww.ServeHTTP(rw, r, func(c *astiws.Client) error {
-		c.SetMessageHandler(i.handleWorkerMessage(c))
-		return nil
-	}); err != nil {
-		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok || v.Code != websocket.CloseNormalClosure {
-			astilog.Error(errors.Wrap(err, "index: handling worker websocket failed"))
-		}
-		return
-	}
-}
-
-func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
-	return func(p []byte) (err error) {
-		// Unmarshal
-		m := astibob.NewMessage()
-		if err = json.Unmarshal(p, m); err != nil {
-			err = errors.Wrap(err, "index: unmarshaling failed")
-			return
-		}
-
-		// In case of a register cmd we need to store the client
-		if m.Name == astibob.CmdWorkerRegisterMessage && m.From.Name != nil {
-			i.ww.RegisterClient(*m.From.Name, c)
-		}
-
-		// Dispatch
-		i.d.Dispatch(m)
-		return
-	}
-}

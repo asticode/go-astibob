@@ -29,6 +29,7 @@ type Index struct {
 
 // New creates a new index
 func New(o Options) (i *Index) {
+	// Create index
 	i = &Index{
 		d:  astibob.NewDispatcher(),
 		mw: &sync.Mutex{},
@@ -37,9 +38,11 @@ func New(o Options) (i *Index) {
 		ws: make(map[string]*worker),
 		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
 	}
+
+	// Add dispatcher handlers
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, i.sendWebsocketMessage)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.WorkerIdentifierType}}, i.sendMessageToWorker)
 	return
 }
 

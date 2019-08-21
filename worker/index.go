@@ -2,6 +2,7 @@ package worker
 
 import (
 	"encoding/base64"
+	"encoding/json"
 	"net/http"
 
 	"github.com/asticode/go-astibob"
@@ -50,15 +51,6 @@ func (w *Worker) sendRegister() (err error) {
 	return
 }
 
-func (w *Worker) sendWebsocketMessage(m *astibob.Message) (err error) {
-	// Write
-	if err = w.ws.WriteJSON(m); err != nil {
-		err = errors.Wrap(err, "worker: writing JSON message failed")
-		return
-	}
-	return
-}
-
 func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
 	if err = astibob.ParseEventWorkerWelcomePayload(m); err != nil {
@@ -68,5 +60,33 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 
 	// Log
 	astilog.Info("worker: worker has registered to the index")
+	return
+}
+
+func (w *Worker) handleIndexMessage(p []byte) (err error) {
+	// Log
+	astilog.Debugf("worker: handling index message %s", p)
+
+	// Unmarshal
+	m := astibob.NewMessage()
+	if err = json.Unmarshal(p, m); err != nil {
+		err = errors.Wrap(err, "worker: unmarshaling failed")
+		return
+	}
+
+	// Dispatch
+	w.d.Dispatch(m)
+	return
+}
+
+func (w *Worker) sendMessageToIndex(m *astibob.Message) (err error) {
+	// Log
+	astilog.Debugf("worker: sending %s message to index", m.Name)
+
+	// Write
+	if err = w.ws.WriteJSON(m); err != nil {
+		err = errors.Wrap(err, "worker: writing JSON message failed")
+		return
+	}
 	return
 }

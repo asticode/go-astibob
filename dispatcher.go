@@ -25,11 +25,27 @@ func NewDispatcher() *Dispatcher {
 
 type DispatchConditions struct {
 	Name *string
+	To   *Identifier
 }
 
 func (c DispatchConditions) match(m *Message) bool {
 	// Check name
 	if c.Name != nil && *c.Name != m.Name {
+		return false
+	}
+
+	// Check to
+	if c.To != nil && m.To != nil {
+		// Check type
+		if c.To.Type != m.To.Type {
+			return false
+		}
+
+		// Check name
+		if c.To.Name != nil && *c.To.Name != *m.To.Name {
+			return false
+		}
+	} else if c.To != nil && m.To == nil {
 		return false
 	}
 	return true
