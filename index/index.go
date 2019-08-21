@@ -1,8 +1,6 @@
 package index
 
 import (
-	"encoding/base64"
-	"fmt"
 	"sync"
 
 	"github.com/asticode/go-astibob"
@@ -11,16 +9,9 @@ import (
 	"github.com/asticode/go-astiws"
 )
 
-// Message context keys
-const (
-	clientMessageStateKey = "client"
-)
-
 // Vars
 var (
-	from = astibob.Identifier{
-		Type: astibob.IndexIdentifierType,
-	}
+	from = astibob.Identifier{Type: astibob.IndexIdentifierType}
 )
 
 type Options struct {
@@ -70,8 +61,4 @@ func (i *Index) Wait() {
 // On makes sure to handle messages with specific conditions
 func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
-}
-
-func clientStateKey(c *astiws.Client) string {
-	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%p", c)))
 }

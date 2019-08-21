@@ -38,14 +38,12 @@ func (w *Worker) Register() {
 
 func (w *Worker) sendRegister() (err error) {
 	// Create message
-	var m *astibob.Message
-	if m, err = astibob.NewCmdWorkerRegisterMessage(astibob.Identifier{
+	m := astibob.NewCmdWorkerRegisterMessage(astibob.Identifier{
 		Name: astiptr.Str(w.name),
 		Type: astibob.WorkerIdentifierType,
-	}, w.name); err != nil {
-		err = errors.Wrap(err, "worker: creating message failed")
-		return
-	}
+	}, &astibob.Identifier{
+		Type: astibob.IndexIdentifierType,
+	})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -63,7 +61,7 @@ func (w *Worker) sendWebsocketMessage(m *astibob.Message) (err error) {
 
 func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
-	if err = astibob.ParseWorkerWelcomeEventPayload(m); err != nil {
+	if err = astibob.ParseEventWorkerWelcomePayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing message payload failed")
 		return
 	}

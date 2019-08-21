@@ -22,10 +22,10 @@ const (
 )
 
 type Message struct {
-	From    Identifier        `json:"from"`
-	Name    string            `json:"name"`
-	Payload json.RawMessage   `json:"payload,omitempty"`
-	State   map[string]string `json:"state,omitempty"`
+	From    Identifier      `json:"from"`
+	Name    string          `json:"name"`
+	Payload json.RawMessage `json:"payload,omitempty"`
+	To      *Identifier     `json:"to,omitempty"`
 }
 
 type Identifier struct {
@@ -34,19 +34,24 @@ type Identifier struct {
 }
 
 func NewMessage() *Message {
-	return &Message{State: make(map[string]string)}
+	return &Message{}
 }
 
-func newMessage(from Identifier, name string) *Message {
+func newMessage(from Identifier, to *Identifier, name string) *Message {
 	m := NewMessage()
 	m.From = from
 	m.Name = name
+	m.To = to
 	return m
 }
 
-func NewCmdWorkerRegisterMessage(from Identifier, worker string) (m *Message, err error) {
+func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, CmdWorkerRegisterMessage)
+}
+
+func NewEventWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, CmdWorkerRegisterMessage)
+	m = newMessage(from, to, EventWorkerDisconnectedMessage)
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(worker); err != nil {
@@ -56,34 +61,7 @@ func NewCmdWorkerRegisterMessage(from Identifier, worker string) (m *Message, er
 	return
 }
 
-func ParseWorkerRegisterCmdPayload(m *Message) (worker string, err error) {
-	// Check name
-	if m.Name != CmdWorkerRegisterMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdWorkerRegisterMessage)
-		return
-	}
-
-	// Unmarshal
-	if err = json.Unmarshal(m.Payload, &worker); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
-		return
-	}
-	return
-}
-
-func NewEventWorkerDisconnectedMessage(from Identifier, worker string) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, EventWorkerDisconnectedMessage)
-
-	// Marshal payload
-	if m.Payload, err = json.Marshal(worker); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
-		return
-	}
-	return
-}
-
-func ParseWorkerDisconnectedEventPayload(m *Message) (worker string, err error) {
+func ParseEventWorkerDisconnectedPayload(m *Message) (worker string, err error) {
 	// Check name
 	if m.Name != EventWorkerDisconnectedMessage {
 		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventWorkerDisconnectedMessage)
@@ -93,18 +71,17 @@ func ParseWorkerDisconnectedEventPayload(m *Message) (worker string, err error) 
 	// Unmarshal
 	if err = json.Unmarshal(m.Payload, &worker); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
-		return
 	}
 	return
 }
 
-func NewEventWorkerWelcomeMessage(from Identifier) (m *Message, err error) {
+func NewEventWorkerWelcomeMessage(from Identifier, to *Identifier) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, EventWorkerWelcomeMessage)
+	m = newMessage(from, to, EventWorkerWelcomeMessage)
 	return
 }
 
-func ParseWorkerWelcomeEventPayload(m *Message) (err error) {
+func ParseEventWorkerWelcomePayload(m *Message) (err error) {
 	// Check name
 	if m.Name != EventWorkerWelcomeMessage {
 		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventWorkerWelcomeMessage)
