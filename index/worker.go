@@ -2,6 +2,7 @@ package index
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
@@ -35,17 +36,17 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Retrieve client from context
-	v, ok := m.FromContext(clientMessageContextKey)
+	// Retrieve client from state
+	ck, ok := m.State[clientMessageStateKey]
 	if !ok {
-		err = errors.New("index: client key not found in context")
+		err = errors.New("index: client key not found in state")
 		return
 	}
 
-	// Assert client
-	c, ok := v.(*astiws.Client)
+	// Retrieve client from manager
+	c, ok := i.ww.Client(ck)
 	if !ok {
-		err = errors.New("index: client key is not *astiws.Client")
+		err = fmt.Errorf("index: client %s doesn't exist", ck)
 		return
 	}
 
@@ -61,13 +62,16 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 		// Create message
 		var m *astibob.Message
-		if m, err = astibob.NewWorkerDisconnectedEventMessage(from, name); err != nil {
+		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, name); err != nil {
 			err = errors.Wrap(err, "astibob: creating message failed")
 			return
 		}
 
 		// Dispatch
 		i.d.Dispatch(m)
+
+		// Unregister client
+		i.ww.UnregisterClient(ck)
 		return
 	})
 
@@ -75,13 +79,13 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	astilog.Infof("index: worker %s has registered", w.name)
 
 	// Create message
-	if m, err = astibob.NewWorkerWelcomeEventMessage(from); err != nil {
+	if m, err = astibob.NewEventWorkerWelcomeMessage(from); err != nil {
 		err = errors.Wrap(err, "astibob: creating message failed")
 		return
 	}
 
-	// Add client to context
-	m.ToContext(clientMessageContextKey, c)
+	// Add client to state
+	m.State[clientMessageStateKey] = ck
 
 	// Dispatch
 	i.d.Dispatch(m)
@@ -107,17 +111,17 @@ func (i *Index) delWorker(m *astibob.Message) (err error) {
 }
 
 func (i *Index) sendWebsocketMessage(m *astibob.Message) (err error) {
-	// Retrieve client from context
-	v, ok := m.FromContext(clientMessageContextKey)
+	// Retrieve client from state
+	ck, ok := m.State[clientMessageStateKey]
 	if !ok {
-		err = errors.New("index: client key not found in context")
+		err = errors.New("index: client key not found in state")
 		return
 	}
 
-	// Assert client
-	c, ok := v.(*astiws.Client)
+	// Retrieve client from manager
+	c, ok := i.ww.Client(ck)
 	if !ok {
-		err = errors.New("index: client key is not *astiws.Client")
+		err = fmt.Errorf("index: client %s doesn't exist", ck)
 		return
 	}
 

@@ -1,6 +1,8 @@
 package index
 
 import (
+	"encoding/base64"
+	"fmt"
 	"sync"
 
 	"github.com/asticode/go-astibob"
@@ -11,7 +13,7 @@ import (
 
 // Message context keys
 const (
-	clientMessageContextKey = "client"
+	clientMessageStateKey = "client"
 )
 
 // Vars
@@ -44,9 +46,9 @@ func New(o Options) (i *Index) {
 		ws: make(map[string]*worker),
 		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
 	}
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterCmdMessage)}, i.addWorker)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedEventMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeEventMessage)}, i.sendWebsocketMessage)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, i.sendWebsocketMessage)
 	return
 }
 
@@ -68,4 +70,8 @@ func (i *Index) Wait() {
 // On makes sure to handle messages with specific conditions
 func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
+}
+
+func clientStateKey(c *astiws.Client) string {
+	return base64.StdEncoding.EncodeToString([]byte(fmt.Sprintf("%p", c)))
 }

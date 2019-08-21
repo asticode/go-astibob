@@ -5,8 +5,6 @@ import (
 
 	"fmt"
 
-	"sync"
-
 	"github.com/pkg/errors"
 )
 
@@ -18,29 +16,25 @@ const (
 
 // Message names
 const (
-	WorkerRegisterCmdMessage       = "cmd.worker.register"
-	WorkerDisconnectedEventMessage = "event.worker.disconnected"
-	WorkerWelcomeEventMessage      = "event.worker.welcome"
+	CmdWorkerRegisterMessage       = "cmd.worker.register"
+	EventWorkerDisconnectedMessage = "event.worker.disconnected"
+	EventWorkerWelcomeMessage      = "event.worker.welcome"
 )
 
 type Message struct {
-	ctx     map[string]interface{} `json:"-"`
-	From    Identifier             `json:"from"`
-	m       *sync.Mutex            `json:"-"` // Lock ctx
-	Name    string                 `json:"name"`
-	Payload json.RawMessage        `json:"payload"`
+	From    Identifier        `json:"from"`
+	Name    string            `json:"name"`
+	Payload json.RawMessage   `json:"payload,omitempty"`
+	State   map[string]string `json:"state,omitempty"`
 }
 
 type Identifier struct {
-	Name *string `json:"name"`
+	Name *string `json:"name,omitempty"`
 	Type string  `json:"type"`
 }
 
 func NewMessage() *Message {
-	return &Message{
-		ctx: make(map[string]interface{}),
-		m:   &sync.Mutex{},
-	}
+	return &Message{State: make(map[string]string)}
 }
 
 func newMessage(from Identifier, name string) *Message {
@@ -50,22 +44,9 @@ func newMessage(from Identifier, name string) *Message {
 	return m
 }
 
-func (m *Message) ToContext(v string, k interface{}) {
-	m.m.Lock()
-	defer m.m.Unlock()
-	m.ctx[v] = k
-}
-
-func (m *Message) FromContext(v string) (k interface{}, ok bool) {
-	m.m.Lock()
-	defer m.m.Unlock()
-	k, ok = m.ctx[v]
-	return
-}
-
-func NewWorkerRegisterCmdMessage(from Identifier, worker string) (m *Message, err error) {
+func NewCmdWorkerRegisterMessage(from Identifier, worker string) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, WorkerRegisterCmdMessage)
+	m = newMessage(from, CmdWorkerRegisterMessage)
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(worker); err != nil {
@@ -77,8 +58,8 @@ func NewWorkerRegisterCmdMessage(from Identifier, worker string) (m *Message, er
 
 func ParseWorkerRegisterCmdPayload(m *Message) (worker string, err error) {
 	// Check name
-	if m.Name != WorkerRegisterCmdMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, WorkerRegisterCmdMessage)
+	if m.Name != CmdWorkerRegisterMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdWorkerRegisterMessage)
 		return
 	}
 
@@ -90,9 +71,9 @@ func ParseWorkerRegisterCmdPayload(m *Message) (worker string, err error) {
 	return
 }
 
-func NewWorkerDisconnectedEventMessage(from Identifier, worker string) (m *Message, err error) {
+func NewEventWorkerDisconnectedMessage(from Identifier, worker string) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, WorkerDisconnectedEventMessage)
+	m = newMessage(from, EventWorkerDisconnectedMessage)
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(worker); err != nil {
@@ -104,8 +85,8 @@ func NewWorkerDisconnectedEventMessage(from Identifier, worker string) (m *Messa
 
 func ParseWorkerDisconnectedEventPayload(m *Message) (worker string, err error) {
 	// Check name
-	if m.Name != WorkerDisconnectedEventMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, WorkerDisconnectedEventMessage)
+	if m.Name != EventWorkerDisconnectedMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventWorkerDisconnectedMessage)
 		return
 	}
 
@@ -117,16 +98,16 @@ func ParseWorkerDisconnectedEventPayload(m *Message) (worker string, err error) 
 	return
 }
 
-func NewWorkerWelcomeEventMessage(from Identifier) (m *Message, err error) {
+func NewEventWorkerWelcomeMessage(from Identifier) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, WorkerWelcomeEventMessage)
+	m = newMessage(from, EventWorkerWelcomeMessage)
 	return
 }
 
 func ParseWorkerWelcomeEventPayload(m *Message) (err error) {
 	// Check name
-	if m.Name != WorkerWelcomeEventMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, WorkerWelcomeEventMessage)
+	if m.Name != EventWorkerWelcomeMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventWorkerWelcomeMessage)
 		return
 	}
 	return

@@ -39,15 +39,13 @@ func (w *Worker) Register() {
 func (w *Worker) sendRegister() (err error) {
 	// Create message
 	var m *astibob.Message
-	if m, err = astibob.NewWorkerRegisterCmdMessage(astibob.Identifier{
+	if m, err = astibob.NewCmdWorkerRegisterMessage(astibob.Identifier{
 		Name: astiptr.Str(w.name),
 		Type: astibob.WorkerIdentifierType,
 	}, w.name); err != nil {
 		err = errors.Wrap(err, "worker: creating message failed")
 		return
 	}
-
-	// TODO Add abilities
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -69,8 +67,6 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 		err = errors.Wrap(err, "worker: parsing message payload failed")
 		return
 	}
-
-	// TODO Request events to proper workers
 
 	// Log
 	astilog.Info("worker: worker has registered to the index")

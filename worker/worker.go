@@ -37,8 +37,8 @@ func New(name string, o Options) (w *Worker) {
 	w.ws.SetMessageHandler(w.handleIndexMessages)
 
 	// Add dispatcher handlers
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeEventMessage)}, w.finishRegistration)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterCmdMessage)}, w.sendWebsocketMessage)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, w.sendWebsocketMessage)
 	return
 }
 

@@ -36,7 +36,12 @@ func (i *Index) listWorkers(rw http.ResponseWriter, r *http.Request, p httproute
 
 func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if err := i.ww.ServeHTTP(rw, r, func(c *astiws.Client) error {
-		c.SetMessageHandler(i.handleWorkerMessage(c))
+		// Register client
+		ck := clientStateKey(c)
+		i.ww.RegisterClient(ck, c)
+
+		// Set message handler
+		c.SetMessageHandler(i.handleWorkerMessage(ck))
 		return nil
 	}); err != nil {
 		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok || v.Code != websocket.CloseNormalClosure {
@@ -46,7 +51,7 @@ func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p
 	}
 }
 
-func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
+func (i *Index) handleWorkerMessage(clientKey string) astiws.MessageHandler {
 	return func(p []byte) (err error) {
 		// Unmarshal
 		m := astibob.NewMessage()
@@ -55,8 +60,8 @@ func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 			return
 		}
 
-		// Add client to context
-		m.ToContext(clientMessageContextKey, c)
+		// Add client to state
+		m.State[clientMessageStateKey] = clientKey
 
 		// Dispatch
 		i.d.Dispatch(m)
