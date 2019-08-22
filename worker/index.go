@@ -5,16 +5,17 @@ import (
 	"encoding/json"
 	"net/http"
 
+	"sort"
+
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
 
 // Register registers the worker to the index
-func (w *Worker) Register() {
+func (w *Worker) RegisterToIndex() {
 	// Create headers
 	h := make(http.Header)
 	if w.o.Index.Password != "" && w.o.Index.Username != "" {
@@ -38,13 +39,38 @@ func (w *Worker) Register() {
 }
 
 func (w *Worker) sendRegister() (err error) {
+	// Get runnable keys
+	w.mr.Lock()
+	var ks []string
+	for k := range w.rs {
+		ks = append(ks, k)
+	}
+
+	// Sort
+	sort.Strings(ks)
+
+	// Loop through runnables
+	var as []astibob.Ability
+	for _, k := range ks {
+		// Get runnable
+		r := w.rs[k]
+
+		// Append ability
+		as = append(as, astibob.Ability{
+			Metadata: r.Metadata(),
+			Status:   r.Status(),
+		})
+	}
+	w.mr.Unlock()
+
 	// Create message
-	m := astibob.NewCmdWorkerRegisterMessage(astibob.Identifier{
-		Name: astiptr.Str(w.name),
-		Type: astibob.WorkerIdentifierType,
-	}, &astibob.Identifier{
+	var m *astibob.Message
+	if m, err = astibob.NewCmdWorkerRegisterMessage(w.from(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
-	})
+	}, as); err != nil {
+		err = errors.Wrap(err, "worker: creating message failed")
+		return
+	}
 
 	// Dispatch
 	w.d.Dispatch(m)

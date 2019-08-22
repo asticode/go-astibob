@@ -54,55 +54,47 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		// Log
 		astilog.Infof("astibob: ui %s has connected", name)
 
-		// Get worker names
+		// Get worker keys
 		i.mw.Lock()
-		var names []string
+		var wks []string
 		for n := range i.ws {
-			names = append(names, n)
+			wks = append(wks, n)
 		}
 
-		// Sort worker names
-		sort.Strings(names)
+		// Sort worker keys
+		sort.Strings(wks)
 
-		// Loop through names
+		// Loop through worker keys
 		var ws []astibob.Worker
-		for _, n := range names {
-			ws = append(ws, astibob.Worker{Name: n})
+		for _, wk := range wks {
+			// Get worker
+			w := i.ws[wk]
+
+			// Get ability keys
+			w.ma.Lock()
+			var aks []string
+			for n := range w.as {
+				aks = append(aks, n)
+			}
+
+			// Sort ability keys
+			sort.Strings(aks)
+
+			// Loop through ability keys
+			var as []astibob.Ability
+			for _, ak := range aks {
+				// Append ability
+				as = append(as, w.as[ak])
+			}
+			w.ma.Unlock()
+
+			// Append worker
+			ws = append(ws, astibob.Worker{
+				Abilities: as,
+				Name:      w.name,
+			})
 		}
 		i.mw.Unlock()
-
-		// TODO Remove
-		ws = []astibob.Worker{
-			{
-				Abilities: []astibob.Ability{
-					{
-						Description: "Description #1",
-						Name: "Ability #1",
-						Status: "running",
-					},
-					{
-						Description: "Description #2",
-						Name: "Ability #2",
-						Status: "stopped",
-						UIHomepage: "/test",
-					},
-				},
-				Name: "Worker #1",
-			},
-			{
-				Name: "Worker #2",
-			},
-			{
-				Abilities: []astibob.Ability{
-					{
-						Description: "Description #3",
-						Name: "Ability #3",
-						Status: "running",
-					},
-				},
-				Name: "Worker #3",
-			},
-		}
 
 		// Create message
 		var m *astibob.Message

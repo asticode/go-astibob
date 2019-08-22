@@ -35,18 +35,26 @@ func (c DispatchConditions) match(m *Message) bool {
 	}
 
 	// Check to
-	if c.To != nil && m.To != nil {
+	if c.To != nil {
+		// No to in message
+		if m.To == nil {
+			return false
+		}
+
 		// Check type
 		if c.To.Type != m.To.Type {
 			return false
 		}
 
 		// Check name
-		if c.To.Name != nil && *c.To.Name != *m.To.Name {
+		if c.To.Name != nil && (m.To.Name == nil || *c.To.Name != *m.To.Name) {
 			return false
 		}
-	} else if c.To != nil && m.To == nil {
-		return false
+
+		// Check worker
+		if c.To.Worker != nil && (m.To.Worker == nil || *c.To.Worker != *m.To.Worker) {
+			return false
+		}
 	}
 	return true
 }

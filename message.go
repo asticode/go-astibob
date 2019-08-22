@@ -10,15 +10,21 @@ import (
 
 // Identifier types
 const (
-	IndexIdentifierType  = "index"
-	UIIdentifierType     = "ui"
-	WorkerIdentifierType = "worker"
+	AbilityIdentifierType = "ability"
+	IndexIdentifierType   = "index"
+	UIIdentifierType      = "ui"
+	WorkerIdentifierType  = "worker"
 )
 
 // Message names
 const (
+	CmdAbilityStartMessage         = "cmd.ability.start"
+	CmdAbilityStopMessage          = "cmd.ability.stop"
 	CmdUIPingMessage               = "cmd.ui.ping"
 	CmdWorkerRegisterMessage       = "cmd.worker.register"
+	EventAbilityCrashedMessage     = "event.ability.crashed"
+	EventAbilityStartedMessage     = "event.ability.started"
+	EventAbilityStoppedMessage     = "event.ability.stopped"
 	EventUIDisconnectedMessage     = "event.ui.disconnected"
 	EventUIWelcomeMessage          = "event.ui.welcome"
 	EventWorkerDisconnectedMessage = "event.worker.disconnected"
@@ -33,8 +39,9 @@ type Message struct {
 }
 
 type Identifier struct {
-	Name *string `json:"name,omitempty"`
-	Type string  `json:"type"`
+	Name   *string `json:"name,omitempty"`
+	Type   string  `json:"type"`
+	Worker *string `json:"worker,omitempty"`
 }
 
 type WelcomeUI struct {
@@ -48,10 +55,14 @@ type Worker struct {
 }
 
 type Ability struct {
+	Metadata
+	Status     string `json:"status"`
+	UIHomepage string `json:"ui_homepage,omitempty"`
+}
+
+type Metadata struct {
 	Description string `json:"description"`
 	Name        string `json:"name"`
-	Status      string `json:"status"`
-	UIHomepage string   `json:"ui_homepage"`
 }
 
 func NewMessage() *Message {
@@ -66,8 +77,94 @@ func newMessage(from Identifier, to *Identifier, name string) *Message {
 	return m
 }
 
-func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier) *Message {
-	return newMessage(from, to, CmdWorkerRegisterMessage)
+func ParseCmdAbilityStartPayload(m *Message) (name string, err error) {
+	// Check name
+	if m.Name != CmdAbilityStartMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdAbilityStartMessage)
+		return
+	}
+
+	// Unmarshal
+	if err = json.Unmarshal(m.Payload, &name); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+	}
+	return
+}
+
+func ParseCmdAbilityStopPayload(m *Message) (name string, err error) {
+	// Check name
+	if m.Name != CmdAbilityStopMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdAbilityStopMessage)
+		return
+	}
+
+	// Unmarshal
+	if err = json.Unmarshal(m.Payload, &name); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+	}
+	return
+}
+
+func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier, as []Ability) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, CmdWorkerRegisterMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(as); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseCmdWorkerRegisterPayload(m *Message) (as []Ability, err error) {
+	// Check name
+	if m.Name != CmdWorkerRegisterMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdWorkerRegisterMessage)
+		return
+	}
+
+	// Unmarshal
+	if err = json.Unmarshal(m.Payload, &as); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+	}
+	return
+}
+
+func NewEventAbilityCrashedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventAbilityCrashedMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(name); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func NewEventAbilityStartedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventAbilityStartedMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(name); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func NewEventAbilityStoppedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventAbilityStoppedMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(name); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
 }
 
 func NewEventUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {

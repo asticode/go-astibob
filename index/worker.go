@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
+	"sync"
+
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
@@ -15,15 +17,26 @@ import (
 )
 
 type worker struct {
+	as   map[string]astibob.Ability
+	ma   *sync.Mutex // Locks as
 	name string
 	ws   *astiws.Client
 }
 
-func newWorker(name string, ws *astiws.Client) *worker {
-	return &worker{
+func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker) {
+	// Create
+	w = &worker{
+		as:   make(map[string]astibob.Ability),
+		ma:   &sync.Mutex{},
 		name: name,
 		ws:   ws,
 	}
+
+	// Loop through abilities
+	for _, a := range as {
+		w.as[a.Name] = a
+	}
+	return
 }
 
 func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -87,6 +100,13 @@ func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
 }
 
 func (i *Index) addWorker(m *astibob.Message) (err error) {
+	// Parse payload
+	var as []astibob.Ability
+	if as, err = astibob.ParseCmdWorkerRegisterPayload(m); err != nil {
+		err = errors.Wrap(err, "index: parsing payload failed")
+		return
+	}
+
 	// Name is empty
 	if m.From.Name == nil || *m.From.Name == "" {
 		err = errors.New("index: from name is empty")
@@ -101,7 +121,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	}
 
 	// Create worker
-	w := newWorker(*m.From.Name, c)
+	w := newWorker(*m.From.Name, c, as)
 
 	// Update pool
 	i.mw.Lock()

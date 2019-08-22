@@ -4,6 +4,7 @@ import (
 	"flag"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astibob/abilities/speak"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
 )
@@ -25,8 +26,11 @@ func main() {
 	// Handle signals
 	w.HandleSignals()
 
-	// Register
-	w.Register()
+	// Register runnables
+	w.RegisterRunnables(speak.NewRunnable("Speak"))
+
+	// Register to index
+	w.RegisterToIndex()
 
 	// Blocking pattern
 	w.Wait()

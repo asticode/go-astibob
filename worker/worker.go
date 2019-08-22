@@ -1,9 +1,11 @@
 package worker
 
 import (
+	"sync"
+
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astitools/ptr"
-	"github.com/asticode/go-astitools/worker"
+	astiptr "github.com/asticode/go-astitools/ptr"
+	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/asticode/go-astiws"
 )
 
@@ -14,7 +16,9 @@ type Options struct {
 type Worker struct {
 	d    *astibob.Dispatcher
 	name string
+	mr   *sync.Mutex // Locks rs
 	o    Options
+	rs   map[string]astibob.Runnable
 	w    *astiworker.Worker
 	ws   *astiws.Client
 }
@@ -25,7 +29,9 @@ func New(name string, o Options) (w *Worker) {
 	w = &Worker{
 		d:    astibob.NewDispatcher(),
 		name: name,
+		mr:   &sync.Mutex{},
 		o:    o,
+		rs:   make(map[string]astibob.Runnable),
 		w:    astiworker.NewWorker(),
 		ws:   astiws.NewClient(astiws.ClientConfiguration{}),
 	}
@@ -34,6 +40,8 @@ func New(name string, o Options) (w *Worker) {
 	w.ws.SetMessageHandler(w.handleIndexMessage)
 
 	// Add dispatcher handlers
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStartMessage)}, w.startAbility)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStopMessage)}, w.stopAbility)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.IndexIdentifierType}}, w.sendMessageToIndex)
 	return
@@ -47,4 +55,11 @@ func (w *Worker) HandleSignals() {
 // Wait waits for the index to be stopped
 func (w *Worker) Wait() {
 	w.w.Wait()
+}
+
+func (w *Worker) from() astibob.Identifier {
+	return astibob.Identifier{
+		Name: astiptr.Str(w.name),
+		Type: astibob.WorkerIdentifierType,
+	}
 }
