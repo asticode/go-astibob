@@ -1,4 +1,8 @@
 let consts = {
+    abilityStatuses: {
+        running: "running",
+        stopped: "stopped",
+    },
     identifierTypes: {
         index: "index",
         ui: "ui",

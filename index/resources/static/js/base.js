@@ -29,7 +29,14 @@ let base = {
                     messageRaw: function(data) {
                         switch (data.name) {
                             case consts.messageNames.eventUIWelcome:
-                                base.from.name = data.payload
+                                // Update from
+                                base.from.name = data.payload.name
+
+                                // Init menu
+                                menu.init(data.payload)
+
+                                // Custom callback
+                                if (typeof onLoad !== "undefined") onLoad(data.payload)
                                 break
                         }
                     },

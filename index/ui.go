@@ -10,6 +10,8 @@ import (
 	"encoding/base64"
 	"fmt"
 
+	"sort"
+
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
@@ -52,12 +54,62 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		// Log
 		astilog.Infof("astibob: ui %s has connected", name)
 
+		// Get worker names
+		i.mw.Lock()
+		var names []string
+		for n := range i.ws {
+			names = append(names, n)
+		}
+
+		// Sort worker names
+		sort.Strings(names)
+
+		// Loop through names
+		var ws []astibob.Worker
+		for _, n := range names {
+			ws = append(ws, astibob.Worker{Name: n})
+		}
+		i.mw.Unlock()
+
+		// TODO Remove
+		ws = []astibob.Worker{
+			{
+				Abilities: []astibob.Ability{
+					{
+						Description: "Description #1",
+						Name: "Ability #1",
+						Status: "running",
+					},
+					{
+						Description: "Description #2",
+						Name: "Ability #2",
+						Status: "stopped",
+						UIHomepage: "/test",
+					},
+				},
+				Name: "Worker #1",
+			},
+			{
+				Name: "Worker #2",
+			},
+			{
+				Abilities: []astibob.Ability{
+					{
+						Description: "Description #3",
+						Name: "Ability #3",
+						Status: "running",
+					},
+				},
+				Name: "Worker #3",
+			},
+		}
+
 		// Create message
 		var m *astibob.Message
 		if m, err = astibob.NewEventUIWelcomeMessage(from, &astibob.Identifier{
 			Name: astiptr.Str(name),
 			Type: astibob.UIIdentifierType,
-		}, name); err != nil {
+		}, name, ws); err != nil {
 			err = errors.Wrap(err, "index: creating message failed")
 			return
 		}

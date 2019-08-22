@@ -37,6 +37,23 @@ type Identifier struct {
 	Type string  `json:"type"`
 }
 
+type WelcomeUI struct {
+	Name    string   `json:"name"`
+	Workers []Worker `json:"workers,omitempty"`
+}
+
+type Worker struct {
+	Abilities []Ability `json:"abilities,omitempty"`
+	Name      string    `json:"name"`
+}
+
+type Ability struct {
+	Description string `json:"description"`
+	Name        string `json:"name"`
+	Status      string `json:"status"`
+	UIHomepage string   `json:"ui_homepage"`
+}
+
 func NewMessage() *Message {
 	return &Message{}
 }
@@ -65,12 +82,15 @@ func NewEventUIDisconnectedMessage(from Identifier, to *Identifier, name string)
 	return
 }
 
-func NewEventUIWelcomeMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+func NewEventUIWelcomeMessage(from Identifier, to *Identifier, name string, ws []Worker) (m *Message, err error) {
 	// Create message
 	m = newMessage(from, to, EventUIWelcomeMessage)
 
 	// Marshal payload
-	if m.Payload, err = json.Marshal(name); err != nil {
+	if m.Payload, err = json.Marshal(WelcomeUI{
+		Name:    name,
+		Workers: ws,
+	}); err != nil {
 		err = errors.Wrap(err, "astibob: marshaling payload failed")
 		return
 	}
