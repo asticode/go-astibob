@@ -26,8 +26,6 @@ func newWorker(name string, ws *astiws.Client) *worker {
 	}
 }
 
-func (i *Index) listWorkers(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}
-
 func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
 	if err := i.ww.ServeHTTP(rw, r, func(c *astiws.Client) error {
 		c.SetMessageHandler(i.handleWorkerMessage(c))

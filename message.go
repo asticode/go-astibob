@@ -11,12 +11,16 @@ import (
 // Identifier types
 const (
 	IndexIdentifierType  = "index"
+	UIIdentifierType     = "ui"
 	WorkerIdentifierType = "worker"
 )
 
 // Message names
 const (
+	CmdUIPingMessage               = "cmd.ui.ping"
 	CmdWorkerRegisterMessage       = "cmd.worker.register"
+	EventUIDisconnectedMessage     = "event.ui.disconnected"
+	EventUIWelcomeMessage          = "event.ui.welcome"
 	EventWorkerDisconnectedMessage = "event.worker.disconnected"
 	EventWorkerWelcomeMessage      = "event.worker.welcome"
 )
@@ -47,6 +51,44 @@ func newMessage(from Identifier, to *Identifier, name string) *Message {
 
 func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier) *Message {
 	return newMessage(from, to, CmdWorkerRegisterMessage)
+}
+
+func NewEventUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventUIDisconnectedMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(name); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func NewEventUIWelcomeMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventUIWelcomeMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(name); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseEventUIDisconnectedPayload(m *Message) (name string, err error) {
+	// Check name
+	if m.Name != EventUIDisconnectedMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventUIDisconnectedMessage)
+		return
+	}
+
+	// Unmarshal
+	if err = json.Unmarshal(m.Payload, &name); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+	}
+	return
 }
 
 func NewEventWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string) (m *Message, err error) {
