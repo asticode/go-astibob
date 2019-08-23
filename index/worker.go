@@ -74,26 +74,13 @@ func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 	}
 }
 
-func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
+func (i *Index) sendMessageToWorkers(m *astibob.Message) (err error) {
 	// Log
-	astilog.Debugf("index: sending %s message to worker", m.Name)
+	astilog.Debugf("index: sending %s message to workers", m.Name)
 
-	// No name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: to name is empty")
-		return
-	}
-
-	// Retrieve client from manager
-	c, ok := i.ww.Client(*m.To.Name)
-	if !ok {
-		err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
-		return
-	}
-
-	// Write
-	if err = c.WriteJSON(m); err != nil {
-		err = errors.Wrap(err, "worker: writing JSON message failed")
+	// Send message
+	if err = sendMessage(m, i.ww); err != nil {
+		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}
 	return
@@ -130,10 +117,10 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 
 	// Handle disconnect
 	c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
-		// Create message
+		// Create disconnected message
 		var m *astibob.Message
-		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, nil, w.name); err != nil {
-			err = errors.Wrap(err, "astibob: creating message failed")
+		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, &astibob.Identifier{Type: astibob.AllIdentifierType}, w.name); err != nil {
+			err = errors.Wrap(err, "astibob: creating disconnected message failed")
 			return
 		}
 
@@ -145,12 +132,21 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	// Log
 	astilog.Infof("index: worker %s has registered", w.name)
 
-	// Create message
+	// Create registered message
+	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Type: astibob.AllIdentifierType}, w.name, as); err != nil {
+		err = errors.Wrap(err, "astibob: creating registered message failed")
+		return
+	}
+
+	// Dispatch
+	i.d.Dispatch(m)
+
+	// Create welcome message
 	if m, err = astibob.NewEventWorkerWelcomeMessage(from, &astibob.Identifier{
 		Name: astiptr.Str(w.name),
 		Type: astibob.WorkerIdentifierType,
 	}); err != nil {
-		err = errors.Wrap(err, "astibob: creating message failed")
+		err = errors.Wrap(err, "astibob: creating welcome message failed")
 		return
 	}
 

@@ -36,10 +36,10 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 
 		// Handle disconnect
 		c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
-			// Create message
+			// Create disconnected message
 			var m *astibob.Message
 			if m, err = astibob.NewEventUIDisconnectedMessage(from, nil, name); err != nil {
-				err = errors.Wrap(err, "astibob: creating message failed")
+				err = errors.Wrap(err, "astibob: creating disconnected message failed")
 				return
 			}
 
@@ -96,13 +96,13 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		}
 		i.mw.Unlock()
 
-		// Create message
+		// Create welcome message
 		var m *astibob.Message
 		if m, err = astibob.NewEventUIWelcomeMessage(from, &astibob.Identifier{
 			Name: astiptr.Str(name),
 			Type: astibob.UIIdentifierType,
 		}, name, ws); err != nil {
-			err = errors.Wrap(err, "index: creating message failed")
+			err = errors.Wrap(err, "index: creating welcome message failed")
 			return
 		}
 
@@ -137,20 +137,9 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 	// Log
 	astilog.Debugf("index: sending %s message to ui", m.Name)
 
-	// Names is specified
-	if m.To != nil && m.To.Name != nil {
-		// Retrieve client from manager
-		c, ok := i.wu.Client(*m.To.Name)
-		if !ok {
-			err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
-			return
-		}
-
-		// Write
-		if err = c.WriteJSON(m); err != nil {
-			err = errors.Wrap(err, "worker: writing JSON message failed")
-			return
-		}
+	// Send message
+	if err = sendMessage(m, i.wu); err != nil {
+		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}
 	return

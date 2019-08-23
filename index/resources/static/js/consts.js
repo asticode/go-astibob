@@ -11,5 +11,7 @@ let consts = {
         cmdUIPing: "cmd.ui.ping",
         cmdUIRegister: "cmd.ui.register",
         eventUIWelcome: "event.ui.welcome",
+        eventWorkerDisconnected: "event.worker.disconnected",
+        eventWorkerRegistered: "event.worker.registered",
     },
 }

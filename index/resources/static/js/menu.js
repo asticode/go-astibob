@@ -14,6 +14,21 @@ let menu = {
         }
     },
 
+    // Websocket
+
+    onMessage: function(data) {
+        switch (data.name) {
+            case consts.messageNames.eventWorkerDisconnected:
+                // Remove worker from menu
+                menu.removeWorker(data.payload)
+                break
+            case consts.messageNames.eventWorkerRegistered:
+                // Add worker to menu
+                menu.addWorker(data.payload)
+                break
+        }
+    },
+
     // Worker
 
     addWorker: function(data) {
@@ -65,9 +80,9 @@ let menu = {
         }
         return r
     },
-    removeWorker: function(data) {
+    removeWorker: function(name) {
         // Fetch worker
-        let worker = menu.workers[data.name]
+        let worker = menu.workers[name]
 
         // Worker exists
         if (typeof worker !== "undefined") {
@@ -75,7 +90,7 @@ let menu = {
             worker.html.wrapper.remove()
 
             // Delete from pool
-            delete(menu.workers[data.name])
+            delete(menu.workers[name])
 
             // Update workers count
             menu.updateWorkersCount(-1)

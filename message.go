@@ -11,6 +11,7 @@ import (
 // Identifier types
 const (
 	AbilityIdentifierType = "ability"
+	AllIdentifierType     = "all"
 	IndexIdentifierType   = "index"
 	UIIdentifierType      = "ui"
 	WorkerIdentifierType  = "worker"
@@ -28,6 +29,7 @@ const (
 	EventUIDisconnectedMessage     = "event.ui.disconnected"
 	EventUIWelcomeMessage          = "event.ui.welcome"
 	EventWorkerDisconnectedMessage = "event.worker.disconnected"
+	EventWorkerRegisteredMessage   = "event.worker.registered"
 	EventWorkerWelcomeMessage      = "event.worker.welcome"
 )
 
@@ -229,6 +231,35 @@ func ParseEventWorkerDisconnectedPayload(m *Message) (worker string, err error) 
 
 	// Unmarshal
 	if err = json.Unmarshal(m.Payload, &worker); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+	}
+	return
+}
+
+func NewEventWorkerRegisteredMessage(from Identifier, to *Identifier, name string, as []Ability) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, EventWorkerRegisteredMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(Worker{
+		Abilities: as,
+		Name:      name,
+	}); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseEventWorkerRegisteredPayload(m *Message) (w Worker, err error) {
+	// Check name
+	if m.Name != EventWorkerRegisteredMessage {
+		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, EventWorkerRegisteredMessage)
+		return
+	}
+
+	// Unmarshal
+	if err = json.Unmarshal(m.Payload, &w); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
 	}
 	return

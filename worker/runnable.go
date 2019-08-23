@@ -53,9 +53,9 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 	// Log
 	astilog.Infof("worker: starting runnable %s", name)
 
-	// Create message
+	// Create started message
 	if m, err = astibob.NewEventAbilityStartedMessage(w.from(), &astibob.Identifier{Type: astibob.IndexIdentifierType}, name); err != nil {
-		err = errors.Wrap(err, "worker: creating message failed")
+		err = errors.Wrap(err, "worker: creating started message failed")
 		return
 	}
 

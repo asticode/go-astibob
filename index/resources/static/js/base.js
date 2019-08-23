@@ -3,7 +3,7 @@ let base = {
         type: consts.identifierTypes.ui,
     },
 
-    init: function(messageHandler, onLoad) {
+    init: function(onMessage, onLoad) {
         // Init astitools
         asticode.loader.init();
         asticode.notifier.init();
@@ -27,6 +27,10 @@ let base = {
                     offline: function() { asticode.notifier.error("Server is offline") },
                     open: function() { asticode.loader.hide() },
                     messageRaw: function(data) {
+                        // Log
+                        console.debug("received msg", data)
+
+                        // Switch on name
                         switch (data.name) {
                             case consts.messageNames.eventUIWelcome:
                                 // Update from
@@ -39,6 +43,12 @@ let base = {
                                 if (typeof onLoad !== "undefined") onLoad(data.payload)
                                 break
                         }
+
+                        // Menu
+                        menu.onMessage(data)
+
+                        // Custom callback
+                        if (typeof onMessage !== "undefined") onMessage(data)
                     },
                     pingFunc: function(ws) {
                         ws.sendJSON({

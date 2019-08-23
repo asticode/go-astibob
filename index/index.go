@@ -1,9 +1,9 @@
 package index
 
 import (
-	"sync"
-
+	"fmt"
 	"path/filepath"
+	"sync"
 
 	"github.com/asticode/go-astibob"
 	astiptr "github.com/asticode/go-astitools/ptr"
@@ -67,8 +67,10 @@ func New(o Options) (i *Index, err error) {
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventUIDisconnectedMessage)}, i.unregisterUI)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.WorkerIdentifierType}}, i.sendMessageToWorker)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.AllIdentifierType}}, i.sendMessageToUI)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.AllIdentifierType}}, i.sendMessageToWorkers)
 	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.UIIdentifierType}}, i.sendMessageToUI)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.WorkerIdentifierType}}, i.sendMessageToWorkers)
 	return
 }
 
@@ -90,4 +92,36 @@ func (i *Index) Wait() {
 // On makes sure to handle messages with specific conditions
 func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
+}
+
+func sendMessage(m *astibob.Message, wm *astiws.Manager) (err error) {
+	// Get clients
+	var cs []*astiws.Client
+	if m.To != nil && m.To.Name != nil {
+		// Retrieve client from manager
+		c, ok := wm.Client(*m.To.Name)
+		if !ok {
+			err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
+			return
+		}
+
+		// Append client
+		cs = append(cs, c)
+	} else {
+		// Loop through clients
+		wm.Clients(func(_ interface{}, c *astiws.Client) (err error) {
+			cs = append(cs, c)
+			return
+		})
+	}
+
+	// Loop through clients
+	for _, c := range cs {
+		// Write
+		if err = c.WriteJSON(m); err != nil {
+			err = errors.Wrap(err, "worker: writing JSON message failed")
+			return
+		}
+	}
+	return
 }

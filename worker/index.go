@@ -63,12 +63,12 @@ func (w *Worker) sendRegister() (err error) {
 	}
 	w.mr.Unlock()
 
-	// Create message
+	// Create register message
 	var m *astibob.Message
 	if m, err = astibob.NewCmdWorkerRegisterMessage(w.from(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
 	}, as); err != nil {
-		err = errors.Wrap(err, "worker: creating message failed")
+		err = errors.Wrap(err, "worker: creating register message failed")
 		return
 	}
 
