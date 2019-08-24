@@ -84,7 +84,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 			var as []astibob.Ability
 			for _, ak := range aks {
 				// Append ability
-				as = append(as, *w.as[ak])
+				as = append(as, w.as[ak])
 			}
 			w.ma.Unlock()
 

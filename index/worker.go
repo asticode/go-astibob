@@ -17,7 +17,7 @@ import (
 )
 
 type worker struct {
-	as   map[string]*astibob.Ability
+	as   map[string]astibob.Ability
 	ma   *sync.Mutex // Locks as
 	name string
 	ws   *astiws.Client
@@ -26,7 +26,7 @@ type worker struct {
 func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker) {
 	// Create
 	w = &worker{
-		as:   make(map[string]*astibob.Ability),
+		as:   make(map[string]astibob.Ability),
 		ma:   &sync.Mutex{},
 		name: name,
 		ws:   ws,
@@ -34,7 +34,7 @@ func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker)
 
 	// Loop through abilities
 	for _, a := range as {
-		w.as[a.Name] = &a
+		w.as[a.Name] = a
 	}
 	return
 }

@@ -74,5 +74,8 @@ func (i *Index) updateAbilityStatus(m *astibob.Message) (err error) {
 	} else {
 		a.Status = astibob.StoppedStatus
 	}
+
+	// Update ability
+	w.as[*m.From.Name] = a
 	return
 }
