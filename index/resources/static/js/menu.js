@@ -135,12 +135,12 @@ let menu = {
     newAbility: function(worker, data) {
         // Create results
         let r = {
-            worker_name: worker.name,
             description: data.description,
             html: {},
             name: data.name,
             status: data.status,
             web_homepage: data.web_homepage,
+            worker_name: worker.name,
         }
 
         // Create wrapper

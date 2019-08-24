@@ -15,7 +15,7 @@ func main() {
 	astilog.FlagInit()
 
 	// Create worker
-	w := worker.New("Worker #1", worker.Options{
+	w := worker.New("Worker #2", worker.Options{
 		Index: astibob.ServerOptions{
 			Addr:     "127.0.0.1:4000",
 			Password: "admin",

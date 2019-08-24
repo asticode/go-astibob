@@ -60,6 +60,9 @@ let base = {
             }
         })
     },
+    finish: function() {
+        asticode.loader.hide()
+    },
     httpError: function(data) {
         asticode.notifier.error(data.responseJSON.message)
         asticode.loader.hide();
