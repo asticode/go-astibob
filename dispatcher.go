@@ -4,6 +4,7 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astilog"
+	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/pkg/errors"
 )
 
@@ -17,10 +18,14 @@ type dispatcherHandler struct {
 type Dispatcher struct {
 	hs []dispatcherHandler
 	m  *sync.Mutex
+	t  astiworker.TaskFunc
 }
 
-func NewDispatcher() *Dispatcher {
-	return &Dispatcher{m: &sync.Mutex{}}
+func NewDispatcher(t astiworker.TaskFunc) *Dispatcher {
+	return &Dispatcher{
+		m: &sync.Mutex{},
+		t: t,
+	}
 }
 
 type DispatchConditions struct {
@@ -72,8 +77,15 @@ func (d *Dispatcher) Dispatch(m *Message) {
 			continue
 		}
 
+		// Create task
+		t := d.t()
+
 		// Handle in a goroutine so that it's non blocking
 		go func(h MessageHandler) {
+			// Task is done
+			defer t.Done()
+
+			// Handle message
 			if err := h(m); err != nil {
 				astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
 				return

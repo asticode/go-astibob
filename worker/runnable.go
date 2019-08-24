@@ -74,7 +74,7 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 		defer t.Done()
 
 		// Start the runnable
-		if err := r.Start(w.w.Context()); err != nil {
+		if err := r.Start(w.w.Context()); err != nil && err != astibob.ErrContextCancelled {
 			astilog.Error(errors.Wrapf(err, "worker: starting runnable %s failed", r.Metadata().Name))
 		}
 

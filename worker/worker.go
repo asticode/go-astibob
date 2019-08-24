@@ -4,9 +4,11 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
 	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/asticode/go-astiws"
+	"github.com/pkg/errors"
 )
 
 type Options struct {
@@ -27,7 +29,6 @@ type Worker struct {
 func New(name string, o Options) (w *Worker) {
 	// Create worker
 	w = &Worker{
-		d:    astibob.NewDispatcher(),
 		name: name,
 		mr:   &sync.Mutex{},
 		o:    o,
@@ -35,6 +36,9 @@ func New(name string, o Options) (w *Worker) {
 		w:    astiworker.NewWorker(),
 		ws:   astiws.NewClient(astiws.ClientConfiguration{}),
 	}
+
+	// Create dispatcher
+	w.d = astibob.NewDispatcher(w.w.NewTask)
 
 	// Add websocket message handler
 	w.ws.SetMessageHandler(w.handleIndexMessage)
@@ -68,6 +72,17 @@ func (w *Worker) HandleSignals() {
 // Wait waits for the index to be stopped
 func (w *Worker) Wait() {
 	w.w.Wait()
+}
+
+// Close closes the worker properly
+func (w *Worker) Close() error {
+	// Close client
+	if w.ws != nil {
+		if err := w.ws.Close(); err != nil {
+			astilog.Error(errors.Wrap(err, "worker: closing client failed"))
+		}
+	}
+	return nil
 }
 
 func (w *Worker) from() astibob.Identifier {

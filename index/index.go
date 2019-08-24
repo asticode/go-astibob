@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
 	astitemplate "github.com/asticode/go-astitools/template"
 	astiworker "github.com/asticode/go-astitools/worker"
@@ -38,7 +39,6 @@ type Index struct {
 func New(o Options) (i *Index, err error) {
 	// Create index
 	i = &Index{
-		d:  astibob.NewDispatcher(),
 		mw: &sync.Mutex{},
 		o:  o,
 		w:  astiworker.NewWorker(),
@@ -51,6 +51,9 @@ func New(o Options) (i *Index, err error) {
 	if i.o.ResourcesPath == "" {
 		i.o.ResourcesPath = "index/resources"
 	}
+
+	// Create dispatcher
+	i.d = astibob.NewDispatcher(i.w.NewTask)
 
 	// Create templater
 	if i.t, err = astitemplate.NewTemplater(
@@ -94,8 +97,21 @@ func New(o Options) (i *Index, err error) {
 }
 
 // Close closes the index properly
-func (i *Index) Close() {
-	i.ww.Close()
+func (i *Index) Close() error {
+	// Close ui clients
+	if i.wu != nil {
+		if err := i.wu.Close(); err != nil {
+			astilog.Error(errors.Wrap(err, "index: closing ui clients failed"))
+		}
+	}
+
+	// Close worker clients
+	if i.ww != nil {
+		if err := i.ww.Close(); err != nil {
+			astilog.Error(errors.Wrap(err, "index: closing worker clients failed"))
+		}
+	}
+	return nil
 }
 
 // HandleSignals handles signals

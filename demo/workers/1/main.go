@@ -22,6 +22,7 @@ func main() {
 			Username: "admin",
 		},
 	})
+	defer w.Close()
 
 	// Handle signals
 	w.HandleSignals()
