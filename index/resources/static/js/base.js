@@ -50,9 +50,8 @@ let base = {
                         // Custom callback
                         if (typeof onMessage !== "undefined") onMessage(data)
                     },
-                    pingFunc: function(ws) {
-                        ws.sendJSON({
-                            from: base.from,
+                    pingFunc: function() {
+                        base.sendWebsocketMessage({
                             name: consts.messageNames.cmdUIPing,
                             to: {type: consts.identifierTypes.index},
                         })
@@ -64,5 +63,9 @@ let base = {
     httpError: function(data) {
         asticode.notifier.error(data.responseJSON.message)
         asticode.loader.hide();
+    },
+    sendWebsocketMessage: function(m) {
+        m.from = base.from
+        asticode.ws.sendJSON(m)
     }
 }

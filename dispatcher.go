@@ -24,35 +24,36 @@ func NewDispatcher() *Dispatcher {
 }
 
 type DispatchConditions struct {
-	Name *string
-	To   *Identifier
+	From  *Identifier
+	Name  *string
+	Names map[string]bool
+	To    *Identifier
 }
 
 func (c DispatchConditions) match(m *Message) bool {
+	// Check from
+	if c.From != nil && !c.From.match(m.From) {
+		return false
+	}
+
 	// Check name
-	if c.Name != nil && *c.Name != m.Name {
+	if c.Names != nil {
+		if _, ok := c.Names[m.Name]; !ok {
+			return false
+		}
+	} else if c.Name != nil && *c.Name != m.Name {
 		return false
 	}
 
 	// Check to
 	if c.To != nil {
-		// No to in message
+		// Check message
 		if m.To == nil {
 			return false
 		}
 
-		// Check type
-		if c.To.Type != m.To.Type {
-			return false
-		}
-
-		// Check name
-		if c.To.Name != nil && (m.To.Name == nil || *c.To.Name != *m.To.Name) {
-			return false
-		}
-
-		// Check worker
-		if c.To.Worker != nil && (m.To.Worker == nil || *c.To.Worker != *m.To.Worker) {
+		// Check identifier
+		if !c.To.match(*m.To) {
 			return false
 		}
 	}

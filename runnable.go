@@ -13,6 +13,11 @@ const (
 	StoppedStatus = "stopped"
 )
 
+// Errors
+var (
+	ErrContextCancelled = errors.New("astibob: context cancelled")
+)
+
 type Runnable interface {
 	Metadata() Metadata
 	OnMessage(m *Message) error
@@ -72,6 +77,11 @@ func (r *runnable) Start(ctx context.Context) (err error) {
 			}
 		} else {
 			<-r.ctx.Done()
+		}
+
+		// Check context
+		if r.ctx.Err() != nil {
+			err = ErrContextCancelled
 		}
 
 		// Update status

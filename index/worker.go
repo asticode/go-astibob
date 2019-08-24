@@ -17,7 +17,7 @@ import (
 )
 
 type worker struct {
-	as   map[string]astibob.Ability
+	as   map[string]*astibob.Ability
 	ma   *sync.Mutex // Locks as
 	name string
 	ws   *astiws.Client
@@ -26,7 +26,7 @@ type worker struct {
 func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker) {
 	// Create
 	w = &worker{
-		as:   make(map[string]astibob.Ability),
+		as:   make(map[string]*astibob.Ability),
 		ma:   &sync.Mutex{},
 		name: name,
 		ws:   ws,
@@ -34,7 +34,7 @@ func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker)
 
 	// Loop through abilities
 	for _, a := range as {
-		w.as[a.Name] = a
+		w.as[a.Name] = &a
 	}
 	return
 }
@@ -119,7 +119,10 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 		// Create disconnected message
 		var m *astibob.Message
-		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, &astibob.Identifier{Type: astibob.AllIdentifierType}, w.name); err != nil {
+		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, &astibob.Identifier{Types: map[string]bool{
+			astibob.UIIdentifierType:     true,
+			astibob.WorkerIdentifierType: true,
+		}}, w.name); err != nil {
 			err = errors.Wrap(err, "astibob: creating disconnected message failed")
 			return
 		}
@@ -133,7 +136,10 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	astilog.Infof("index: worker %s has registered", w.name)
 
 	// Create registered message
-	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Type: astibob.AllIdentifierType}, w.name, as); err != nil {
+	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Types: map[string]bool{
+		astibob.UIIdentifierType:     true,
+		astibob.WorkerIdentifierType: true,
+	}}, w.name, as); err != nil {
 		err = errors.Wrap(err, "astibob: creating registered message failed")
 		return
 	}

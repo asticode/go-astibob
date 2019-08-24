@@ -65,12 +65,31 @@ func New(o Options) (i *Index, err error) {
 	// Add dispatcher handlers
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdUIPingMessage)}, i.extendUIConnection)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
+	i.d.On(astibob.DispatchConditions{Names: map[string]bool{
+		astibob.EventAbilityCrashedMessage: true,
+		astibob.EventAbilityStartedMessage: true,
+		astibob.EventAbilityStoppedMessage: true,
+	}}, i.updateAbilityStatus)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventUIDisconnectedMessage)}, i.unregisterUI)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.AllIdentifierType}}, i.sendMessageToUI)
-	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.AllIdentifierType}}, i.sendMessageToWorkers)
-	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.UIIdentifierType}}, i.sendMessageToUI)
-	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.WorkerIdentifierType}}, i.sendMessageToWorkers)
+	i.d.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{Types: map[string]bool{
+			astibob.IndexIdentifierType: true,
+			astibob.UIIdentifierType:    true,
+		}},
+		To: &astibob.Identifier{Type: astibob.AbilityIdentifierType},
+	}, i.sendMessageToAbility)
+	i.d.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{Types: map[string]bool{
+			astibob.AbilityIdentifierType: true,
+			astibob.IndexIdentifierType:   true,
+		}},
+		To: &astibob.Identifier{Type: astibob.UIIdentifierType},
+	}, i.sendMessageToUI)
+	i.d.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{Type: astibob.IndexIdentifierType},
+		To:   &astibob.Identifier{Type: astibob.WorkerIdentifierType},
+	}, i.sendMessageToWorkers)
 	return
 }
 

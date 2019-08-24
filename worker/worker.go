@@ -43,7 +43,20 @@ func New(name string, o Options) (w *Worker) {
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStartMessage)}, w.startAbility)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStopMessage)}, w.stopAbility)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
-	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.IndexIdentifierType}}, w.sendMessageToIndex)
+	w.d.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{
+			Name: astiptr.Str(w.name),
+			Type: astibob.WorkerIdentifierType,
+		},
+		To: &astibob.Identifier{Type: astibob.IndexIdentifierType},
+	}, w.sendMessageToIndex)
+	w.d.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{
+			Type:   astibob.AbilityIdentifierType,
+			Worker: astiptr.Str(w.name),
+		},
+		To: &astibob.Identifier{Type: astibob.UIIdentifierType},
+	}, w.sendMessageToIndex)
 	return
 }
 
@@ -61,5 +74,13 @@ func (w *Worker) from() astibob.Identifier {
 	return astibob.Identifier{
 		Name: astiptr.Str(w.name),
 		Type: astibob.WorkerIdentifierType,
+	}
+}
+
+func (w *Worker) fromAbility(name string) astibob.Identifier {
+	return astibob.Identifier{
+		Name:   astiptr.Str(name),
+		Type:   astibob.AbilityIdentifierType,
+		Worker: astiptr.Str(w.name),
 	}
 }

@@ -32,12 +32,12 @@ func (w *Worker) RegisterRunnables(rs ...astibob.Runnable) {
 }
 
 func (w *Worker) startAbility(m *astibob.Message) (err error) {
-	// Parse payload
-	var name string
-	if name, err = astibob.ParseCmdAbilityStartPayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing payload failed")
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
 		return
 	}
+	name := *m.To.Name
 
 	// Fetch runnable
 	w.mr.Lock()
@@ -50,14 +50,17 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 		return
 	}
 
+	// Check status
+	if r.Status() == astibob.RunningStatus {
+		err = fmt.Errorf("worker: runnable %s is already running", name)
+		return
+	}
+
 	// Log
 	astilog.Infof("worker: starting runnable %s", name)
 
 	// Create started message
-	if m, err = astibob.NewEventAbilityStartedMessage(w.from(), &astibob.Identifier{Type: astibob.IndexIdentifierType}, name); err != nil {
-		err = errors.Wrap(err, "worker: creating started message failed")
-		return
-	}
+	m = astibob.NewEventAbilityStartedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -76,15 +79,12 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 		}
 
 		// Create message
-		if err == nil {
-			m, err = astibob.NewEventAbilityStoppedMessage(w.from(), &astibob.Identifier{Type: astibob.IndexIdentifierType}, name)
+		if err == nil || err == astibob.ErrContextCancelled {
+			m = astibob.NewEventAbilityStoppedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has stopped", name)
 		} else {
-			m, err = astibob.NewEventAbilityCrashedMessage(w.from(), &astibob.Identifier{Type: astibob.IndexIdentifierType}, name)
+			m = astibob.NewEventAbilityCrashedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has crashed", name)
-		}
-		if err != nil {
-			astilog.Error(errors.Wrap(err, "worker: creating message failed"))
 		}
 
 		// Dispatch
@@ -94,12 +94,12 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 }
 
 func (w *Worker) stopAbility(m *astibob.Message) (err error) {
-	// Parse payload
-	var name string
-	if name, err = astibob.ParseCmdAbilityStopPayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing payload failed")
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
 		return
 	}
+	name := *m.To.Name
 
 	// Fetch runnable
 	w.mr.Lock()
@@ -109,6 +109,12 @@ func (w *Worker) stopAbility(m *astibob.Message) (err error) {
 	// No runnable
 	if !ok {
 		err = fmt.Errorf("worker: no %s runnable", name)
+		return
+	}
+
+	// Check status
+	if r.Status() == astibob.StoppedStatus {
+		err = fmt.Errorf("worker: runnable %s is already stopped", name)
 		return
 	}
 

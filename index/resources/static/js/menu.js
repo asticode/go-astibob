@@ -18,6 +18,12 @@ let menu = {
 
     onMessage: function(data) {
         switch (data.name) {
+            case consts.messageNames.eventAbilityCrashed:
+            case consts.messageNames.eventAbilityStarted:
+            case consts.messageNames.eventAbilityStopped:
+                // Update toggle
+                menu.updateToggle(data)
+                break
             case consts.messageNames.eventWorkerDisconnected:
                 // Remove worker from menu
                 menu.removeWorker(data.payload)
@@ -166,34 +172,45 @@ let menu = {
         r.html.toggle = document.createElement("label")
         r.html.toggle.className = "toggle " + menu.toggleClass(data.status)
         r.html.toggle.innerHTML = '<span class="slider"></span>'
-        r.html.toggle.click(function() {
-            // TODO
-            /*base.sendWs(r.is_on ? consts.websocket.eventNames.abilityStop : consts.websocket.eventNames.abilityStart, {
-                worker_name: r.worker_name,
-                name: r.name,
-            })*/
+        r.html.toggle.addEventListener("click", function() {
+            // Create message
+            let m = {
+                to: {
+                    name: r.name,
+                    type: consts.identifierTypes.ability,
+                    worker: r.worker_name,
+                },
+            }
+
+            // Add name
+            if (r.status === consts.abilityStatuses.stopped) {
+                m.name = consts.messageNames.cmdAbilityStart
+            } else {
+                m.name = consts.messageNames.cmdAbilityStop
+            }
+
+            // Send message
+            base.sendWebsocketMessage(m)
         })
         cell.appendChild(r.html.toggle)
         return r
     },
     updateToggle: function(data) {
         // Fetch worker
-        let worker = menu.workers[data.worker_name]
+        let worker = menu.workers[data.from.worker]
 
         // Worker exists
         if (typeof worker !== "undefined") {
             // Fetch ability
-            let ability = worker.abilities[data.name]
+            let ability = worker.abilities[data.from.name]
 
             // Ability exists
             if (typeof ability !== "undefined") {
-                // Update class
-                asticode.tools.removeClass(ability.html.toggle, "on")
-                asticode.tools.removeClass(ability.html.toggle, "off")
-                asticode.tools.addClass(ability.html.toggle, menu.toggleClass(data.status))
+                // Update status
+                ability.status = (data.name === consts.messageNames.eventAbilityStarted ? consts.abilityStatuses.running : consts.abilityStatuses.stopped)
 
-                // Update attribute
-                ability.status = data.status
+                // Update class
+                ability.html.toggle.className = "toggle " + menu.toggleClass(ability.status)
             }
         }
     },

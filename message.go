@@ -11,7 +11,6 @@ import (
 // Identifier types
 const (
 	AbilityIdentifierType = "ability"
-	AllIdentifierType     = "all"
 	IndexIdentifierType   = "index"
 	UIIdentifierType      = "ui"
 	WorkerIdentifierType  = "worker"
@@ -41,9 +40,51 @@ type Message struct {
 }
 
 type Identifier struct {
-	Name   *string `json:"name,omitempty"`
-	Type   string  `json:"type"`
-	Worker *string `json:"worker,omitempty"`
+	Name   *string         `json:"name,omitempty"`
+	Type   string          `json:"type,omitempty"`
+	Types  map[string]bool `json:"types,omitempty"`
+	Worker *string         `json:"worker,omitempty"`
+}
+
+func (o *Identifier) match(i Identifier) bool {
+	// Check type
+	if o.Types != nil {
+		if i.Types != nil {
+			match := false
+			for t := range i.Types {
+				if _, ok := o.Types[t]; ok {
+					match = true
+					break
+				}
+			}
+			if !match {
+				return false
+			}
+		} else {
+			if _, ok := o.Types[i.Type]; !ok {
+				return false
+			}
+		}
+	} else  {
+		if i.Types != nil {
+			if _, ok := i.Types[o.Type]; !ok {
+				return false
+			}
+		} else if o.Type != i.Type {
+			return false
+		}
+	}
+
+	// Check name
+	if o.Name != nil && (i.Name == nil || *o.Name != *i.Name) {
+		return false
+	}
+
+	// Check worker
+	if o.Worker != nil && (i.Worker == nil || *o.Worker != *i.Worker) {
+		return false
+	}
+	return true
 }
 
 type WelcomeUI struct {
@@ -79,34 +120,6 @@ func newMessage(from Identifier, to *Identifier, name string) *Message {
 	return m
 }
 
-func ParseCmdAbilityStartPayload(m *Message) (name string, err error) {
-	// Check name
-	if m.Name != CmdAbilityStartMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdAbilityStartMessage)
-		return
-	}
-
-	// Unmarshal
-	if err = json.Unmarshal(m.Payload, &name); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
-	}
-	return
-}
-
-func ParseCmdAbilityStopPayload(m *Message) (name string, err error) {
-	// Check name
-	if m.Name != CmdAbilityStopMessage {
-		err = fmt.Errorf("astibob: invalid name %s, requested %s", m.Name, CmdAbilityStopMessage)
-		return
-	}
-
-	// Unmarshal
-	if err = json.Unmarshal(m.Payload, &name); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
-	}
-	return
-}
-
 func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier, as []Ability) (m *Message, err error) {
 	// Create message
 	m = newMessage(from, to, CmdWorkerRegisterMessage)
@@ -133,40 +146,16 @@ func ParseCmdWorkerRegisterPayload(m *Message) (as []Ability, err error) {
 	return
 }
 
-func NewEventAbilityCrashedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, to, EventAbilityCrashedMessage)
-
-	// Marshal payload
-	if m.Payload, err = json.Marshal(name); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
-		return
-	}
-	return
+func NewEventAbilityCrashedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventAbilityCrashedMessage)
 }
 
-func NewEventAbilityStartedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, to, EventAbilityStartedMessage)
-
-	// Marshal payload
-	if m.Payload, err = json.Marshal(name); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
-		return
-	}
-	return
+func NewEventAbilityStartedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventAbilityStartedMessage)
 }
 
-func NewEventAbilityStoppedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, to, EventAbilityStoppedMessage)
-
-	// Marshal payload
-	if m.Payload, err = json.Marshal(name); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
-		return
-	}
-	return
+func NewEventAbilityStoppedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventAbilityStoppedMessage)
 }
 
 func NewEventUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {
