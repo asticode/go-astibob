@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
-
+	"sort"
 	"sync"
 
 	"github.com/asticode/go-astibob"
@@ -17,24 +17,54 @@ import (
 )
 
 type worker struct {
+	addr string
 	as   map[string]astibob.Ability
 	ma   *sync.Mutex // Locks as
 	name string
 	ws   *astiws.Client
 }
 
-func newWorker(name string, ws *astiws.Client, as []astibob.Ability) (w *worker) {
+func newWorker(i astibob.Worker, ws *astiws.Client) (w *worker) {
 	// Create
 	w = &worker{
+		addr: i.Addr,
 		as:   make(map[string]astibob.Ability),
 		ma:   &sync.Mutex{},
-		name: name,
+		name: i.Name,
 		ws:   ws,
 	}
 
 	// Loop through abilities
-	for _, a := range as {
+	for _, a := range i.Abilities {
 		w.as[a.Name] = a
+	}
+	return
+}
+
+func (w *worker) toMessage() (o astibob.Worker) {
+	// Lock
+	w.ma.Lock()
+	defer w.ma.Unlock()
+
+	// Create worker
+	o = astibob.Worker{
+		Addr: w.addr,
+		Name: w.name,
+	}
+
+	// Get keys
+	var ks []string
+	for n := range w.as {
+		ks = append(ks, n)
+	}
+
+	// Sort keys
+	sort.Strings(ks)
+
+	// Loop through keys
+	for _, k := range ks {
+		// Append
+		o.Abilities = append(o.Abilities, w.as[k])
 	}
 	return
 }
@@ -88,27 +118,21 @@ func (i *Index) sendMessageToWorkers(m *astibob.Message) (err error) {
 
 func (i *Index) addWorker(m *astibob.Message) (err error) {
 	// Parse payload
-	var as []astibob.Ability
-	if as, err = astibob.ParseCmdWorkerRegisterPayload(m); err != nil {
+	var mw astibob.Worker
+	if mw, err = astibob.ParseCmdWorkerRegisterPayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing payload failed")
 		return
 	}
 
-	// Name is empty
-	if m.From.Name == nil || *m.From.Name == "" {
-		err = errors.New("index: from name is empty")
-		return
-	}
-
 	// Retrieve client
-	c, ok := i.ww.Client(*m.From.Name)
+	c, ok := i.ww.Client(mw.Name)
 	if !ok {
-		err = fmt.Errorf("index: client %s doesn't exist", *m.From.Name)
+		err = fmt.Errorf("index: client %s doesn't exist", mw.Name)
 		return
 	}
 
 	// Create worker
-	w := newWorker(*m.From.Name, c, as)
+	w := newWorker(mw, c)
 
 	// Update pool
 	i.mw.Lock()
@@ -135,24 +159,24 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	// Log
 	astilog.Infof("index: worker %s has registered", w.name)
 
-	// Create registered message
-	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Types: map[string]bool{
-		astibob.UIIdentifierType:     true,
-		astibob.WorkerIdentifierType: true,
-	}}, w.name, as); err != nil {
-		err = errors.Wrap(err, "astibob: creating registered message failed")
+	// Create welcome message
+	if m, err = astibob.NewEventWorkerWelcomeMessage(from, &astibob.Identifier{
+		Name: astiptr.Str(w.name),
+		Type: astibob.WorkerIdentifierType,
+	}, i.workers()); err != nil {
+		err = errors.Wrap(err, "astibob: creating welcome message failed")
 		return
 	}
 
 	// Dispatch
 	i.d.Dispatch(m)
 
-	// Create welcome message
-	if m, err = astibob.NewEventWorkerWelcomeMessage(from, &astibob.Identifier{
-		Name: astiptr.Str(w.name),
-		Type: astibob.WorkerIdentifierType,
-	}); err != nil {
-		err = errors.Wrap(err, "astibob: creating welcome message failed")
+	// Create registered message
+	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Types: map[string]bool{
+		astibob.UIIdentifierType:     true,
+		astibob.WorkerIdentifierType: true,
+	}}, mw); err != nil {
+		err = errors.Wrap(err, "astibob: creating registered message failed")
 		return
 	}
 

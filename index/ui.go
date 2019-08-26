@@ -10,8 +10,6 @@ import (
 	"encoding/base64"
 	"fmt"
 
-	"sort"
-
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	astiptr "github.com/asticode/go-astitools/ptr"
@@ -54,54 +52,12 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		// Log
 		astilog.Infof("astibob: ui %s has connected", name)
 
-		// Get worker keys
-		i.mw.Lock()
-		var wks []string
-		for n := range i.ws {
-			wks = append(wks, n)
-		}
-
-		// Sort worker keys
-		sort.Strings(wks)
-
-		// Loop through worker keys
-		var ws []astibob.Worker
-		for _, wk := range wks {
-			// Get worker
-			w := i.ws[wk]
-
-			// Get ability keys
-			w.ma.Lock()
-			var aks []string
-			for n := range w.as {
-				aks = append(aks, n)
-			}
-
-			// Sort ability keys
-			sort.Strings(aks)
-
-			// Loop through ability keys
-			var as []astibob.Ability
-			for _, ak := range aks {
-				// Append ability
-				as = append(as, w.as[ak])
-			}
-			w.ma.Unlock()
-
-			// Append worker
-			ws = append(ws, astibob.Worker{
-				Abilities: as,
-				Name:      w.name,
-			})
-		}
-		i.mw.Unlock()
-
 		// Create welcome message
 		var m *astibob.Message
 		if m, err = astibob.NewEventUIWelcomeMessage(from, &astibob.Identifier{
 			Name: astiptr.Str(name),
 			Type: astibob.UIIdentifierType,
-		}, name, ws); err != nil {
+		}, name, i.workers()); err != nil {
 			err = errors.Wrap(err, "index: creating welcome message failed")
 			return
 		}
@@ -229,7 +185,7 @@ type APIWebsocket struct {
 }
 
 func (i *Index) references(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	astibob.APIWriteData(rw, APIReferences{Websocket: APIWebsocket{
+	astibob.WriteHTTPData(rw, APIReferences{Websocket: APIWebsocket{
 		Addr:       "ws://" + i.o.Server.Addr + "/websockets/ui",
 		PingPeriod: astiws.PingPeriod,
 	}})

@@ -25,7 +25,7 @@ func (w *Worker) RegisterToIndex() {
 	// Dial
 	w.w.Dial(astiworker.DialOptions{
 		Addr:   "ws://" + w.o.Index.Addr + "/websockets/worker",
-		Client: w.ws,
+		Client: w.cw,
 		Header: h,
 		OnDial: w.sendRegister,
 		OnReadError: func(err error) {
@@ -65,9 +65,13 @@ func (w *Worker) sendRegister() (err error) {
 
 	// Create register message
 	var m *astibob.Message
-	if m, err = astibob.NewCmdWorkerRegisterMessage(w.from(), &astibob.Identifier{
+	if m, err = astibob.NewCmdWorkerRegisterMessage(*w.from(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
-	}, as); err != nil {
+	}, astibob.Worker{
+		Abilities: as,
+		Addr:      "http://" + w.o.Server.Addr,
+		Name:      w.name,
+	}); err != nil {
 		err = errors.Wrap(err, "worker: creating register message failed")
 		return
 	}
@@ -79,9 +83,16 @@ func (w *Worker) sendRegister() (err error) {
 
 func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
-	if err = astibob.ParseEventWorkerWelcomePayload(m); err != nil {
+	var ws []astibob.Worker
+	if ws, err = astibob.ParseEventWorkerWelcomePayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing message payload failed")
 		return
+	}
+
+	// Loop through workers
+	for _, mw := range ws {
+		// Add worker
+		w.addWorker(mw)
 	}
 
 	// Log
@@ -110,9 +121,68 @@ func (w *Worker) sendMessageToIndex(m *astibob.Message) (err error) {
 	astilog.Debugf("worker: sending %s message to index", m.Name)
 
 	// Write
-	if err = w.ws.WriteJSON(m); err != nil {
+	if err = w.cw.WriteJSON(m); err != nil {
 		err = errors.Wrap(err, "worker: writing JSON message failed")
 		return
 	}
+	return
+}
+
+func (w *Worker) registerWorker(m *astibob.Message) (err error) {
+	// Parse payload
+	var mw astibob.Worker
+	if mw, err = astibob.ParseEventWorkerRegisteredPayload(m); err != nil {
+		err = errors.Wrap(err, "worker: parsing registered payload failed")
+		return
+	}
+
+	// Add worker
+	w.addWorker(mw)
+	return
+}
+
+func (w *Worker) addWorker(m astibob.Worker) {
+	// Lock
+	w.mw.Lock()
+	defer w.mw.Unlock()
+
+	// Do not process itself
+	if m.Name == w.name {
+		return
+	}
+
+	// Create worker
+	nw := newWorker(m)
+
+	// Update pool
+	w.ws[nw.name] = nw
+	return
+}
+
+func (w *Worker) unregisterWorker(m *astibob.Message) (err error) {
+	// Parse payload
+	var name string
+	if name, err = astibob.ParseEventWorkerDisconnectedPayload(m); err != nil {
+		err = errors.Wrap(err, "worker: parsing registered payload failed")
+		return
+	}
+
+	// Delete worker
+	w.delWorker(name)
+	return
+}
+
+func (w *Worker) delWorker(name string) {
+	// Lock
+	w.mw.Lock()
+	defer w.mw.Unlock()
+
+	// Do not process itself
+	if name == w.name {
+		return
+	}
+
+	// Update pool
+	delete(w.ws, name)
 	return
 }

@@ -3,6 +3,7 @@ package index
 import (
 	"fmt"
 	"path/filepath"
+	"sort"
 	"sync"
 
 	"github.com/asticode/go-astibob"
@@ -157,6 +158,28 @@ func sendMessage(m *astibob.Message, wm *astiws.Manager) (err error) {
 			err = errors.Wrap(err, "worker: writing JSON message failed")
 			return
 		}
+	}
+	return
+}
+
+func (i *Index) workers() (ws []astibob.Worker) {
+	// Lock
+	i.mw.Lock()
+	defer i.mw.Unlock()
+
+	// Get keys
+	var ks []string
+	for n := range i.ws {
+		ks = append(ks, n)
+	}
+
+	// Sort keys
+	sort.Strings(ks)
+
+	// Loop through keys
+	for _, k := range ks {
+		// Append
+		ws = append(ws, i.ws[k].toMessage())
 	}
 	return
 }

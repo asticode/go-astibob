@@ -110,6 +110,11 @@ func (r *runnable) OnMessage(m *Message) (err error) {
 		return
 	}
 
+	// Check status
+	if r.status != RunningStatus {
+		return
+	}
+
 	// Custom
 	if err = r.o.OnMessage(m); err != nil {
 		err = errors.Wrap(err, "astibob: OnMessage failed")

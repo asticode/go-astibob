@@ -2,6 +2,7 @@ package main
 
 import (
 	"flag"
+	"time"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/abilities/speak"
@@ -21,18 +22,24 @@ func main() {
 			Password: "admin",
 			Username: "admin",
 		},
+		Server: astibob.ServerOptions{Addr: "127.0.0.1:4002"},
 	})
 	defer w.Close()
 
 	// Handle signals
 	w.HandleSignals()
 
-	// Register runnables
-	w.RegisterRunnables(speak.NewRunnable("Speak 1"))
-	w.RegisterRunnables(speak.NewRunnable("Speak 2"))
+	// Serve
+	w.Serve()
 
 	// Register to index
 	w.RegisterToIndex()
+
+	// TODO Testing
+	go func() {
+		time.Sleep(time.Second)
+		w.SendCmds("Worker #1", "Speak", speak.NewSayCmd("hello world"), speak.NewSayCmd("how are you today?"))
+	}()
 
 	// Blocking pattern
 	w.Wait()

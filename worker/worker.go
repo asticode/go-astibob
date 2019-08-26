@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"net/http"
 	"sync"
 
 	"github.com/asticode/go-astibob"
@@ -12,47 +13,53 @@ import (
 )
 
 type Options struct {
-	Index astibob.ServerOptions `toml:"index"`
+	Index  astibob.ServerOptions `toml:"index"`
+	Server astibob.ServerOptions `toml:"server"`
 }
 
 type Worker struct {
+	ch   *http.Client
+	cw   *astiws.Client
 	d    *astibob.Dispatcher
 	name string
 	mr   *sync.Mutex // Locks rs
+	mw   *sync.Mutex // Locks ws
 	o    Options
 	rs   map[string]astibob.Runnable
 	w    *astiworker.Worker
-	ws   *astiws.Client
+	ws   map[string]*worker
 }
 
 // New creates a new worker
 func New(name string, o Options) (w *Worker) {
 	// Create worker
 	w = &Worker{
+		ch:   &http.Client{},
+		cw:   astiws.NewClient(astiws.ClientConfiguration{}),
 		name: name,
 		mr:   &sync.Mutex{},
+		mw:   &sync.Mutex{},
 		o:    o,
 		rs:   make(map[string]astibob.Runnable),
 		w:    astiworker.NewWorker(),
-		ws:   astiws.NewClient(astiws.ClientConfiguration{}),
+		ws:   make(map[string]*worker),
 	}
 
 	// Create dispatcher
 	w.d = astibob.NewDispatcher(w.w.NewTask)
 
 	// Add websocket message handler
-	w.ws.SetMessageHandler(w.handleIndexMessage)
+	w.cw.SetMessageHandler(w.handleIndexMessage)
 
 	// Add dispatcher handlers
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStartMessage)}, w.startAbility)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdAbilityStopMessage)}, w.stopAbility)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerRegisteredMessage)}, w.registerWorker)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, w.unregisterWorker)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
 	w.d.On(astibob.DispatchConditions{
-		From: &astibob.Identifier{
-			Name: astiptr.Str(w.name),
-			Type: astibob.WorkerIdentifierType,
-		},
-		To: &astibob.Identifier{Type: astibob.IndexIdentifierType},
+		From: w.from(),
+		To:   &astibob.Identifier{Type: astibob.IndexIdentifierType},
 	}, w.sendMessageToIndex)
 	w.d.On(astibob.DispatchConditions{
 		From: &astibob.Identifier{
@@ -61,6 +68,10 @@ func New(name string, o Options) (w *Worker) {
 		},
 		To: &astibob.Identifier{Type: astibob.UIIdentifierType},
 	}, w.sendMessageToIndex)
+	w.d.On(astibob.DispatchConditions{
+		From: w.from(),
+		To:   &astibob.Identifier{Type: astibob.AbilityIdentifierType},
+	}, w.sendMessageToAbility)
 	return
 }
 
@@ -77,16 +88,16 @@ func (w *Worker) Wait() {
 // Close closes the worker properly
 func (w *Worker) Close() error {
 	// Close client
-	if w.ws != nil {
-		if err := w.ws.Close(); err != nil {
+	if w.cw != nil {
+		if err := w.cw.Close(); err != nil {
 			astilog.Error(errors.Wrap(err, "worker: closing client failed"))
 		}
 	}
 	return nil
 }
 
-func (w *Worker) from() astibob.Identifier {
-	return astibob.Identifier{
+func (w *Worker) from() *astibob.Identifier {
+	return &astibob.Identifier{
 		Name: astiptr.Str(w.name),
 		Type: astibob.WorkerIdentifierType,
 	}
@@ -98,4 +109,66 @@ func (w *Worker) fromAbility(name string) astibob.Identifier {
 		Type:   astibob.AbilityIdentifierType,
 		Worker: astiptr.Str(w.name),
 	}
+}
+
+func (w *Worker) SendCmds(worker, ability string, cmds ...astibob.Cmd) (err error) {
+	// Loop through cmds
+	for _, cmd := range cmds {
+		// Create message
+		var m *astibob.Message
+		if m, err = astibob.NewMessageFromCmd(*w.from(), &astibob.Identifier{
+			Name:   astiptr.Str(ability),
+			Type:   astibob.AbilityIdentifierType,
+			Worker: astiptr.Str(worker),
+		}, cmd); err != nil {
+			err = errors.Wrap(err, "worker: creating message from cmd failed")
+			return
+		}
+
+		// Dispatch
+		w.d.Dispatch(m)
+	}
+	return
+}
+
+type worker struct {
+	addr string
+	as   map[string]astibob.Ability
+	ma   *sync.Mutex // Locks as
+	name string
+}
+
+func newWorker(i astibob.Worker) (w *worker) {
+	// Create
+	w = &worker{
+		addr: i.Addr,
+		as:   make(map[string]astibob.Ability),
+		ma:   &sync.Mutex{},
+		name: i.Name,
+	}
+
+	// Loop through abilities
+	for _, a := range i.Abilities {
+		w.as[a.Name] = a
+	}
+	return
+}
+
+func (w *worker) toMessage() (o astibob.Worker) {
+	// Lock
+	w.ma.Lock()
+	defer w.ma.Unlock()
+
+	// Create worker
+	o = astibob.Worker{
+		Addr: w.addr,
+		Name: w.name,
+	}
+
+	// Loop through abilities
+	for _, a := range w.as {
+		// Append
+		o.Abilities = append(o.Abilities, a)
+	}
+	return
 }
