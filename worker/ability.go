@@ -1,14 +1,14 @@
 package worker
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"net/http"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
-	"net/http"
-	"encoding/json"
-	"bytes"
 )
 
 func (w *Worker) sendMessageToAbility(m *astibob.Message) (err error) {
@@ -72,6 +72,38 @@ func (w *Worker) sendMessageToAbility(m *astibob.Message) (err error) {
 		} else {
 			err = fmt.Errorf("worker: response status code is %d", resp.StatusCode)
 		}
+	}
+	return
+}
+
+func (w *Worker) startAbility(m *astibob.Message) (err error) {
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
+		return
+	}
+	name := *m.To.Name
+
+	// Start runnable
+	if err = w.startRunnable(name); err != nil {
+		err = errors.Wrapf(err, "worker: starting runnable %s failed", name)
+		return
+	}
+	return
+}
+
+func (w *Worker) stopAbility(m *astibob.Message) (err error) {
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
+		return
+	}
+	name := *m.To.Name
+
+	// Stop runnable
+	if err = w.stopRunnable(name); err != nil {
+		err = errors.Wrapf(err, "worker: stopping runnable %s failed", name)
+		return
 	}
 	return
 }

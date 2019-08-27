@@ -31,7 +31,7 @@ func main() {
 	w.HandleSignals()
 
 	// Create speaker
-	s := speaker.New(speaker.Options{Voice: "Samantha"})
+	s := speaker.New(speaker.Options{Voice: "Alex"})
 
 	// Init speaker
 	if err := s.Init(); err != nil {
@@ -40,7 +40,10 @@ func main() {
 	defer s.Close()
 
 	// Register runnables
-	w.RegisterRunnables(speak.NewRunnable("Speak", s))
+	w.RegisterRunnables(worker.Runnable{
+		AutoStart: true,
+		Runnable:  speak.NewRunnable("Speak", s),
+	})
 
 	// Serve
 	w.Serve()

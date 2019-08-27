@@ -9,36 +9,40 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (w *Worker) RegisterRunnables(rs ...astibob.Runnable) {
-	// Lock
-	w.mr.Lock()
-	defer w.mr.Unlock()
+type Runnable struct {
+	AutoStart bool
+	Runnable  astibob.Runnable
+}
 
+func (w *Worker) RegisterRunnables(rs ...Runnable) {
 	// Loop through runnables
 	for _, r := range rs {
 		// Add to pool
-		w.rs[r.Metadata().Name] = r
+		w.mr.Lock()
+		w.rs[r.Runnable.Metadata().Name] = r.Runnable
+		w.mr.Unlock()
 
 		// Add dispatch handlers
 		w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{
-			Name:   astiptr.Str(r.Metadata().Name),
+			Name:   astiptr.Str(r.Runnable.Metadata().Name),
 			Type:   astibob.AbilityIdentifierType,
 			Worker: astiptr.Str(w.name),
-		}}, r.OnMessage)
+		}}, r.Runnable.OnMessage)
 
 		// Log
-		astilog.Infof("worker: registered runnable %s", r.Metadata().Name)
+		astilog.Infof("worker: registered runnable %s", r.Runnable.Metadata().Name)
+
+		// Auto start
+		if r.AutoStart {
+			// Start runnable
+			if err := w.startRunnable(r.Runnable.Metadata().Name); err != nil {
+				astilog.Error(errors.Wrapf(err, "worker: starting runnable %s failed", r.Runnable.Metadata().Name))
+			}
+		}
 	}
 }
 
-func (w *Worker) startAbility(m *astibob.Message) (err error) {
-	// Check name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: no to name")
-		return
-	}
-	name := *m.To.Name
-
+func (w *Worker) startRunnable(name string) (err error) {
 	// Fetch runnable
 	w.mr.Lock()
 	r, ok := w.rs[name]
@@ -60,7 +64,7 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 	astilog.Infof("worker: starting runnable %s", name)
 
 	// Create started message
-	m = astibob.NewEventAbilityStartedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+	m := astibob.NewEventAbilityStartedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -93,14 +97,7 @@ func (w *Worker) startAbility(m *astibob.Message) (err error) {
 	return
 }
 
-func (w *Worker) stopAbility(m *astibob.Message) (err error) {
-	// Check name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: no to name")
-		return
-	}
-	name := *m.To.Name
-
+func (w *Worker) stopRunnable(name string) (err error) {
 	// Fetch runnable
 	w.mr.Lock()
 	r, ok := w.rs[name]
