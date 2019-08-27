@@ -56,6 +56,9 @@ func New(o Options) (i *Index, err error) {
 	// Create dispatcher
 	i.d = astibob.NewDispatcher(i.w.NewTask)
 
+	// Start dispatcher
+	go i.d.Start(i.w.Context())
+
 	// Create templater
 	if i.t, err = astitemplate.NewTemplater(
 		filepath.Join(i.o.ResourcesPath, "templates", "pages"),
@@ -99,6 +102,9 @@ func New(o Options) (i *Index, err error) {
 
 // Close closes the index properly
 func (i *Index) Close() error {
+	// Stop dispatcher
+	i.d.Stop()
+
 	// Close ui clients
 	if i.wu != nil {
 		if err := i.wu.Close(); err != nil {

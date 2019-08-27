@@ -48,6 +48,9 @@ func New(name string, o Options) (w *Worker) {
 	// Create dispatcher
 	w.d = astibob.NewDispatcher(w.w.NewTask)
 
+	// Start dispatcher
+	go w.d.Start(w.w.Context())
+
 	// Add websocket message handler
 	w.cw.SetMessageHandler(w.handleIndexMessage)
 
@@ -87,6 +90,9 @@ func (w *Worker) Wait() {
 
 // Close closes the worker properly
 func (w *Worker) Close() error {
+	// Stop dispatcher
+	w.d.Stop()
+
 	// Close client
 	if w.cw != nil {
 		if err := w.cw.Close(); err != nil {

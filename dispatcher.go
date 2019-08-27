@@ -1,9 +1,11 @@
 package astibob
 
 import (
+	"context"
 	"sync"
 
 	"github.com/asticode/go-astilog"
+	astisync "github.com/asticode/go-astitools/sync"
 	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/pkg/errors"
 )
@@ -16,15 +18,15 @@ type dispatcherHandler struct {
 }
 
 type Dispatcher struct {
+	c  *astisync.Chan
 	hs []dispatcherHandler
-	m  *sync.Mutex
-	t  astiworker.TaskFunc
+	mh *sync.Mutex // Locks hs
 }
 
 func NewDispatcher(t astiworker.TaskFunc) *Dispatcher {
 	return &Dispatcher{
-		m: &sync.Mutex{},
-		t: t,
+		c:  astisync.NewChan(astisync.ChanOptions{TaskFunc: t}),
+		mh: &sync.Mutex{},
 	}
 }
 
@@ -67,8 +69,8 @@ func (c DispatchConditions) match(m *Message) bool {
 
 func (d *Dispatcher) Dispatch(m *Message) {
 	// Lock
-	d.m.Lock()
-	defer d.m.Unlock()
+	d.mh.Lock()
+	defer d.mh.Unlock()
 
 	// Loop through handlers
 	for _, h := range d.hs {
@@ -77,26 +79,32 @@ func (d *Dispatcher) Dispatch(m *Message) {
 			continue
 		}
 
-		// Create task
-		t := d.t()
-
-		// Handle in a goroutine so that it's non blocking
-		go func(h MessageHandler) {
-			// Task is done
-			defer t.Done()
-
-			// Handle message
-			if err := h(m); err != nil {
-				astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
-				return
-			}
-		}(h.h)
+		// Dispatch
+		d.dispatch(m, h.h)
 	}
 }
 
+func (d *Dispatcher) dispatch(m *Message, h MessageHandler) {
+	// Add to chan
+	d.c.Add(func() {
+		// Handle message
+		if err := h(m); err != nil {
+			astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
+		}
+	})
+}
+
+func (d *Dispatcher) Start(ctx context.Context) {
+	d.c.Start(ctx)
+}
+
+func (d *Dispatcher) Stop() {
+	d.c.Stop()
+}
+
 func (d *Dispatcher) On(c DispatchConditions, h MessageHandler) {
-	d.m.Lock()
-	defer d.m.Unlock()
+	d.mh.Lock()
+	defer d.mh.Unlock()
 	d.hs = append(d.hs, dispatcherHandler{
 		c: c,
 		h: h,
