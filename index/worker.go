@@ -18,9 +18,9 @@ import (
 
 type worker struct {
 	addr string
-	as   map[string]astibob.Ability
-	ma   *sync.Mutex // Locks as
+	mr   *sync.Mutex // Locks rs
 	name string
+	rs   map[string]astibob.RunnableMessage
 	ws   *astiws.Client
 }
 
@@ -28,23 +28,23 @@ func newWorker(i astibob.Worker, ws *astiws.Client) (w *worker) {
 	// Create
 	w = &worker{
 		addr: i.Addr,
-		as:   make(map[string]astibob.Ability),
-		ma:   &sync.Mutex{},
+		mr:   &sync.Mutex{},
 		name: i.Name,
+		rs:   make(map[string]astibob.RunnableMessage),
 		ws:   ws,
 	}
 
-	// Loop through abilities
-	for _, a := range i.Abilities {
-		w.as[a.Name] = a
+	// Loop through runnables
+	for _, r := range i.Runnables {
+		w.rs[r.Name] = r
 	}
 	return
 }
 
 func (w *worker) toMessage() (o astibob.Worker) {
 	// Lock
-	w.ma.Lock()
-	defer w.ma.Unlock()
+	w.mr.Lock()
+	defer w.mr.Unlock()
 
 	// Create worker
 	o = astibob.Worker{
@@ -54,7 +54,7 @@ func (w *worker) toMessage() (o astibob.Worker) {
 
 	// Get keys
 	var ks []string
-	for n := range w.as {
+	for n := range w.rs {
 		ks = append(ks, n)
 	}
 
@@ -64,7 +64,7 @@ func (w *worker) toMessage() (o astibob.Worker) {
 	// Loop through keys
 	for _, k := range ks {
 		// Append
-		o.Abilities = append(o.Abilities, w.as[k])
+		o.Runnables = append(o.Runnables, w.rs[k])
 	}
 	return
 }
@@ -104,12 +104,18 @@ func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 	}
 }
 
-func (i *Index) sendMessageToWorkers(m *astibob.Message) (err error) {
-	// Log
-	astilog.Debugf("index: sending %s message to workers", m.Name)
+func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
+	// Invalid to
+	if m.To == nil {
+		err = errors.New("index: invalid to")
+		return
+	}
+
+	// Get worker name
+	worker := m.To.WorkerName()
 
 	// Send message
-	if err = sendMessage(m, i.ww); err != nil {
+	if err = sendMessage(m, worker, "worker", i.ww); err != nil {
 		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}

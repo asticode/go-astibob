@@ -1,22 +1,22 @@
 let consts = {
-    abilityStatuses: {
+    runnableStatuses: {
         running: "running",
         stopped: "stopped",
     },
     identifierTypes: {
-        ability: "ability",
+        runnable: "runnable",
         index: "index",
         ui: "ui",
         worker: "worker",
     },
     messageNames: {
-        cmdAbilityStart: "cmd.ability.start",
-        cmdAbilityStop: "cmd.ability.stop",
+        cmdRunnableStart: "cmd.runnable.start",
+        cmdRunnableStop: "cmd.runnable.stop",
         cmdUIPing: "cmd.ui.ping",
         cmdUIRegister: "cmd.ui.register",
-        eventAbilityCrashed: "event.ability.crashed",
-        eventAbilityStarted: "event.ability.started",
-        eventAbilityStopped: "event.ability.stopped",
+        eventRunnableCrashed: "event.runnable.crashed",
+        eventRunnableStarted: "event.runnable.started",
+        eventRunnableStopped: "event.runnable.stopped",
         eventUIWelcome: "event.ui.welcome",
         eventWorkerDisconnected: "event.worker.disconnected",
         eventWorkerRegistered: "event.worker.registered",

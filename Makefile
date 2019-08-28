@@ -6,3 +6,6 @@ w1:
 
 w2:
 	go run demo/workers/2/main.go -v
+
+w3:
+	go run demo/workers/3/main.go -v

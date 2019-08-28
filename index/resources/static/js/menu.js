@@ -18,9 +18,9 @@ let menu = {
 
     onMessage: function(data) {
         switch (data.name) {
-            case consts.messageNames.eventAbilityCrashed:
-            case consts.messageNames.eventAbilityStarted:
-            case consts.messageNames.eventAbilityStopped:
+            case consts.messageNames.eventRunnableCrashed:
+            case consts.messageNames.eventRunnableStarted:
+            case consts.messageNames.eventRunnableStopped:
                 // Update toggle
                 menu.updateToggle(data)
                 break
@@ -58,7 +58,7 @@ let menu = {
     newWorker: function(data) {
         // Init
         let r = {
-            abilities: {},
+            runnables: {},
             html: {},
             name: data.name,
         }
@@ -78,10 +78,10 @@ let menu = {
         r.html.table.className = "table"
         r.html.wrapper.appendChild(r.html.table)
 
-        // Loop through abilities
-        if (typeof data.abilities !== "undefined") {
-            for (let k = 0; k < data.abilities.length; k++) {
-                menu.addAbility(r, data.abilities[k])
+        // Loop through runnables
+        if (typeof data.runnables !== "undefined") {
+            for (let k = 0; k < data.runnables.length; k++) {
+                menu.addRunnable(r, data.runnables[k])
             }
         }
         return r
@@ -115,24 +115,24 @@ let menu = {
         }
     },
 
-    // Ability
+    // Runnable
 
-    addAbility: function(worker, data) {
-        // Ability already exists
-        if (typeof worker.abilities[data.name] !== "undefined") {
+    addRunnable: function(worker, data) {
+        // Runnable already exists
+        if (typeof worker.runnables[data.name] !== "undefined") {
             return
         }
 
-        // Create ability
-        let ability = menu.newAbility(worker, data)
+        // Create runnable
+        let runnable = menu.newRunnable(worker, data)
 
         // Add in alphabetical order
-        asticode.tools.appendSorted(worker.html.table, ability, worker.abilities)
+        asticode.tools.appendSorted(worker.html.table, runnable, worker.runnables)
 
         // Append to pool
-        worker.abilities[ability.name] = ability
+        worker.runnables[runnable.name] = runnable
     },
-    newAbility: function(worker, data) {
+    newRunnable: function(worker, data) {
         // Create results
         let r = {
             description: data.description,
@@ -177,16 +177,16 @@ let menu = {
             let m = {
                 to: {
                     name: r.name,
-                    type: consts.identifierTypes.ability,
+                    type: consts.identifierTypes.runnable,
                     worker: r.worker_name,
                 },
             }
 
             // Add name
-            if (r.status === consts.abilityStatuses.stopped) {
-                m.name = consts.messageNames.cmdAbilityStart
+            if (r.status === consts.runnableStatuses.stopped) {
+                m.name = consts.messageNames.cmdRunnableStart
             } else {
-                m.name = consts.messageNames.cmdAbilityStop
+                m.name = consts.messageNames.cmdRunnableStop
             }
 
             // Send message
@@ -201,16 +201,16 @@ let menu = {
 
         // Worker exists
         if (typeof worker !== "undefined") {
-            // Fetch ability
-            let ability = worker.abilities[data.from.name]
+            // Fetch runnable
+            let runnable = worker.runnables[data.from.name]
 
-            // Ability exists
-            if (typeof ability !== "undefined") {
+            // Runnable exists
+            if (typeof runnable !== "undefined") {
                 // Update status
-                ability.status = (data.name === consts.messageNames.eventAbilityStarted ? consts.abilityStatuses.running : consts.abilityStatuses.stopped)
+                runnable.status = (data.name === consts.messageNames.eventRunnableStarted ? consts.runnableStatuses.running : consts.runnableStatuses.stopped)
 
                 // Update class
-                ability.html.toggle.className = "toggle " + menu.toggleClass(ability.status)
+                runnable.html.toggle.className = "toggle " + menu.toggleClass(runnable.status)
             }
         }
     },

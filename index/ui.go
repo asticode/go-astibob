@@ -90,11 +90,20 @@ func (i *Index) handleUIMessage(p []byte) (err error) {
 }
 
 func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
-	// Log
-	astilog.Debugf("index: sending %s message to ui", m.Name)
+	// Invalid to
+	if m.To == nil {
+		err = errors.New("index: invalid to")
+		return
+	}
+
+	// Get ui name
+	var ui string
+	if m.To.Name != nil {
+		ui = *m.To.Name
+	}
 
 	// Send message
-	if err = sendMessage(m, i.wu); err != nil {
+	if err = sendMessage(m, ui, "ui", i.wu); err != nil {
 		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}

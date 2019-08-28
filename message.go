@@ -3,26 +3,28 @@ package astibob
 import (
 	"encoding/json"
 
+	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/pkg/errors"
 )
 
 // Identifier types
 const (
-	AbilityIdentifierType = "ability"
-	IndexIdentifierType   = "index"
-	UIIdentifierType      = "ui"
-	WorkerIdentifierType  = "worker"
+	IndexIdentifierType    = "index"
+	RunnableIdentifierType = "runnable"
+	UIIdentifierType       = "ui"
+	WorkerIdentifierType   = "worker"
 )
 
 // Message names
 const (
-	CmdAbilityStartMessage         = "cmd.ability.start"
-	CmdAbilityStopMessage          = "cmd.ability.stop"
+	CmdListenablesRegisterMessage  = "cmd.listenables.register"
+	CmdRunnableStartMessage        = "cmd.runnable.start"
+	CmdRunnableStopMessage         = "cmd.runnable.stop"
 	CmdUIPingMessage               = "cmd.ui.ping"
 	CmdWorkerRegisterMessage       = "cmd.worker.register"
-	EventAbilityCrashedMessage     = "event.ability.crashed"
-	EventAbilityStartedMessage     = "event.ability.started"
-	EventAbilityStoppedMessage     = "event.ability.stopped"
+	EventRunnableCrashedMessage    = "event.runnable.crashed"
+	EventRunnableStartedMessage    = "event.runnable.started"
+	EventRunnableStoppedMessage    = "event.runnable.stopped"
 	EventUIDisconnectedMessage     = "event.ui.disconnected"
 	EventUIWelcomeMessage          = "event.ui.welcome"
 	EventWorkerDisconnectedMessage = "event.worker.disconnected"
@@ -37,6 +39,26 @@ type Message struct {
 	To      *Identifier     `json:"to,omitempty"`
 }
 
+func (m *Message) Clone() (o *Message) {
+	// Create message
+	o = &Message{
+		From: *m.From.Clone(),
+		Name: m.Name,
+	}
+
+	// Clone to
+	if m.To != nil {
+		o.To = m.To.Clone()
+	}
+
+	// Clone payload
+	if len(m.Payload) > 0 {
+		o.Payload = make(json.RawMessage, len(m.Payload))
+		copy(o.Payload, m.Payload)
+	}
+	return
+}
+
 type Identifier struct {
 	Name   *string         `json:"name,omitempty"`
 	Type   string          `json:"type,omitempty"`
@@ -44,13 +66,37 @@ type Identifier struct {
 	Worker *string         `json:"worker,omitempty"`
 }
 
-func (o *Identifier) match(i Identifier) bool {
+func (i Identifier) Clone() (o *Identifier) {
+	// Create identifier
+	o = &Identifier{Type: i.Type}
+
+	// Add name
+	if i.Name != nil {
+		o.Name = astiptr.Str(*i.Name)
+	}
+
+	// Add types
+	if len(i.Types) > 0 {
+		o.Types = make(map[string]bool)
+		for k, v := range i.Types {
+			o.Types[k] = v
+		}
+	}
+
+	// Add worker
+	if i.Worker != nil {
+		o.Worker = astiptr.Str(*i.Worker)
+	}
+	return
+}
+
+func (i *Identifier) match(id Identifier) bool {
 	// Check type
-	if o.Types != nil {
-		if i.Types != nil {
+	if i.Types != nil {
+		if id.Types != nil {
 			match := false
-			for t := range i.Types {
-				if _, ok := o.Types[t]; ok {
+			for t := range id.Types {
+				if _, ok := i.Types[t]; ok {
 					match = true
 					break
 				}
@@ -59,30 +105,44 @@ func (o *Identifier) match(i Identifier) bool {
 				return false
 			}
 		} else {
-			if _, ok := o.Types[i.Type]; !ok {
+			if _, ok := i.Types[id.Type]; !ok {
 				return false
 			}
 		}
 	} else {
-		if i.Types != nil {
-			if _, ok := i.Types[o.Type]; !ok {
+		if id.Types != nil {
+			if _, ok := id.Types[i.Type]; !ok {
 				return false
 			}
-		} else if o.Type != i.Type {
+		} else if i.Type != id.Type {
 			return false
 		}
 	}
 
 	// Check name
-	if o.Name != nil && (i.Name == nil || *o.Name != *i.Name) {
+	if i.Name != nil && (id.Name == nil || *i.Name != *id.Name) {
 		return false
 	}
 
 	// Check worker
-	if o.Worker != nil && (i.Worker == nil || *o.Worker != *i.Worker) {
+	if i.Worker != nil && (id.Worker == nil || *i.Worker != *id.Worker) {
 		return false
 	}
 	return true
+}
+
+func (i Identifier) WorkerName() string {
+	switch i.Type {
+	case RunnableIdentifierType:
+		if i.Worker != nil {
+			return *i.Worker
+		}
+	case WorkerIdentifierType:
+		if i.Name != nil {
+			return *i.Name
+		}
+	}
+	return ""
 }
 
 type WelcomeUI struct {
@@ -91,12 +151,12 @@ type WelcomeUI struct {
 }
 
 type Worker struct {
-	Abilities []Ability `json:"abilities,omitempty"`
-	Addr      string    `json:"addr,omitempty"`
-	Name      string    `json:"name"`
+	Addr      string            `json:"addr,omitempty"`
+	Name      string            `json:"name"`
+	Runnables []RunnableMessage `json:"runnables,omitempty"`
 }
 
-type Ability struct {
+type RunnableMessage struct {
 	Metadata
 	Status     string `json:"status"`
 	UIHomepage string `json:"ui_homepage,omitempty"`
@@ -123,6 +183,26 @@ func newMessage(from Identifier, to *Identifier, name string) *Message {
 	return m
 }
 
+func NewCmdListenablesRegisterMessage(from Identifier, to *Identifier, ns []string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, CmdListenablesRegisterMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(ns); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseCmdListenablesRegisterPayload(m *Message) (ns []string, err error) {
+	if err = json.Unmarshal(m.Payload, &ns); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
 func NewCmdWorkerRegisterMessage(from Identifier, to *Identifier, w Worker) (m *Message, err error) {
 	// Create message
 	m = newMessage(from, to, CmdWorkerRegisterMessage)
@@ -143,16 +223,16 @@ func ParseCmdWorkerRegisterPayload(m *Message) (w Worker, err error) {
 	return
 }
 
-func NewEventAbilityCrashedMessage(from Identifier, to *Identifier) *Message {
-	return newMessage(from, to, EventAbilityCrashedMessage)
+func NewEventRunnableCrashedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventRunnableCrashedMessage)
 }
 
-func NewEventAbilityStartedMessage(from Identifier, to *Identifier) *Message {
-	return newMessage(from, to, EventAbilityStartedMessage)
+func NewEventRunnableStartedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventRunnableStartedMessage)
 }
 
-func NewEventAbilityStoppedMessage(from Identifier, to *Identifier) *Message {
-	return newMessage(from, to, EventAbilityStoppedMessage)
+func NewEventRunnableStoppedMessage(from Identifier, to *Identifier) *Message {
+	return newMessage(from, to, EventRunnableStoppedMessage)
 }
 
 func NewEventUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *Message, err error) {

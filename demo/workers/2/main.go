@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astibob/abilities/hear"
 	"github.com/asticode/go-astibob/abilities/speak"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
@@ -25,6 +26,12 @@ func main() {
 		Server: astibob.ServerOptions{Addr: "127.0.0.1:4002"},
 	})
 	defer w.Close()
+
+	// Register runnables
+	w.RegisterRunnables(worker.Runnable{
+		AutoStart: true,
+		Runnable:  hear.NewRunnable("Hear", nil),
+	})
 
 	// Handle signals
 	w.HandleSignals()

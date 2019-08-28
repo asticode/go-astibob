@@ -73,30 +73,17 @@ func New(o Options) (i *Index, err error) {
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdUIPingMessage)}, i.extendUIConnection)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{Names: map[string]bool{
-		astibob.EventAbilityCrashedMessage: true,
-		astibob.EventAbilityStartedMessage: true,
-		astibob.EventAbilityStoppedMessage: true,
-	}}, i.updateAbilityStatus)
+		astibob.EventRunnableCrashedMessage: true,
+		astibob.EventRunnableStartedMessage: true,
+		astibob.EventRunnableStoppedMessage: true,
+	}}, i.updateRunnableStatus)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventUIDisconnectedMessage)}, i.unregisterUI)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{
-		From: &astibob.Identifier{Types: map[string]bool{
-			astibob.IndexIdentifierType: true,
-			astibob.UIIdentifierType:    true,
-		}},
-		To: &astibob.Identifier{Type: astibob.AbilityIdentifierType},
-	}, i.sendMessageToAbility)
-	i.d.On(astibob.DispatchConditions{
-		From: &astibob.Identifier{Types: map[string]bool{
-			astibob.AbilityIdentifierType: true,
-			astibob.IndexIdentifierType:   true,
-		}},
-		To: &astibob.Identifier{Type: astibob.UIIdentifierType},
-	}, i.sendMessageToUI)
-	i.d.On(astibob.DispatchConditions{
-		From: &astibob.Identifier{Type: astibob.IndexIdentifierType},
-		To:   &astibob.Identifier{Type: astibob.WorkerIdentifierType},
-	}, i.sendMessageToWorkers)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
+		astibob.RunnableIdentifierType: true,
+		astibob.WorkerIdentifierType:   true,
+	}}}, i.sendMessageToWorker)
+	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.UIIdentifierType}}, i.sendMessageToUI)
 	return
 }
 
@@ -136,14 +123,14 @@ func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
 }
 
-func sendMessage(m *astibob.Message, wm *astiws.Manager) (err error) {
+func sendMessage(m *astibob.Message, name, label string, wm *astiws.Manager) (err error) {
 	// Get clients
 	var cs []*astiws.Client
-	if m.To != nil && m.To.Name != nil {
+	if name != "" {
 		// Retrieve client from manager
-		c, ok := wm.Client(*m.To.Name)
+		c, ok := wm.Client(name)
 		if !ok {
-			err = fmt.Errorf("index: client %s doesn't exist", *m.To.Name)
+			err = fmt.Errorf("index: client %s doesn't exist", name)
 			return
 		}
 
@@ -159,9 +146,12 @@ func sendMessage(m *astibob.Message, wm *astiws.Manager) (err error) {
 
 	// Loop through clients
 	for _, c := range cs {
+		// Log
+		astilog.Debugf("index: sending %s message to %s %s", m.Name, label, name)
+
 		// Write
 		if err = c.WriteJSON(m); err != nil {
-			err = errors.Wrap(err, "worker: writing JSON message failed")
+			err = errors.Wrap(err, "index: writing JSON message failed")
 			return
 		}
 	}

@@ -22,10 +22,13 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 		w.rs[r.Runnable.Metadata().Name] = r.Runnable
 		w.mr.Unlock()
 
+		// Set dispatch func
+		r.Runnable.SetDispatchFunc(w.dispatchFunc(r.Runnable.Metadata().Name))
+
 		// Add dispatch handlers
 		w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{
 			Name:   astiptr.Str(r.Runnable.Metadata().Name),
-			Type:   astibob.AbilityIdentifierType,
+			Type:   astibob.RunnableIdentifierType,
 			Worker: astiptr.Str(w.name),
 		}}, r.Runnable.OnMessage)
 
@@ -40,6 +43,66 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 			}
 		}
 	}
+}
+
+func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
+	return func(m *astibob.Message) {
+		// Set from
+		m.From = astibob.Identifier{
+			Name:   astiptr.Str(name),
+			Type:   astibob.RunnableIdentifierType,
+			Worker: astiptr.Str(w.name),
+		}
+
+		// Lock
+		w.mo.Lock()
+		defer w.mo.Unlock()
+
+		// Get listenables by workers
+		wls, ok := w.ols[name]
+
+		// No listenables for this runnable
+		if !ok {
+			return
+		}
+
+		// Loop through workers
+		for n, ls := range wls {
+			// No listenable for this worker
+			if _, ok := ls[m.Name]; !ok {
+				continue
+			}
+
+			// Clone message
+			cm := m.Clone()
+
+			// Set to
+			cm.To = &astibob.Identifier{
+				Name: astiptr.Str(n),
+				Type: astibob.WorkerIdentifierType,
+			}
+
+			// Dispatch
+			w.d.Dispatch(cm)
+		}
+		return
+	}
+}
+
+func (w *Worker) startRunnableFromMessage(m *astibob.Message) (err error) {
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
+		return
+	}
+	name := *m.To.Name
+
+	// Start runnable
+	if err = w.startRunnable(name); err != nil {
+		err = errors.Wrapf(err, "worker: starting runnable %s failed", name)
+		return
+	}
+	return
 }
 
 func (w *Worker) startRunnable(name string) (err error) {
@@ -64,7 +127,7 @@ func (w *Worker) startRunnable(name string) (err error) {
 	astilog.Infof("worker: starting runnable %s", name)
 
 	// Create started message
-	m := astibob.NewEventAbilityStartedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+	m := astibob.NewEventRunnableStartedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -84,16 +147,32 @@ func (w *Worker) startRunnable(name string) (err error) {
 
 		// Create message
 		if err == nil || err == astibob.ErrContextCancelled {
-			m = astibob.NewEventAbilityStoppedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewEventRunnableStoppedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has stopped", name)
 		} else {
-			m = astibob.NewEventAbilityCrashedMessage(w.fromAbility(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewEventRunnableCrashedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has crashed", name)
 		}
 
 		// Dispatch
 		w.d.Dispatch(m)
 	}()
+	return
+}
+
+func (w *Worker) stopRunnableFromMessage(m *astibob.Message) (err error) {
+	// Check name
+	if m.To == nil || m.To.Name == nil {
+		err = errors.New("index: no to name")
+		return
+	}
+	name := *m.To.Name
+
+	// Stop runnable
+	if err = w.stopRunnable(name); err != nil {
+		err = errors.Wrapf(err, "worker: stopping runnable %s failed", name)
+		return
+	}
 	return
 }
 
@@ -120,5 +199,33 @@ func (w *Worker) stopRunnable(name string) (err error) {
 
 	// Stop runnable
 	r.Stop()
+	return
+}
+
+func (w *Worker) fromRunnable(name string) astibob.Identifier {
+	return astibob.Identifier{
+		Name:   astiptr.Str(name),
+		Type:   astibob.RunnableIdentifierType,
+		Worker: astiptr.Str(w.name),
+	}
+}
+
+func (w *Worker) SendCmds(worker, ability string, cmds ...astibob.Cmd) (err error) {
+	// Loop through cmds
+	for _, cmd := range cmds {
+		// Create message
+		var m *astibob.Message
+		if m, err = astibob.NewMessageFromCmd(*w.from(), &astibob.Identifier{
+			Name:   astiptr.Str(ability),
+			Type:   astibob.RunnableIdentifierType,
+			Worker: astiptr.Str(worker),
+		}, cmd); err != nil {
+			err = errors.Wrap(err, "worker: creating message from cmd failed")
+			return
+		}
+
+		// Dispatch
+		w.d.Dispatch(m)
+	}
 	return
 }

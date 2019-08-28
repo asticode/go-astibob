@@ -49,14 +49,14 @@ func (w *Worker) sendRegister() (err error) {
 	// Sort
 	sort.Strings(ks)
 
-	// Loop through runnables
-	var as []astibob.Ability
+	// Loop through keys
+	var rs []astibob.RunnableMessage
 	for _, k := range ks {
 		// Get runnable
 		r := w.rs[k]
 
-		// Append ability
-		as = append(as, astibob.Ability{
+		// Append runnable
+		rs = append(rs, astibob.RunnableMessage{
 			Metadata: r.Metadata(),
 			Status:   r.Status(),
 		})
@@ -68,9 +68,9 @@ func (w *Worker) sendRegister() (err error) {
 	if m, err = astibob.NewCmdWorkerRegisterMessage(*w.from(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
 	}, astibob.Worker{
-		Abilities: as,
 		Addr:      "http://" + w.o.Server.Addr,
 		Name:      w.name,
+		Runnables: rs,
 	}); err != nil {
 		err = errors.Wrap(err, "worker: creating register message failed")
 		return
@@ -93,6 +93,12 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	for _, mw := range ws {
 		// Add worker
 		w.addWorker(mw)
+
+		// Send register listenables
+		if err = w.sendRegisterListenables(mw.Name); err != nil {
+			err = errors.Wrapf(err, "worker: sending register listenables to worker %s failed", mw.Name)
+			return
+		}
 	}
 
 	// Log
@@ -117,6 +123,11 @@ func (w *Worker) handleIndexMessage(p []byte) (err error) {
 }
 
 func (w *Worker) sendMessageToIndex(m *astibob.Message) (err error) {
+	// Only send message from current worker
+	if m.From.WorkerName() != w.name {
+		return
+	}
+
 	// Log
 	astilog.Debugf("worker: sending %s message to index", m.Name)
 
@@ -136,8 +147,19 @@ func (w *Worker) registerWorker(m *astibob.Message) (err error) {
 		return
 	}
 
+	// Do not process itself
+	if mw.Name == w.name {
+		return
+	}
+
 	// Add worker
 	w.addWorker(mw)
+
+	// Send register listenables
+	if err = w.sendRegisterListenables(mw.Name); err != nil {
+		err = errors.Wrapf(err, "worker: sending register listenables to worker %s failed", mw.Name)
+		return
+	}
 	return
 }
 
@@ -145,11 +167,6 @@ func (w *Worker) addWorker(m astibob.Worker) {
 	// Lock
 	w.mw.Lock()
 	defer w.mw.Unlock()
-
-	// Do not process itself
-	if m.Name == w.name {
-		return
-	}
 
 	// Create worker
 	nw := newWorker(m)
@@ -167,8 +184,20 @@ func (w *Worker) unregisterWorker(m *astibob.Message) (err error) {
 		return
 	}
 
+	// Do not process itself
+	if name == w.name {
+		return
+	}
+
 	// Delete worker
 	w.delWorker(name)
+
+	// Update listenables
+	w.mo.Lock()
+	for r := range w.ols {
+		delete(w.ols[r], name)
+	}
+	w.mo.Unlock()
 	return
 }
 
@@ -176,11 +205,6 @@ func (w *Worker) delWorker(name string) {
 	// Lock
 	w.mw.Lock()
 	defer w.mw.Unlock()
-
-	// Do not process itself
-	if name == w.name {
-		return
-	}
 
 	// Update pool
 	delete(w.ws, name)

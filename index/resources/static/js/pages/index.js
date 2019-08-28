@@ -55,7 +55,7 @@ let index = {
     newWorker: function(data) {
         // Init
         let r = {
-            abilities: {},
+            runnables: {},
             html: {},
             name: data.name,
         }
@@ -75,10 +75,10 @@ let index = {
         r.html.flex.className = "flex"
         r.html.wrapper.appendChild(r.html.flex)
 
-        // Loop through abilities
-        if (typeof data.abilities !== "undefined") {
-            for (let k = 0; k < data.abilities.length; k++) {
-                index.addAbility(r, data.abilities[k])
+        // Loop through runnables
+        if (typeof data.runnables !== "undefined") {
+            for (let k = 0; k < data.runnables.length; k++) {
+                index.addRunnable(r, data.runnables[k])
             }
         }
         return r
@@ -112,24 +112,24 @@ let index = {
         }
     },
 
-    // Ability
+    // Runnable
 
-    addAbility: function(worker, data) {
-        // Ability already exists
-        if (typeof worker.abilities[data.name] !== "undefined") {
+    addRunnable: function(worker, data) {
+        // Runnable already exists
+        if (typeof worker.runnables[data.name] !== "undefined") {
             return
         }
 
-        // Create ability
-        let ability = index.newAbility(worker, data)
+        // Create runnable
+        let runnable = index.newRunnable(worker, data)
 
         // Add in alphabetical order
-        asticode.tools.appendSorted(worker.html.flex, ability, worker.abilities)
+        asticode.tools.appendSorted(worker.html.flex, runnable, worker.runnables)
 
         // Append to pool
-        worker.abilities[ability.name] = ability
+        worker.runnables[runnable.name] = runnable
     },
-    newAbility: function(worker, data) {
+    newRunnable: function(worker, data) {
         // Create results
         let r = {
             description: data.description,

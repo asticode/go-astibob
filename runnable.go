@@ -21,28 +21,31 @@ var (
 type Runnable interface {
 	Metadata() Metadata
 	OnMessage(m *Message) error
+	SetDispatchFunc(f DispatchFunc)
 	Start(ctx context.Context) error
 	Status() string
 	Stop()
 }
 
-type RunnableOptions struct {
-	Metadata  Metadata
-	OnMessage func(m *Message) error
-	OnStart   func(ctx context.Context) error
+type DispatchFunc func(m *Message)
+
+type BaseRunnableOptions struct {
+	Metadata Metadata
+	OnStart  func(ctx context.Context) error
 }
 
-type runnable struct {
-	cancel context.CancelFunc
-	ctx    context.Context
-	o      RunnableOptions
-	oStart *sync.Once
-	oStop  *sync.Once
-	status string
+type BaseRunnable struct {
+	cancel       context.CancelFunc
+	ctx          context.Context
+	dispatchFunc DispatchFunc
+	o            BaseRunnableOptions
+	oStart       *sync.Once
+	oStop        *sync.Once
+	status       string
 }
 
-func NewRunnable(o RunnableOptions) Runnable {
-	return &runnable{
+func NewBaseRunnable(o BaseRunnableOptions) *BaseRunnable {
+	return &BaseRunnable{
 		o:      o,
 		oStart: &sync.Once{},
 		oStop:  &sync.Once{},
@@ -50,15 +53,21 @@ func NewRunnable(o RunnableOptions) Runnable {
 	}
 }
 
-func (r *runnable) Metadata() Metadata {
-	return r.o.Metadata
+func (r *BaseRunnable) Dispatch(m *Message) {
+	if r.dispatchFunc != nil {
+		r.dispatchFunc(m)
+	}
 }
 
-func (r *runnable) Status() string {
-	return r.status
-}
+func (r *BaseRunnable) Metadata() Metadata { return r.o.Metadata }
 
-func (r *runnable) Start(ctx context.Context) (err error) {
+func (r *BaseRunnable) OnMessage(m *Message) (err error) { return }
+
+func (r *BaseRunnable) SetDispatchFunc(f DispatchFunc) { r.dispatchFunc = f }
+
+func (r *BaseRunnable) Status() string { return r.status }
+
+func (r *BaseRunnable) Start(ctx context.Context) (err error) {
 	// Make sure it's started only once
 	r.oStart.Do(func() {
 		// Create context
@@ -90,7 +99,7 @@ func (r *runnable) Start(ctx context.Context) (err error) {
 	return
 }
 
-func (r *runnable) Stop() {
+func (r *BaseRunnable) Stop() {
 	// Make sure it's stopped only once
 	r.oStop.Do(func() {
 		// Cancel context
@@ -101,24 +110,5 @@ func (r *runnable) Stop() {
 		// Reset once
 		r.oStart = &sync.Once{}
 	})
-	return
-}
-
-func (r *runnable) OnMessage(m *Message) (err error) {
-	// No handler
-	if r.o.OnMessage == nil {
-		return
-	}
-
-	// Check status
-	if r.status != RunningStatus {
-		return
-	}
-
-	// Custom
-	if err = r.o.OnMessage(m); err != nil {
-		err = errors.Wrap(err, "astibob: OnMessage failed")
-		return
-	}
 	return
 }
