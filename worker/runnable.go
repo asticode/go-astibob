@@ -5,7 +5,6 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/pkg/errors"
 )
 
@@ -26,11 +25,7 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 		r.Runnable.SetDispatchFunc(w.dispatchFunc(r.Runnable.Metadata().Name))
 
 		// Add dispatch handlers
-		w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{
-			Name:   astiptr.Str(r.Runnable.Metadata().Name),
-			Type:   astibob.RunnableIdentifierType,
-			Worker: astiptr.Str(w.name),
-		}}, r.Runnable.OnMessage)
+		w.d.On(astibob.DispatchConditions{To: w.runnableIdentifier(r.Runnable.Metadata().Name)}, r.Runnable.OnMessage)
 
 		// Log
 		astilog.Infof("worker: registered runnable %s", r.Runnable.Metadata().Name)
@@ -48,11 +43,7 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
 	return func(m *astibob.Message) {
 		// Set from
-		m.From = astibob.Identifier{
-			Name:   astiptr.Str(name),
-			Type:   astibob.RunnableIdentifierType,
-			Worker: astiptr.Str(w.name),
-		}
+		m.From = *w.runnableIdentifier(name)
 
 		// Lock
 		w.mo.Lock()
@@ -77,10 +68,7 @@ func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
 			cm := m.Clone()
 
 			// Set to
-			cm.To = &astibob.Identifier{
-				Name: astiptr.Str(n),
-				Type: astibob.WorkerIdentifierType,
-			}
+			cm.To = astibob.NewWorkerIdentifier(n)
 
 			// Dispatch
 			w.d.Dispatch(cm)
@@ -90,12 +78,12 @@ func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
 }
 
 func (w *Worker) startRunnableFromMessage(m *astibob.Message) (err error) {
-	// Check name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: no to name")
+	// Parse payload
+	var name string
+	if name, err = astibob.ParseCmdRunnableStartPayload(m); err != nil {
+		err = errors.Wrap(err, "index: parsing start payload failed")
 		return
 	}
-	name := *m.To.Name
 
 	// Start runnable
 	if err = w.startRunnable(name); err != nil {
@@ -127,7 +115,7 @@ func (w *Worker) startRunnable(name string) (err error) {
 	astilog.Infof("worker: starting runnable %s", name)
 
 	// Create started message
-	m := astibob.NewEventRunnableStartedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+	m := astibob.NewEventRunnableStartedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -147,10 +135,10 @@ func (w *Worker) startRunnable(name string) (err error) {
 
 		// Create message
 		if err == nil || err == astibob.ErrContextCancelled {
-			m = astibob.NewEventRunnableStoppedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewEventRunnableStoppedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has stopped", name)
 		} else {
-			m = astibob.NewEventRunnableCrashedMessage(w.fromRunnable(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewEventRunnableCrashedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
 			astilog.Infof("worker: runnable %s has crashed", name)
 		}
 
@@ -161,12 +149,12 @@ func (w *Worker) startRunnable(name string) (err error) {
 }
 
 func (w *Worker) stopRunnableFromMessage(m *astibob.Message) (err error) {
-	// Check name
-	if m.To == nil || m.To.Name == nil {
-		err = errors.New("index: no to name")
+	// Parse payload
+	var name string
+	if name, err = astibob.ParseCmdRunnableStopPayload(m); err != nil {
+		err = errors.Wrap(err, "index: parsing stop payload failed")
 		return
 	}
-	name := *m.To.Name
 
 	// Stop runnable
 	if err = w.stopRunnable(name); err != nil {
@@ -202,24 +190,12 @@ func (w *Worker) stopRunnable(name string) (err error) {
 	return
 }
 
-func (w *Worker) fromRunnable(name string) astibob.Identifier {
-	return astibob.Identifier{
-		Name:   astiptr.Str(name),
-		Type:   astibob.RunnableIdentifierType,
-		Worker: astiptr.Str(w.name),
-	}
-}
-
-func (w *Worker) SendCmds(worker, ability string, cmds ...astibob.Cmd) (err error) {
+func (w *Worker) SendCmds(worker, runnable string, cmds ...astibob.Cmd) (err error) {
 	// Loop through cmds
 	for _, cmd := range cmds {
 		// Create message
 		var m *astibob.Message
-		if m, err = astibob.NewMessageFromCmd(*w.from(), &astibob.Identifier{
-			Name:   astiptr.Str(ability),
-			Type:   astibob.RunnableIdentifierType,
-			Worker: astiptr.Str(worker),
-		}, cmd); err != nil {
+		if m, err = astibob.NewMessageFromCmd(*w.workerIdentifier(), astibob.NewRunnableIdentifier(runnable, worker), cmd); err != nil {
 			err = errors.Wrap(err, "worker: creating message from cmd failed")
 			return
 		}

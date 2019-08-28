@@ -57,10 +57,7 @@ func New(name string, o Options) (w *Worker) {
 	}
 
 	// Create dispatcher
-	w.d = astibob.NewDispatcher(w.w.NewTask)
-
-	// Start dispatcher
-	go w.d.Start(w.w.Context())
+	w.d = astibob.NewDispatcher(w.w.Context(), w.w.NewTask)
 
 	// Add websocket message handler
 	w.cw.SetMessageHandler(w.handleIndexMessage)
@@ -95,8 +92,8 @@ func (w *Worker) Wait() {
 
 // Close closes the worker properly
 func (w *Worker) Close() error {
-	// Stop dispatcher
-	w.d.Stop()
+	// Close dispatcher
+	w.d.Close()
 
 	// Close client
 	if w.cw != nil {
@@ -107,11 +104,12 @@ func (w *Worker) Close() error {
 	return nil
 }
 
-func (w *Worker) from() *astibob.Identifier {
-	return &astibob.Identifier{
-		Name: astiptr.Str(w.name),
-		Type: astibob.WorkerIdentifierType,
-	}
+func (w *Worker) workerIdentifier() *astibob.Identifier {
+	return astibob.NewWorkerIdentifier(w.name)
+}
+
+func (w *Worker) runnableIdentifier(name string) *astibob.Identifier {
+	return astibob.NewRunnableIdentifier(name, w.name)
 }
 
 type worker struct {

@@ -12,7 +12,6 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
@@ -36,7 +35,11 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 			// Create disconnected message
 			var m *astibob.Message
-			if m, err = astibob.NewEventUIDisconnectedMessage(from, nil, name); err != nil {
+			if m, err = astibob.NewEventUIDisconnectedMessage(
+				*astibob.NewIndexIdentifier(),
+				nil,
+				name,
+			); err != nil {
 				err = errors.Wrap(err, "astibob: creating disconnected message failed")
 				return
 			}
@@ -54,10 +57,14 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 
 		// Create welcome message
 		var m *astibob.Message
-		if m, err = astibob.NewEventUIWelcomeMessage(from, &astibob.Identifier{
-			Name: astiptr.Str(name),
-			Type: astibob.UIIdentifierType,
-		}, name, i.workers()); err != nil {
+		if m, err = astibob.NewEventUIWelcomeMessage(
+			*astibob.NewIndexIdentifier(),
+			astibob.NewUIIdentifier(name),
+			astibob.WelcomeUI{
+				Name:    name,
+				Workers: i.workers(),
+			},
+		); err != nil {
 			err = errors.Wrap(err, "index: creating welcome message failed")
 			return
 		}
@@ -66,7 +73,8 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		i.d.Dispatch(m)
 		return
 	}); err != nil {
-		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok || (v.Code != websocket.CloseNoStatusReceived && v.Code != websocket.CloseNormalClosure) {
+		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok ||
+			(v.Code != websocket.CloseNoStatusReceived && v.Code != websocket.CloseNormalClosure) {
 			astilog.Error(errors.Wrap(err, "index: handling ui websocket failed"))
 		}
 		return

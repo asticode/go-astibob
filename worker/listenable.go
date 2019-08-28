@@ -2,7 +2,6 @@ package worker
 
 import (
 	"github.com/asticode/go-astibob"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/pkg/errors"
 )
 
@@ -17,15 +16,8 @@ func (w *Worker) RegisterListenables(ls ...Listenable) {
 	for _, l := range ls {
 		// Add dispatcher handler
 		w.d.On(astibob.DispatchConditions{
-			From: &astibob.Identifier{
-				Name:   astiptr.Str(l.Runnable),
-				Type:   astibob.RunnableIdentifierType,
-				Worker: astiptr.Str(l.Worker),
-			},
-			To: &astibob.Identifier{
-				Name: astiptr.Str(w.name),
-				Type: astibob.WorkerIdentifierType,
-			},
+			From: astibob.NewRunnableIdentifier(l.Runnable, l.Worker),
+			To:   w.workerIdentifier(),
 		}, l.Listenable.OnMessage)
 
 		// Add message names
@@ -75,11 +67,14 @@ func (w *Worker) sendRegisterListenables(worker string) (err error) {
 
 		// Create message
 		var m *astibob.Message
-		if m, err = astibob.NewCmdListenablesRegisterMessage(*w.from(), &astibob.Identifier{
-			Name:   astiptr.Str(r),
-			Type:   astibob.RunnableIdentifierType,
-			Worker: astiptr.Str(worker),
-		}, p); err != nil {
+		if m, err = astibob.NewCmdListenablesRegisterMessage(
+			*w.workerIdentifier(),
+			astibob.NewWorkerIdentifier(worker),
+			astibob.Listenables{
+				Names:    p,
+				Runnable: r,
+			},
+		); err != nil {
 			err = errors.Wrap(err, "worker: creating register message failed")
 			return
 		}
@@ -105,15 +100,9 @@ func (w *Worker) registerListenables(m *astibob.Message) (err error) {
 		return
 	}
 
-	// To is invalid
-	if m.To == nil {
-		err = errors.New("worker: to is invalid")
-		return
-	}
-
 	// Parse payload
-	var ns []string
-	if ns, err = astibob.ParseCmdListenablesRegisterPayload(m); err != nil {
+	var l astibob.Listenables
+	if l, err = astibob.ParseCmdListenablesRegisterPayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing register payload failed")
 		return
 	}
@@ -122,18 +111,18 @@ func (w *Worker) registerListenables(m *astibob.Message) (err error) {
 	w.mo.Lock()
 
 	// Add runnable key
-	if _, ok := w.ols[*m.To.Name]; !ok {
-		w.ols[*m.To.Name] = make(map[string]map[string]bool)
+	if _, ok := w.ols[l.Runnable]; !ok {
+		w.ols[l.Runnable] = make(map[string]map[string]bool)
 	}
 
 	// Add worker key
-	if _, ok := w.ols[*m.To.Name][worker]; !ok {
-		w.ols[*m.To.Name][worker] = make(map[string]bool)
+	if _, ok := w.ols[l.Runnable][worker]; !ok {
+		w.ols[l.Runnable][worker] = make(map[string]bool)
 	}
 
 	// Add message name keys
-	for _, n := range ns {
-		w.ols[*m.To.Name][worker][n] = true
+	for _, n := range l.Names {
+		w.ols[l.Runnable][worker][n] = true
 	}
 
 	// Unlock

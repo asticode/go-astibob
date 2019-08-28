@@ -9,7 +9,6 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
@@ -149,10 +148,14 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 		// Create disconnected message
 		var m *astibob.Message
-		if m, err = astibob.NewEventWorkerDisconnectedMessage(from, &astibob.Identifier{Types: map[string]bool{
-			astibob.UIIdentifierType:     true,
-			astibob.WorkerIdentifierType: true,
-		}}, w.name); err != nil {
+		if m, err = astibob.NewEventWorkerDisconnectedMessage(
+			*astibob.NewIndexIdentifier(),
+			&astibob.Identifier{Types: map[string]bool{
+				astibob.UIIdentifierType:     true,
+				astibob.WorkerIdentifierType: true,
+			}},
+			w.name,
+		); err != nil {
 			err = errors.Wrap(err, "astibob: creating disconnected message failed")
 			return
 		}
@@ -166,10 +169,11 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	astilog.Infof("index: worker %s has registered", w.name)
 
 	// Create welcome message
-	if m, err = astibob.NewEventWorkerWelcomeMessage(from, &astibob.Identifier{
-		Name: astiptr.Str(w.name),
-		Type: astibob.WorkerIdentifierType,
-	}, i.workers()); err != nil {
+	if m, err = astibob.NewEventWorkerWelcomeMessage(
+		*astibob.NewIndexIdentifier(),
+		astibob.NewWorkerIdentifier(w.name),
+		i.workers(),
+	); err != nil {
 		err = errors.Wrap(err, "astibob: creating welcome message failed")
 		return
 	}
@@ -178,10 +182,14 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	i.d.Dispatch(m)
 
 	// Create registered message
-	if m, err = astibob.NewEventWorkerRegisteredMessage(from, &astibob.Identifier{Types: map[string]bool{
-		astibob.UIIdentifierType:     true,
-		astibob.WorkerIdentifierType: true,
-	}}, mw); err != nil {
+	if m, err = astibob.NewEventWorkerRegisteredMessage(
+		*astibob.NewIndexIdentifier(),
+		&astibob.Identifier{Types: map[string]bool{
+			astibob.UIIdentifierType:     true,
+			astibob.WorkerIdentifierType: true,
+		}},
+		mw,
+	); err != nil {
 		err = errors.Wrap(err, "astibob: creating registered message failed")
 		return
 	}

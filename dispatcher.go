@@ -2,6 +2,7 @@ package astibob
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/asticode/go-astilog"
@@ -15,19 +16,6 @@ type MessageHandler func(m *Message) error
 type dispatcherHandler struct {
 	c DispatchConditions
 	h MessageHandler
-}
-
-type Dispatcher struct {
-	c  *astisync.Chan
-	hs []dispatcherHandler
-	mh *sync.Mutex // Locks hs
-}
-
-func NewDispatcher(t astiworker.TaskFunc) *Dispatcher {
-	return &Dispatcher{
-		c:  astisync.NewChan(astisync.ChanOptions{TaskFunc: t}),
-		mh: &sync.Mutex{},
-	}
 }
 
 type DispatchConditions struct {
@@ -67,39 +55,103 @@ func (c DispatchConditions) match(m *Message) bool {
 	return true
 }
 
+type Dispatcher struct {
+	ctx context.Context
+	cs  map[string]*astisync.Chan
+	hs  []dispatcherHandler
+	mc  *sync.Mutex // Locks cs
+	mh  *sync.Mutex // Locks hs
+	t   astiworker.TaskFunc
+}
+
+func NewDispatcher(ctx context.Context, t astiworker.TaskFunc) *Dispatcher {
+	return &Dispatcher{
+		ctx: ctx,
+		cs:  make(map[string]*astisync.Chan),
+		mc:  &sync.Mutex{},
+		mh:  &sync.Mutex{},
+		t:   t,
+	}
+}
+
+func (d *Dispatcher) Close() {
+	// Lock
+	d.mc.Lock()
+	defer d.mc.Unlock()
+
+	// Stop chans
+	for _, c := range d.cs {
+		c.Stop()
+	}
+}
+
 func (d *Dispatcher) Dispatch(m *Message) {
 	// Lock
 	d.mh.Lock()
 	defer d.mh.Unlock()
 
 	// Loop through handlers
+	var c *astisync.Chan
 	for _, h := range d.hs {
 		// No match
 		if !h.c.match(m) {
 			continue
 		}
 
+		// No chan
+		if c == nil {
+			// Get message key
+			k := d.key(m)
+
+			// Lock
+			d.mc.Lock()
+
+			// Get chan
+			var ok bool
+			if c, ok = d.cs[k]; !ok {
+				// Log
+				astilog.Debugf("astibob: creating new dispatcher chan with key %s", k)
+
+				// Create chan
+				c = astisync.NewChan(astisync.ChanOptions{TaskFunc: d.t})
+				d.cs[k] = c
+
+				// Start chan
+				go c.Start(d.ctx)
+			}
+
+			// Unlock
+			d.mc.Unlock()
+		}
+
 		// Dispatch
-		d.dispatch(m, h.h)
+		d.dispatch(c, m, h.h)
 	}
 }
 
-func (d *Dispatcher) dispatch(m *Message, h MessageHandler) {
+// We don't want one dispatch to delay Cmds and Events, that's why we create specific chans for each of them. For now
+// we're limiting this behavior to Cmds and Events for lack of examples of other cases.
+func (d *Dispatcher) key(m *Message) string {
+	// Message to runnable: Cmds
+	if m.To != nil && m.To.Type == RunnableIdentifierType {
+		return fmt.Sprintf("to.runnable.%s.%s", *m.To.Worker, *m.To.Name)
+	}
+
+	// Message from runnable: Events
+	if m.From.Type == RunnableIdentifierType {
+		return fmt.Sprintf("from.runnable.%s.%s", *m.From.Worker, *m.From.Name)
+	}
+	return "default"
+}
+
+func (d *Dispatcher) dispatch(c *astisync.Chan, m *Message, h MessageHandler) {
 	// Add to chan
-	d.c.Add(func() {
+	c.Add(func() {
 		// Handle message
 		if err := h(m); err != nil {
 			astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
 		}
 	})
-}
-
-func (d *Dispatcher) Start(ctx context.Context) {
-	d.c.Start(ctx)
-}
-
-func (d *Dispatcher) Stop() {
-	d.c.Stop()
 }
 
 func (d *Dispatcher) On(c DispatchConditions, h MessageHandler) {

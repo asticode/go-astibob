@@ -15,11 +15,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Vars
-var (
-	from = astibob.Identifier{Type: astibob.IndexIdentifierType}
-)
-
 type Options struct {
 	Server        astibob.ServerOptions `toml:"server"`
 	ResourcesPath string                `toml:"resources_path"`
@@ -54,10 +49,7 @@ func New(o Options) (i *Index, err error) {
 	}
 
 	// Create dispatcher
-	i.d = astibob.NewDispatcher(i.w.NewTask)
-
-	// Start dispatcher
-	go i.d.Start(i.w.Context())
+	i.d = astibob.NewDispatcher(i.w.Context(), i.w.NewTask)
 
 	// Create templater
 	if i.t, err = astitemplate.NewTemplater(
@@ -89,8 +81,8 @@ func New(o Options) (i *Index, err error) {
 
 // Close closes the index properly
 func (i *Index) Close() error {
-	// Stop dispatcher
-	i.d.Stop()
+	// Close dispatcher
+	i.d.Close()
 
 	// Close ui clients
 	if i.wu != nil {

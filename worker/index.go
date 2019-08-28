@@ -65,7 +65,7 @@ func (w *Worker) sendRegister() (err error) {
 
 	// Create register message
 	var m *astibob.Message
-	if m, err = astibob.NewCmdWorkerRegisterMessage(*w.from(), &astibob.Identifier{
+	if m, err = astibob.NewCmdWorkerRegisterMessage(*w.workerIdentifier(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
 	}, astibob.Worker{
 		Addr:      "http://" + w.o.Server.Addr,

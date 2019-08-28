@@ -176,10 +176,10 @@ let menu = {
             // Create message
             let m = {
                 to: {
-                    name: r.name,
-                    type: consts.identifierTypes.runnable,
-                    worker: r.worker_name,
+                    name: r.worker_name,
+                    type: consts.identifierTypes.worker,
                 },
+                payload: r.name,
             }
 
             // Add name
