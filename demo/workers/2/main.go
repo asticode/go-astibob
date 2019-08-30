@@ -2,13 +2,18 @@ package main
 
 import (
 	"flag"
-	"time"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/abilities/audio_input"
-	"github.com/asticode/go-astibob/abilities/text_to_speech"
+	"github.com/asticode/go-astibob/abilities/audio_input/portaudio"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
+	"github.com/pkg/errors"
+)
+
+// Constants
+const (
+	sampleRate = 44100
 )
 
 func main() {
@@ -27,10 +32,31 @@ func main() {
 	})
 	defer w.Close()
 
+	// Create portaudio
+	p := portaudio.New()
+
+	// Initialize portaudio
+	if err := p.Initialize(); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: initializing portaudio failed"))
+	}
+	defer p.Close()
+
+	// Create default stream
+	s, err := p.NewDefaultStream(portaudio.StreamOptions{
+		BitDepth:             32,
+		BufferLength:         5000,
+		MaxSilenceAudioLevel: 35 * 1e6,
+		NumInputChannels:     1,
+		SampleRate:           sampleRate,
+	})
+	if err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: creating default stream failed"))
+	}
+
 	// Register runnables
 	w.RegisterRunnables(worker.Runnable{
 		AutoStart: true,
-		Runnable:  audio_input.NewRunnable("Audio input", nil),
+		Runnable:  audio_input.NewRunnable("Audio input", s),
 	})
 
 	// Handle signals
@@ -41,12 +67,6 @@ func main() {
 
 	// Register to index
 	w.RegisterToIndex()
-
-	// TODO Testing
-	go func() {
-		time.Sleep(time.Second)
-		w.SendCmds("Worker #1", "Text to Speech", text_to_speech.NewSayCmd("hello world"), text_to_speech.NewSayCmd("how are you today?"))
-	}()
 
 	// Blocking pattern
 	w.Wait()

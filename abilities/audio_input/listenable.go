@@ -6,7 +6,7 @@ import (
 )
 
 type ListenableOptions struct {
-	OnSamples func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) error
+	OnSamples func(samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) error
 }
 
 func NewListenable(o ListenableOptions) astibob.Listenable {
@@ -41,15 +41,15 @@ func (l *listenable) OnMessage(m *astibob.Message) (err error) {
 
 func (l *listenable) onSamples(m *astibob.Message) (err error) {
 	// Parse payload
-	var ss Samples
-	if ss, err = parseSamplesPayload(m); err != nil {
+	var s Samples
+	if s, err = parseSamplesPayload(m); err != nil {
 		err = errors.Wrap(err, "audio_input: parsing samples payload failed")
 		return
 	}
 
 	// Custom
 	if l.o.OnSamples != nil {
-		if err = l.o.OnSamples(ss.Samples, ss.SampleRate, ss.SignificantBits, ss.SilenceMaxAudioLevel); err != nil {
+		if err = l.o.OnSamples(s.Samples, s.BitDepth, s.SampleRate, s.MaxSilenceAudioLevel); err != nil {
 			err = errors.Wrap(err, "audio_input: custom on samples failed")
 			return
 		}

@@ -4,9 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
-	"time"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
 )
 
@@ -15,17 +15,22 @@ const (
 	eventHearSamplesMessage = "event.hear.samples"
 )
 
-type SampleReader interface {
-	ReadSample() (int32, error)
+type Stream interface {
+	BitDepth() int
+	MaxSilenceAudioLevel() float64
+	Read() ([]int32, error)
+	SampleRate() float64
+	Start() error
+	Stop() error
 }
 
 type runnable struct {
 	*astibob.BaseRunnable
 	m *sync.Mutex
-	s SampleReader
+	s Stream
 }
 
-func NewRunnable(name string, s SampleReader) astibob.Runnable {
+func NewRunnable(name string, s Stream) astibob.Runnable {
 	// Create runnable
 	r := &runnable{
 		m: &sync.Mutex{},
@@ -44,35 +49,55 @@ func NewRunnable(name string, s SampleReader) astibob.Runnable {
 }
 
 func (r *runnable) onStart(ctx context.Context) (err error) {
-	t := time.NewTicker(2 * time.Second)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			// Create message
-			var m *astibob.Message
-			if m, err = r.newSamplesMessage([]int32{1, 2, 3}); err != nil {
-				err = errors.Wrap(err, "audio_input: creating sample message failed")
-				return
-			}
+	// Start stream
+	if err = r.s.Start(); err != nil {
+		err = errors.Wrap(err, "audio_input: starting stream failed")
+		return
+	}
 
-			// Dispatch
-			r.Dispatch(m)
-		case <-ctx.Done():
+	// Make sure to stop stream
+	defer func() {
+		if err := r.s.Stop(); err != nil {
+			astilog.Error(errors.Wrap(err, "audio_input: stopping stream failed"))
 			return
 		}
+	}()
+
+	// Read
+	for {
+		// Check context
+		if ctx.Err() != nil {
+			return
+		}
+
+		// Read
+		var b []int32
+		if b, err = r.s.Read(); err != nil {
+			err = errors.Wrap(err, "audio_input: reading failed")
+			return
+		}
+
+		// Create message
+		var m *astibob.Message
+		if m, err = r.newSamplesMessage(b); err != nil {
+			err = errors.Wrap(err, "audio_input: creating samples message failed")
+			return
+		}
+
+		// Dispatch
+		r.Dispatch(m)
 	}
 	return
 }
 
 type Samples struct {
+	BitDepth             int     `json:"bit_depth"`
+	MaxSilenceAudioLevel float64 `json:"max_silence_audio_level"`
 	Samples              []int32 `json:"samples"`
-	SampleRate           int     `json:"sample_rate"`
-	SignificantBits      int     `json:"significant_bits"`
-	SilenceMaxAudioLevel float64 `json:"silence_max_audio_level"`
+	SampleRate           float64 `json:"sample_rate"`
 }
 
-func (r *runnable) newSamplesMessage(samples []int32) (m *astibob.Message, err error) {
+func (r *runnable) newSamplesMessage(b []int32) (m *astibob.Message, err error) {
 	// Create message
 	m = astibob.NewMessage()
 
@@ -81,10 +106,10 @@ func (r *runnable) newSamplesMessage(samples []int32) (m *astibob.Message, err e
 
 	// Marshal
 	if m.Payload, err = json.Marshal(Samples{
-		Samples:              samples,
-		SampleRate:           1,
-		SignificantBits:      2,
-		SilenceMaxAudioLevel: 0.9,
+		BitDepth:             r.s.BitDepth(),
+		MaxSilenceAudioLevel: r.s.MaxSilenceAudioLevel(),
+		Samples:              b,
+		SampleRate:           r.s.SampleRate(),
 	}); err != nil {
 		err = errors.Wrap(err, "audio_input: marshaling payload failed")
 		return

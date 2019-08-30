@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (s *Speaker) Init() (err error) {
+func (s *Speaker) Initialize() (err error) {
 	// Initialize ole
 	astilog.Debug("speaker: initializing ole")
 	if err = ole.CoInitialize(0); err != nil {

@@ -34,8 +34,8 @@ func main() {
 	// Create speaker
 	s := speak.New(speak.Options{})
 
-	// Init speaker
-	if err := s.Init(); err != nil {
+	// Initialize speaker
+	if err := s.Initialize(); err != nil {
 		astilog.Fatal(errors.Wrap(err, "main: initializing speaker failed"))
 	}
 	defer s.Close()
@@ -49,8 +49,8 @@ func main() {
 	// Register listenables
 	w.RegisterListenables(worker.Listenable{
 		Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
-			OnSamples: func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) (err error) {
-				astilog.Warnf("samples: %+v - sample rate: %v - significant bits: %v - silence max audio level: %v", samples, sampleRate, significantBits, silenceMaxAudioLevel)
+			OnSamples: func(samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) (err error) {
+				astilog.Warnf("samples: %+v - bit depth: %v - sample rate: %v - max silence audio level: %v", samples, bitDepth, sampleRate, maxSilenceAudioLevel)
 				return
 			},
 		}),

@@ -1,6 +1,6 @@
 package speak
 
-func (s *Speaker) Init() error { return nil }
+func (s *Speaker) Initialize() error { return nil }
 
 func (s *Speaker) Close() error { return nil }
 
