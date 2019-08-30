@@ -1,4 +1,4 @@
-package speak
+package text_to_speech
 
 import (
 	"encoding/json"
@@ -27,7 +27,7 @@ func NewRunnable(name string, s Speaker) astibob.Runnable {
 	return &runnable{
 		BaseRunnable: astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
 			Metadata: astibob.Metadata{
-				Description: "Says words to your audio output using speech synthesis",
+				Description: "Converts text into spoken voice output using a form of speech synthesis",
 				Name:        name,
 			},
 		}),
@@ -40,7 +40,7 @@ func (r *runnable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case cmdSayMessage:
 		if err = r.onSay(m); err != nil {
-			err = errors.Wrap(err, "speak: on say failed")
+			err = errors.Wrap(err, "text_to_speech: on say failed")
 			return
 		}
 	}
@@ -56,7 +56,7 @@ func NewSayCmd(s string) astibob.Cmd {
 
 func parseSayPayload(m *astibob.Message) (s string, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
-		err = errors.Wrap(err, "speak: unmarshaling failed")
+		err = errors.Wrap(err, "text_to_speech: unmarshaling failed")
 		return
 	}
 	return
@@ -71,7 +71,7 @@ func (r *runnable) onSay(m *astibob.Message) (err error) {
 	// Parse payload
 	var s string
 	if s, err = parseSayPayload(m); err != nil {
-		err = errors.Wrap(err, "speak: parsing payload failed")
+		err = errors.Wrap(err, "text_to_speech: parsing payload failed")
 		return
 	}
 
@@ -81,7 +81,7 @@ func (r *runnable) onSay(m *astibob.Message) (err error) {
 
 	// Say
 	if err = r.s.Say(s); err != nil {
-		err = errors.Wrap(err, "speak: say failed")
+		err = errors.Wrap(err, "text_to_speech: say failed")
 		return
 	}
 	return

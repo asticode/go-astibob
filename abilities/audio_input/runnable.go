@@ -1,4 +1,4 @@
-package hear
+package audio_input
 
 import (
 	"context"
@@ -35,7 +35,7 @@ func NewRunnable(name string, s SampleReader) astibob.Runnable {
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
 		Metadata: astibob.Metadata{
-			Description: "Listens to an audio input and dispatches audio samples",
+			Description: "Reads an audio input and dispatches audio samples",
 			Name:        name,
 		},
 		OnStart: r.onStart,
@@ -52,7 +52,7 @@ func (r *runnable) onStart(ctx context.Context) (err error) {
 			// Create message
 			var m *astibob.Message
 			if m, err = r.newSamplesMessage([]int32{1, 2, 3}); err != nil {
-				err = errors.Wrap(err, "speak: creating sample message failed")
+				err = errors.Wrap(err, "audio_input: creating sample message failed")
 				return
 			}
 
@@ -86,7 +86,7 @@ func (r *runnable) newSamplesMessage(samples []int32) (m *astibob.Message, err e
 		SignificantBits:      2,
 		SilenceMaxAudioLevel: 0.9,
 	}); err != nil {
-		err = errors.Wrap(err, "speak: marshaling payload failed")
+		err = errors.Wrap(err, "audio_input: marshaling payload failed")
 		return
 	}
 	return
@@ -94,7 +94,7 @@ func (r *runnable) newSamplesMessage(samples []int32) (m *astibob.Message, err e
 
 func parseSamplesPayload(m *astibob.Message) (ss Samples, err error) {
 	if err = json.Unmarshal(m.Payload, &ss); err != nil {
-		err = errors.Wrap(err, "speak: unmarshaling failed")
+		err = errors.Wrap(err, "audio_input: unmarshaling failed")
 		return
 	}
 	return

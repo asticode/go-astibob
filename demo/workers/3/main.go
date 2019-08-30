@@ -4,7 +4,7 @@ import (
 	"flag"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astibob/abilities/hear"
+	"github.com/asticode/go-astibob/abilities/audio_input"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
 )
@@ -27,13 +27,13 @@ func main() {
 
 	// Register listenables
 	w.RegisterListenables(worker.Listenable{
-		Listenable: hear.NewListenable(hear.ListenableOptions{
+		Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
 			OnSamples: func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) (err error) {
 				astilog.Warnf("samples: %+v - sample rate: %v - significant bits: %v - silence max audio level: %v", samples, sampleRate, significantBits, silenceMaxAudioLevel)
 				return
 			},
 		}),
-		Runnable: "Hear",
+		Runnable: "Audio input",
 		Worker:   "Worker #2",
 	})
 

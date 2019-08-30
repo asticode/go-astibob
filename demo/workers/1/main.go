@@ -4,9 +4,9 @@ import (
 	"flag"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astibob/abilities/hear"
-	"github.com/asticode/go-astibob/abilities/speak"
-	"github.com/asticode/go-astibob/abilities/speak/speaker"
+	"github.com/asticode/go-astibob/abilities/audio_input"
+	"github.com/asticode/go-astibob/abilities/text_to_speech"
+	"github.com/asticode/go-astibob/abilities/text_to_speech/speak"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
 	"github.com/pkg/errors"
@@ -32,7 +32,7 @@ func main() {
 	w.HandleSignals()
 
 	// Create speaker
-	s := speaker.New(speaker.Options{})
+	s := speak.New(speak.Options{})
 
 	// Init speaker
 	if err := s.Init(); err != nil {
@@ -43,18 +43,18 @@ func main() {
 	// Register runnables
 	w.RegisterRunnables(worker.Runnable{
 		AutoStart: true,
-		Runnable:  speak.NewRunnable("Speak", s),
+		Runnable:  text_to_speech.NewRunnable("Text to Speech", s),
 	})
 
 	// Register listenables
 	w.RegisterListenables(worker.Listenable{
-		Listenable: hear.NewListenable(hear.ListenableOptions{
+		Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
 			OnSamples: func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) (err error) {
 				astilog.Warnf("samples: %+v - sample rate: %v - significant bits: %v - silence max audio level: %v", samples, sampleRate, significantBits, silenceMaxAudioLevel)
 				return
 			},
 		}),
-		Runnable: "Hear",
+		Runnable: "Audio input",
 		Worker:   "Worker #2",
 	})
 

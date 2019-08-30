@@ -1,4 +1,4 @@
-package speaker
+package speak
 
 func (s *Speaker) Init() error { return nil }
 

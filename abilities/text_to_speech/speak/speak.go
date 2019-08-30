@@ -1,4 +1,4 @@
-package speaker
+package speak
 
 import (
 	"os/exec"

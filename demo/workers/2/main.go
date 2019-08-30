@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astibob/abilities/hear"
-	"github.com/asticode/go-astibob/abilities/speak"
+	"github.com/asticode/go-astibob/abilities/audio_input"
+	"github.com/asticode/go-astibob/abilities/text_to_speech"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
 )
@@ -30,7 +30,7 @@ func main() {
 	// Register runnables
 	w.RegisterRunnables(worker.Runnable{
 		AutoStart: true,
-		Runnable:  hear.NewRunnable("Hear", nil),
+		Runnable:  audio_input.NewRunnable("Audio input", nil),
 	})
 
 	// Handle signals
@@ -45,7 +45,7 @@ func main() {
 	// TODO Testing
 	go func() {
 		time.Sleep(time.Second)
-		w.SendCmds("Worker #1", "Speak", speak.NewSayCmd("hello world"), speak.NewSayCmd("how are you today?"))
+		w.SendCmds("Worker #1", "Text to Speech", text_to_speech.NewSayCmd("hello world"), text_to_speech.NewSayCmd("how are you today?"))
 	}()
 
 	// Blocking pattern

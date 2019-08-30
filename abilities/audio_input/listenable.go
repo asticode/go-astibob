@@ -1,4 +1,4 @@
-package hear
+package audio_input
 
 import (
 	"github.com/asticode/go-astibob"
@@ -32,7 +32,7 @@ func (l *listenable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case eventHearSamplesMessage:
 		if err = l.onSamples(m); err != nil {
-			err = errors.Wrap(err, "hear: on samples failed")
+			err = errors.Wrap(err, "audio_input: on samples failed")
 			return
 		}
 	}
@@ -43,14 +43,14 @@ func (l *listenable) onSamples(m *astibob.Message) (err error) {
 	// Parse payload
 	var ss Samples
 	if ss, err = parseSamplesPayload(m); err != nil {
-		err = errors.Wrap(err, "hear: parsing samples payload failed")
+		err = errors.Wrap(err, "audio_input: parsing samples payload failed")
 		return
 	}
 
 	// Custom
 	if l.o.OnSamples != nil {
 		if err = l.o.OnSamples(ss.Samples, ss.SampleRate, ss.SignificantBits, ss.SilenceMaxAudioLevel); err != nil {
-			err = errors.Wrap(err, "hear: custom on samples failed")
+			err = errors.Wrap(err, "audio_input: custom on samples failed")
 			return
 		}
 	}
