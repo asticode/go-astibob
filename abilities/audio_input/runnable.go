@@ -47,7 +47,7 @@ type runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
 	cs []*calibration
-	l *listenable
+	l  *listenable
 	mc *sync.Mutex // Locks cs
 	s  Stream
 }
@@ -205,10 +205,7 @@ func (r *runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httpro
 	}
 
 	// Write results
-	if err := json.NewEncoder(rw).Encode(c.results()); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "audio_input: writing calibrate results failed"))
-		return
-	}
+	astibob.WriteHTTPData(rw, c.results())
 }
 
 type calibration struct {

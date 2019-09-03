@@ -185,7 +185,7 @@ type Worker struct {
 type RunnableMessage struct {
 	Metadata
 	Status      string `json:"status"`
-	WebHomepage string `json:"web_homepage"`
+	WebHomepage string `json:"web_homepage,omitempty"`
 }
 
 type Metadata struct {
