@@ -45,7 +45,7 @@ func main() {
 	s, err := p.NewDefaultStream(portaudio.StreamOptions{
 		BitDepth:             32,
 		BufferLength:         5000,
-		MaxSilenceAudioLevel: 35 * 1e6,
+		MaxSilenceAudioLevel: 10 * 1e6,
 		NumInputChannels:     1,
 		SampleRate:           sampleRate,
 	})

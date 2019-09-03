@@ -3,8 +3,9 @@ package worker
 import (
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"net/http"
-
+	"net/url"
 	"sort"
 
 	"github.com/asticode/go-astibob"
@@ -55,11 +56,19 @@ func (w *Worker) sendRegister() (err error) {
 		// Get runnable
 		r := w.rs[k]
 
-		// Append runnable
-		rs = append(rs, astibob.RunnableMessage{
+		// Create runnable message
+		rm := astibob.RunnableMessage{
 			Metadata: r.Metadata(),
 			Status:   r.Status(),
-		})
+		}
+
+		// Add web homepage
+		if _, ok := r.(astibob.Operatable); ok {
+			rm.WebHomepage = fmt.Sprintf("/workers/%s/runnables/%s/web/index", url.QueryEscape(w.name), url.QueryEscape(r.Metadata().Name))
+		}
+
+		// Append runnable
+		rs = append(rs, rm)
 	}
 	w.mr.Unlock()
 

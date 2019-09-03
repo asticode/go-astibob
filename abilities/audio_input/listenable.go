@@ -23,14 +23,14 @@ func newListenable(o ListenableOptions) *listenable {
 
 func (l *listenable) MessageNames() (ns []string) {
 	if l.o.OnSamples != nil {
-		ns = append(ns, eventHearSamplesMessage)
+		ns = append(ns, eventSamplesMessage)
 	}
 	return
 }
 
 func (l *listenable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
-	case eventHearSamplesMessage:
+	case eventSamplesMessage:
 		if err = l.onSamples(m); err != nil {
 			err = errors.Wrap(err, "audio_input: on samples failed")
 			return

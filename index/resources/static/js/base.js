@@ -40,7 +40,7 @@ let base = {
                                 menu.init(data.payload)
 
                                 // Custom callback
-                                if (typeof onLoad !== "undefined") onLoad(data.payload)
+                                if (typeof onLoad !== "undefined" && onLoad !== null) onLoad(data.payload)
                                 break
                         }
 
@@ -48,7 +48,7 @@ let base = {
                         menu.onMessage(data)
 
                         // Custom callback
-                        if (typeof onMessage !== "undefined") onMessage(data)
+                        if (typeof onMessage !== "undefined" && onMessage !== null) onMessage(data)
                     },
                     pingFunc: function() {
                         base.sendWebsocketMessage({

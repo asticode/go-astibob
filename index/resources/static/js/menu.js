@@ -148,20 +148,23 @@ let menu = {
         r.html.wrapper.className = "row"
         r.html.wrapper.title = r.description
 
-        // Create title
-        let title = r.name
-        if (typeof r.web_homepage !== "undefined") {
-            title = document.createElement("a")
-            title.href = r.web_homepage
-            title.innerText = r.name
-        }
-
         // Create name
         let name = document.createElement("div")
         name.className = "cell"
         name.style.paddingRight = "10px"
-        name.innerHTML = title
         r.html.wrapper.appendChild(name)
+
+        // Create title
+        let title
+        if (typeof r.web_homepage !== "undefined") {
+            title = document.createElement("a")
+            title.href = r.web_homepage
+            title.innerText = r.name
+        } else {
+            title = document.createElement("span")
+            title.innerText = r.name
+        }
+        name.appendChild(title)
 
         // Create toggle cell
         let cell = document.createElement("div")

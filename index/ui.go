@@ -157,7 +157,7 @@ func (i *Index) extendUIConnection(m *astibob.Message) (err error) {
 }
 
 func (i *Index) homepage(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	http.Redirect(rw, r, webPrefix+"/index", http.StatusPermanentRedirect)
+	http.Redirect(rw, r, "/web/index", http.StatusPermanentRedirect)
 }
 
 func (i *Index) web(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
@@ -169,6 +169,9 @@ func (i *Index) web(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 
 	// Get template data
 	data, code := i.templateData(name)
+
+	// Set content type
+	rw.Header().Set("Content-Type", "text/html; charset=UTF-8")
 
 	// Write header
 	rw.WriteHeader(code)

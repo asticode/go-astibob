@@ -1,0 +1,9 @@
+#calibration-results tr td:first-child {
+    font-weight: bold;
+    padding-right: 10px;
+    text-align: left;
+}
+
+#calibration-results tr td:last-child {
+    text-align: right;
+}

@@ -1,0 +1,18 @@
+{{ define "title" }}{{ .Worker }} - {{ .Runnable }}{{ end }}
+{{ define "css" }}
+<link rel="stylesheet" href="../routes/static/index.css"/>
+{{ end }}
+{{ define "html" }}
+<div class='header'>Calibration</div>
+<p>Click "Calibrate" to retrieve the max audio level as well as the current and suggested max silence audio level specific to your audio input.</p>
+<button class="color-default-front" id="btn-calibrate">Calibrate</button>
+<p id="calibration-results"></p>
+{{ end }}
+{{ define "js" }}
+<script type="text/javascript" src="../routes/static/lib/chart.js-2.7.1/chart.js.min.js"></script>
+<script type="text/javascript" src="../routes/static/index.js"></script>
+<script>
+    index.init();
+</script>
+{{ end }}
+{{ template "base" . }}

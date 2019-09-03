@@ -45,6 +45,12 @@ func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
 		// Set from
 		m.From = *w.runnableIdentifier(name)
 
+		// Dispatch message to itself
+		// Example: audio input calibration on samples
+		cm := m.Clone()
+		cm.To = w.runnableIdentifier(name)
+		w.d.Dispatch(cm)
+
 		// Lock
 		w.mo.Lock()
 		defer w.mo.Unlock()

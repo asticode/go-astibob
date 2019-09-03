@@ -1,3 +1,6 @@
+a:
+	go run cmd/operatable/main.go -v -as abilities
+
 i:
 	go run demo/index/main.go -v
 

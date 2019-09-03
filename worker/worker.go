@@ -204,7 +204,7 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 
 	// Create request
 	var req *http.Request
-	if req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/messages", mw.addr), bytes.NewReader(b)); err != nil {
+	if req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/messages", mw.addr), bytes.NewReader(b)); err != nil {
 		err = errors.Wrap(err, "worker: creating request failed")
 		return
 	}

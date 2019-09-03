@@ -28,8 +28,8 @@ func main() {
 	// Register listenables
 	w.RegisterListenables(worker.Listenable{
 		Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
-			OnSamples: func(samples []int32, sampleRate, significantBits int, silenceMaxAudioLevel float64) (err error) {
-				astilog.Warnf("samples: %+v - sample rate: %v - significant bits: %v - silence max audio level: %v", samples, sampleRate, significantBits, silenceMaxAudioLevel)
+			OnSamples: func(samples []int32, significantBits int, sampleRate, silenceMaxAudioLevel float64) (err error) {
+				astilog.Warnf("samples: %+v - sample rate: %v - significant bits: %v - silence max audio level: %v", len(samples), sampleRate, significantBits, silenceMaxAudioLevel)
 				return
 			},
 		}),

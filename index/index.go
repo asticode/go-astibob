@@ -2,6 +2,7 @@ package index
 
 import (
 	"fmt"
+	"net/http"
 	"path/filepath"
 	"sort"
 	"sync"
@@ -21,6 +22,7 @@ type Options struct {
 }
 
 type Index struct {
+	c  *http.Client
 	d  *astibob.Dispatcher
 	mw *sync.Mutex // Locks ws
 	o  Options
@@ -35,6 +37,7 @@ type Index struct {
 func New(o Options) (i *Index, err error) {
 	// Create index
 	i = &Index{
+		c:  &http.Client{},
 		mw: &sync.Mutex{},
 		o:  o,
 		w:  astiworker.NewWorker(),
