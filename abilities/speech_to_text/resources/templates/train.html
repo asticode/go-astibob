@@ -1,0 +1,17 @@
+{{ define "title" }}{{ .Worker }} - {{ .Runnable }} - Train your dataset{{ end }}
+{{ define "css" }}
+<link rel="stylesheet" href="../routes/static/train.css"/>
+{{ end }}
+{{ define "html" }}
+<div class="header">Train</div>
+<p>Click "Train" to begin training your dataset.</p>
+<button class="color-default-front" id="btn-train">Train</button>
+<div id="progress"></div>
+{{ end }}
+{{ define "js" }}
+<script type="text/javascript" src="../routes/static/train.js"></script>
+<script>
+    train.init();
+</script>
+{{ end }}
+{{ template "base" . }}

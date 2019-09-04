@@ -52,7 +52,7 @@ func (i *Index) updateRunnableStatus(m *astibob.Message) (err error) {
 	}
 
 	// Update status
-	if m.Name == astibob.EventRunnableStartedMessage {
+	if m.Name == astibob.RunnableStartedMessage {
 		r.Status = astibob.RunningStatus
 	} else {
 		r.Status = astibob.StoppedStatus

@@ -18,7 +18,7 @@ body > .table {
     width: 100%;
 }
 
-body > .table > .row .cell:first-child {
+body > .table > .row > .cell:first-child {
     width: 300px;
 }
 
@@ -106,6 +106,10 @@ input[type="text"]:focus {
     vertical-align: top;
 }
 
+#menu .table {
+    width: 100%;
+}
+
 .menu-worker {
     margin-bottom: 20px;
 }
@@ -125,66 +129,49 @@ input[type="text"]:focus {
     vertical-align: top;
 }
 
-#content .header {
+/* header */
+
+.header {
     border-bottom: solid 1px #333;
-    margin-bottom: 10px;
+    font-size: 20px;
+    margin: 10px 0;
 }
 
-.flex {
-    display: flex;
-    flex-flow: row wrap;
-    position: relative;
+#content > .header:first-child, div:first-child > .header {
+    margin-top: 0;
 }
 
-.panel-wrapper {
-    position: relative;
+/* panels */
+
+.panels {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-column-gap: 3px;
+    grid-row-gap: 3px;
 }
 
 .panel {
     background-color: #fff;
     border: solid 1px #dedee0;
     color: #5E6668;
-    margin-bottom: 6px;
     padding: 20px;
-    position: relative;
 }
 
 @media screen and (max-width: 1024px) {
-    .panel-wrapper {
-        width: 100%;
+    .panels {
+        grid-template-columns: repeat(1, 1fr);
     }
 }
 
 @media screen and (min-width: 1024px) and (max-width: 1600px) {
-    .panel-wrapper {
-        width: 50%;
-    }
-
-    .panel-wrapper:nth-child(2n) .panel {
-        margin-left: 3px;
-    }
-
-    .panel-wrapper:nth-child(2n+1) .panel {
-        margin-right: 3px;
+    .panels {
+        grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media screen and (min-width: 1600px) {
-    .panel-wrapper {
-        width: 33.333333333%;
-    }
-
-    .panel-wrapper:nth-child(3n) .panel {
-        margin-left: 3px;
-    }
-
-    .panel-wrapper:nth-child(3n+1) .panel {
-        margin-right: 3px;
-    }
-
-    .panel-wrapper:nth-child(3n+2) .panel {
-        margin-left: 3px;
-        margin-right: 3px;
+    .panels {
+        grid-template-columns: repeat(3, 1fr);
     }
 }
 

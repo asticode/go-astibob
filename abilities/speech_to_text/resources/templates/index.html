@@ -1,0 +1,25 @@
+{{ define "title" }}{{ .Worker }} - {{ .Runnable }}{{ end }}
+{{ define "css" }}{{ end }}
+{{ define "html" }}
+<div class="panels">
+    <a href="build">
+        <div class="panel">
+            <div class="title">Build your dataset</div>
+            <div class="description">Use an audio input to record and add speeches to your dataset</div>
+        </div>
+    </a>
+    <a href="train">
+        <div class="panel">
+            <div class="title">Train your dataset</div>
+            <div class="description">Prepare and train your dataset to get a model specific to your needs</div>
+        </div>
+    </a>
+</div>
+{{ end }}
+{{ define "js" }}
+<script type="text/javascript" src="../routes/static/index.js"></script>
+<script>
+    index.init();
+</script>
+{{ end }}
+{{ template "base" . }}

@@ -74,7 +74,7 @@ func (w *Worker) sendRegister() (err error) {
 
 	// Create register message
 	var m *astibob.Message
-	if m, err = astibob.NewCmdWorkerRegisterMessage(*w.workerIdentifier(), &astibob.Identifier{
+	if m, err = astibob.NewWorkerRegisterMessage(*w.workerIdentifier(), &astibob.Identifier{
 		Type: astibob.IndexIdentifierType,
 	}, astibob.Worker{
 		Addr:      "http://" + w.o.Server.Addr,
@@ -93,7 +93,7 @@ func (w *Worker) sendRegister() (err error) {
 func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
 	var ws []astibob.Worker
-	if ws, err = astibob.ParseEventWorkerWelcomePayload(m); err != nil {
+	if ws, err = astibob.ParseWorkerWelcomePayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing message payload failed")
 		return
 	}
@@ -151,7 +151,7 @@ func (w *Worker) sendMessageToIndex(m *astibob.Message) (err error) {
 func (w *Worker) registerWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var mw astibob.Worker
-	if mw, err = astibob.ParseEventWorkerRegisteredPayload(m); err != nil {
+	if mw, err = astibob.ParseWorkerRegisteredPayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing registered payload failed")
 		return
 	}
@@ -188,7 +188,7 @@ func (w *Worker) addWorker(m astibob.Worker) {
 func (w *Worker) unregisterWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
-	if name, err = astibob.ParseEventWorkerDisconnectedPayload(m); err != nil {
+	if name, err = astibob.ParseWorkerDisconnectedPayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing registered payload failed")
 		return
 	}

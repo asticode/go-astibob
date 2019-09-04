@@ -65,15 +65,15 @@ func New(o Options) (i *Index, err error) {
 	}
 
 	// Add dispatcher handlers
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdUIPingMessage)}, i.extendUIConnection)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdWorkerRegisterMessage)}, i.addWorker)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIPingMessage)}, i.extendUIConnection)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{Names: map[string]bool{
-		astibob.EventRunnableCrashedMessage: true,
-		astibob.EventRunnableStartedMessage: true,
-		astibob.EventRunnableStoppedMessage: true,
+		astibob.RunnableCrashedMessage: true,
+		astibob.RunnableStartedMessage: true,
+		astibob.RunnableStoppedMessage: true,
 	}}, i.updateRunnableStatus)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventUIDisconnectedMessage)}, i.unregisterUI)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, i.delWorker)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIDisconnectedMessage)}, i.unregisterUI)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, i.delWorker)
 	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
 		astibob.RunnableIdentifierType: true,
 		astibob.WorkerIdentifierType:   true,

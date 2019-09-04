@@ -4,8 +4,8 @@
 .toggle {
     position: relative;
     display: inline-block;
-    width: 60px;
-    height: 34px;
+    width: 6em;
+    height: 3.4em;
 }
 
 /* The slider */
@@ -19,16 +19,16 @@
     background-color: #d9534f;
     -webkit-transition: .4s;
     transition: .4s;
-    border-radius: 34px;
+    border-radius: 3.4em;
 }
 
 .slider:before {
     position: absolute;
     content: "";
-    height: 26px;
-    width: 26px;
-    left: 4px;
-    bottom: 4px;
+    height: 2.6em;
+    width: 2.6em;
+    left: 0.4em;
+    bottom: 0.4em;
     background-color: white;
     -webkit-transition: .4s;
     transition: .4s;
@@ -40,7 +40,7 @@
 }
 
 .toggle.on .slider:before {
-    -webkit-transform: translateX(26px);
-    -ms-transform: translateX(26px);
-    transform: translateX(26px);
+    -webkit-transform: translateX(2.6em);
+    -ms-transform: translateX(2.6em);
+    transform: translateX(2.6em);
 }

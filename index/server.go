@@ -30,7 +30,9 @@ func (i *Index) Serve() {
 	r.GET("/websockets/worker", i.handleWorkerWebsocket)
 
 	// Runnable
-	r.GET("/workers/:worker/runnables/:runnable/routes/*path", i.runnableRoutes)
+	for _, m := range []string{http.MethodDelete, http.MethodGet, http.MethodPatch, http.MethodPost} {
+		r.Handle(m, "/workers/:worker/runnables/:runnable/routes/*path", i.runnableRoutes)
+	}
 	r.GET("/workers/:worker/runnables/:runnable/web/*path", i.runnableWeb)
 
 	// Chain middlewares

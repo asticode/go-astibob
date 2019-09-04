@@ -32,7 +32,7 @@ let base = {
 
                         // Switch on name
                         switch (data.name) {
-                            case consts.messageNames.eventUIWelcome:
+                            case consts.messageNames.uiWelcome:
                                 // Update from
                                 base.from.name = data.payload.name
 
@@ -40,7 +40,11 @@ let base = {
                                 menu.init(data.payload)
 
                                 // Custom callback
-                                if (typeof onLoad !== "undefined" && onLoad !== null) onLoad(data.payload)
+                                if (typeof onLoad !== "undefined" && onLoad !== null) {
+                                    onLoad(data.payload)
+                                } else {
+                                    base.finish()
+                                }
                                 break
                         }
 
@@ -52,7 +56,7 @@ let base = {
                     },
                     pingFunc: function() {
                         base.sendWebsocketMessage({
-                            name: consts.messageNames.cmdUIPing,
+                            name: consts.messageNames.uiPing,
                             to: {type: consts.identifierTypes.index},
                         })
                     },
@@ -64,7 +68,7 @@ let base = {
         asticode.loader.hide()
     },
     httpError: function(data) {
-        asticode.notifier.error(data.responseJSON.message)
+        if (typeof data.responseJSON !== "undefined") asticode.notifier.error(data.responseJSON.message)
         asticode.loader.hide();
     },
     sendWebsocketMessage: function(m) {

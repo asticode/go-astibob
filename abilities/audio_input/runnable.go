@@ -25,7 +25,7 @@ import (
 
 // Message names
 const (
-	eventSamplesMessage = "event.samples"
+	samplesMessage = "audio_input.samples"
 )
 
 // Vars
@@ -43,18 +43,18 @@ type Stream interface {
 	Stop() error
 }
 
-type runnable struct {
+type Runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
 	cs []*calibration
-	l  *listenable
+	l  *Listenable
 	mc *sync.Mutex // Locks cs
 	s  Stream
 }
 
-func NewRunnable(name string, s Stream) astibob.Runnable {
+func NewRunnable(name string, s Stream) *Runnable {
 	// Create runnable
-	r := &runnable{
+	r := &Runnable{
 		BaseOperatable: newBaseOperatable(),
 		mc:             &sync.Mutex{},
 		s:              s,
@@ -77,7 +77,15 @@ func NewRunnable(name string, s Stream) astibob.Runnable {
 	return r
 }
 
-func (r *runnable) onStart(ctx context.Context) (err error) {
+func (r *Runnable) MessageNames() []string {
+	return r.l.MessageNames()
+}
+
+func (r *Runnable) OnMessage(m *astibob.Message) error {
+	return r.l.OnMessage(m)
+}
+
+func (r *Runnable) onStart(ctx context.Context) (err error) {
 	// Start stream
 	if err = r.s.Start(); err != nil {
 		err = errors.Wrap(err, "audio_input: starting stream failed")
@@ -126,12 +134,12 @@ type Samples struct {
 	Samples              []int32 `json:"samples"`
 }
 
-func (r *runnable) newSamplesMessage(b []int32) (m *astibob.Message, err error) {
+func (r *Runnable) newSamplesMessage(b []int32) (m *astibob.Message, err error) {
 	// Create message
 	m = astibob.NewMessage()
 
 	// Set name
-	m.Name = eventSamplesMessage
+	m.Name = samplesMessage
 
 	// Marshal
 	if m.Payload, err = json.Marshal(Samples{
@@ -154,11 +162,7 @@ func parseSamplesPayload(m *astibob.Message) (ss Samples, err error) {
 	return
 }
 
-func (r *runnable) OnMessage(m *astibob.Message) error {
-	return r.l.OnMessage(m)
-}
-
-func (r *runnable) onSamples(samples []int32, _ int, _, _ float64) (err error) {
+func (r *Runnable) onSamples(_ astibob.Identifier, samples []int32, _ int, _, _ float64) (err error) {
 	// Lock
 	r.mc.Lock()
 
@@ -184,7 +188,7 @@ func (r *runnable) onSamples(samples []int32, _ int, _, _ float64) (err error) {
 	return
 }
 
-func (r *runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
+func (r *Runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
 	// Set content type
 	rw.Header().Set("Content-Type", "application/json")
 
@@ -217,7 +221,7 @@ type calibration struct {
 	s      Stream
 }
 
-func (r *runnable) newCalibration() (c *calibration) {
+func (r *Runnable) newCalibration() (c *calibration) {
 	// Create calibration
 	c = &calibration{
 		c:  sync.NewCond(&sync.Mutex{}),

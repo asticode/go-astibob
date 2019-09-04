@@ -67,7 +67,7 @@ func (w *Worker) sendRegisterListenables(worker string) (err error) {
 
 		// Create message
 		var m *astibob.Message
-		if m, err = astibob.NewCmdListenablesRegisterMessage(
+		if m, err = astibob.NewListenablesRegisterMessage(
 			*w.workerIdentifier(),
 			astibob.NewWorkerIdentifier(worker),
 			astibob.Listenables{
@@ -95,14 +95,9 @@ func (w *Worker) registerListenables(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Only register listenables from other workers
-	if worker == w.name {
-		return
-	}
-
 	// Parse payload
 	var l astibob.Listenables
-	if l, err = astibob.ParseCmdListenablesRegisterPayload(m); err != nil {
+	if l, err = astibob.ParseListenablesRegisterPayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing register payload failed")
 		return
 	}

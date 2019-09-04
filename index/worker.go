@@ -93,7 +93,7 @@ func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 		}
 
 		// When the worker registers, we need to register the client
-		if m.Name == astibob.CmdWorkerRegisterMessage && m.From.Name != nil {
+		if m.Name == astibob.WorkerRegisterMessage && m.From.Name != nil {
 			i.ww.RegisterClient(*m.From.Name, c)
 		}
 
@@ -124,7 +124,7 @@ func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
 func (i *Index) addWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var mw astibob.Worker
-	if mw, err = astibob.ParseCmdWorkerRegisterPayload(m); err != nil {
+	if mw, err = astibob.ParseWorkerRegisterPayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing payload failed")
 		return
 	}
@@ -148,7 +148,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 		// Create disconnected message
 		var m *astibob.Message
-		if m, err = astibob.NewEventWorkerDisconnectedMessage(
+		if m, err = astibob.NewWorkerDisconnectedMessage(
 			*astibob.NewIndexIdentifier(),
 			&astibob.Identifier{Types: map[string]bool{
 				astibob.UIIdentifierType:     true,
@@ -169,7 +169,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	astilog.Infof("index: worker %s has registered", w.name)
 
 	// Create welcome message
-	if m, err = astibob.NewEventWorkerWelcomeMessage(
+	if m, err = astibob.NewWorkerWelcomeMessage(
 		*astibob.NewIndexIdentifier(),
 		astibob.NewWorkerIdentifier(w.name),
 		i.workers(),
@@ -182,7 +182,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	i.d.Dispatch(m)
 
 	// Create registered message
-	if m, err = astibob.NewEventWorkerRegisteredMessage(
+	if m, err = astibob.NewWorkerRegisteredMessage(
 		*astibob.NewIndexIdentifier(),
 		&astibob.Identifier{Types: map[string]bool{
 			astibob.UIIdentifierType:     true,
@@ -202,7 +202,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 func (i *Index) delWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
-	if name, err = astibob.ParseEventWorkerDisconnectedPayload(m); err != nil {
+	if name, err = astibob.ParseWorkerDisconnectedPayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing message payload failed")
 		return
 	}

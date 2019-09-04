@@ -6,31 +6,31 @@ import (
 )
 
 type ListenableOptions struct {
-	OnSamples func(samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) error
+	OnSamples func(from astibob.Identifier, samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) error
 }
 
-func NewListenable(o ListenableOptions) astibob.Listenable {
-	return newListenable(o)
-}
-
-type listenable struct {
+type Listenable struct {
 	o ListenableOptions
 }
 
-func newListenable(o ListenableOptions) *listenable {
-	return &listenable{o: o}
+func NewListenable(o ListenableOptions) *Listenable {
+	return newListenable(o)
 }
 
-func (l *listenable) MessageNames() (ns []string) {
+func newListenable(o ListenableOptions) *Listenable {
+	return &Listenable{o: o}
+}
+
+func (l *Listenable) MessageNames() (ns []string) {
 	if l.o.OnSamples != nil {
-		ns = append(ns, eventSamplesMessage)
+		ns = append(ns, samplesMessage)
 	}
 	return
 }
 
-func (l *listenable) OnMessage(m *astibob.Message) (err error) {
+func (l *Listenable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
-	case eventSamplesMessage:
+	case samplesMessage:
 		if err = l.onSamples(m); err != nil {
 			err = errors.Wrap(err, "audio_input: on samples failed")
 			return
@@ -39,7 +39,7 @@ func (l *listenable) OnMessage(m *astibob.Message) (err error) {
 	return
 }
 
-func (l *listenable) onSamples(m *astibob.Message) (err error) {
+func (l *Listenable) onSamples(m *astibob.Message) (err error) {
 	// Parse payload
 	var s Samples
 	if s, err = parseSamplesPayload(m); err != nil {
@@ -49,7 +49,7 @@ func (l *listenable) onSamples(m *astibob.Message) (err error) {
 
 	// Custom
 	if l.o.OnSamples != nil {
-		if err = l.o.OnSamples(s.Samples, s.BitDepth, s.SampleRate, s.MaxSilenceAudioLevel); err != nil {
+		if err = l.o.OnSamples(m.From, s.Samples, s.BitDepth, s.SampleRate, s.MaxSilenceAudioLevel); err != nil {
 			err = errors.Wrap(err, "audio_input: custom on samples failed")
 			return
 		}

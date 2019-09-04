@@ -10,21 +10,21 @@ import (
 
 // Message names
 const (
-	cmdSayMessage = "cmd.say"
+	sayMessage = "text_to_speech.say"
 )
 
 type Speaker interface {
 	Say(s string) error
 }
 
-type runnable struct {
+type Runnable struct {
 	*astibob.BaseRunnable
 	m *sync.Mutex
 	s Speaker
 }
 
-func NewRunnable(name string, s Speaker) astibob.Runnable {
-	return &runnable{
+func NewRunnable(name string, s Speaker) *Runnable {
+	return &Runnable{
 		BaseRunnable: astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
 			Metadata: astibob.Metadata{
 				Description: "Converts text into spoken voice output using a form of speech synthesis",
@@ -36,9 +36,9 @@ func NewRunnable(name string, s Speaker) astibob.Runnable {
 	}
 }
 
-func (r *runnable) OnMessage(m *astibob.Message) (err error) {
+func (r *Runnable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
-	case cmdSayMessage:
+	case sayMessage:
 		if err = r.onSay(m); err != nil {
 			err = errors.Wrap(err, "text_to_speech: on say failed")
 			return
@@ -47,14 +47,14 @@ func (r *runnable) OnMessage(m *astibob.Message) (err error) {
 	return
 }
 
-func NewSayCmd(s string) astibob.Cmd {
-	return astibob.Cmd{
-		Name:    cmdSayMessage,
+func NewSayMessage(s string) astibob.MessageContent {
+	return astibob.MessageContent{
+		Name:    sayMessage,
 		Payload: s,
 	}
 }
 
-func parseSayPayload(m *astibob.Message) (s string, err error) {
+func parseSayCmdPayload(m *astibob.Message) (s string, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
 		err = errors.Wrap(err, "text_to_speech: unmarshaling failed")
 		return
@@ -62,7 +62,7 @@ func parseSayPayload(m *astibob.Message) (s string, err error) {
 	return
 }
 
-func (r *runnable) onSay(m *astibob.Message) (err error) {
+func (r *Runnable) onSay(m *astibob.Message) (err error) {
 	// Check status
 	if r.Status() != astibob.RunningStatus {
 		return
@@ -70,7 +70,7 @@ func (r *runnable) onSay(m *astibob.Message) (err error) {
 
 	// Parse payload
 	var s string
-	if s, err = parseSayPayload(m); err != nil {
+	if s, err = parseSayCmdPayload(m); err != nil {
 		err = errors.Wrap(err, "text_to_speech: parsing payload failed")
 		return
 	}

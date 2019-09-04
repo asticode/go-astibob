@@ -1,0 +1,79 @@
+#options .cell {
+    padding-right: 10px;
+}
+
+#options .toggle {
+    font-size: 8px;
+    display: block;
+}
+
+#new-speeches, #validated-speeches {
+    display: none;
+}
+
+.speech-grid {
+    display: grid;
+    grid-auto-rows: 1fr;
+    grid-column-gap: 3px;
+    grid-row-gap: 3px;
+    margin-bottom: 15px;
+}
+
+.speech-grid:last-child {
+    margin-bottom: 0;
+}
+
+@media screen and (max-width: 800px) {
+    .speech-grid {
+        grid-template-columns: repeat(1, 1fr);
+    }
+}
+
+@media screen and (min-width: 800px) and (max-width: 1200px) {
+    .speech-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media screen and (min-width: 1200px) and (max-width: 1600px) {
+    .speech-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
+}
+
+@media screen and (min-width: 1600px) {
+    .speech-grid {
+        grid-template-columns: repeat(4, 1fr);
+    }
+}
+
+.speech-wrapper {
+    background-color: white;
+    border: solid 1px #dedee0;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.speech-wrapper input {
+    border: solid 1px #dedee0;
+    border-radius: 4px;
+    font-size: 13px;
+    height: 30px;
+    padding: 7px 10px;
+    width: 100%;
+}
+
+.speech-wrapper input:focus {
+    outline: 0;
+}
+
+.speech-wrapper .cell:last-child {
+    width: 40px;
+}
+
+.speech-wrapper img {
+    cursor: pointer;
+    display: block;
+    height: 30px;
+    padding-left: 10px;
+}

@@ -2,13 +2,16 @@ a:
 	go run cmd/operatable/main.go -v -as abilities
 
 i:
-	go run demo/index/main.go -v
+	go run demo/index/main.go
 
 w1:
-	go run demo/workers/1/main.go -v
+	go run demo/workers/1/main.go
 
 w2:
-	go run demo/workers/2/main.go -v
+	go run demo/workers/2/main.go
 
 w3:
-	go run demo/workers/3/main.go -v
+	CGO_CXXFLAGS="-I${CURDIR}/demo/tmp/deepspeech/include" \
+	LIBRARY_PATH=${CURDIR}/demo/tmp/deepspeech/lib:${LIBRARY_PATH} \
+	LD_LIBRARY_PATH=${CURDIR}/demo/tmp/deepspeech/lib:${LD_LIBRARY_PATH} \
+	go run demo/workers/3/main.go

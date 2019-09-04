@@ -23,10 +23,10 @@ let index = {
 
     onMessage: function(data) {
         switch (data.name) {
-            case consts.messageNames.eventWorkerDisconnected:
+            case consts.messageNames.workerDisconnected:
                 index.removeWorker(data.payload)
                 break
-            case consts.messageNames.eventWorkerRegistered:
+            case consts.messageNames.workerRegistered:
                 index.addWorker(data.payload)
                 break
         }
@@ -62,7 +62,6 @@ let index = {
 
         // Create wrapper
         r.html.wrapper = document.createElement("div")
-        r.html.wrapper.className = "index-worker"
 
         // Create name
         let name = document.createElement("div")
@@ -70,10 +69,10 @@ let index = {
         name.innerText = data.name
         r.html.wrapper.appendChild(name)
 
-        // Create flex
-        r.html.flex = document.createElement("div")
-        r.html.flex.className = "flex"
-        r.html.wrapper.appendChild(r.html.flex)
+        // Create panels
+        r.html.panels = document.createElement("div")
+        r.html.panels.className = "panels"
+        r.html.wrapper.appendChild(r.html.panels)
 
         // Loop through runnables
         if (typeof data.runnables !== "undefined") {
@@ -124,7 +123,7 @@ let index = {
         let runnable = index.newRunnable(worker, data)
 
         // Add in alphabetical order
-        asticode.tools.appendSorted(worker.html.flex, runnable, worker.runnables)
+        asticode.tools.appendSorted(worker.html.panels, runnable, worker.runnables)
 
         // Append to pool
         worker.runnables[runnable.name] = runnable
@@ -140,24 +139,21 @@ let index = {
             worker_name: worker.name,
         }
 
-        // Create wrapper
-        r.html.wrapper = document.createElement("div")
-        r.html.wrapper.className = "panel-wrapper"
-
-        // Create link
-        let wrapper = r.html.wrapper
-        if (typeof r.web_homepage !== "undefined") {
-            wrapper = document.createElement("a")
-            wrapper.href = r.web_homepage
-            r.html.wrapper.appendChild(wrapper)
-        }
-
         // Create panel
         let panel = document.createElement("div")
         panel.className = "panel"
-        wrapper.appendChild(panel)
 
-        // Create name
+        // Create link
+        if (typeof r.web_homepage !== "undefined") {
+            let link = document.createElement("a")
+            link.href = r.web_homepage
+            link.appendChild(panel)
+            r.html.wrapper = link
+        } else {
+            r.html.wrapper = panel
+        }
+
+        // Create title
         let name = document.createElement("div")
         name.className = "title"
         name.innerText = r.name

@@ -1,0 +1,36 @@
+{{ define "title" }}{{ .Worker }} - {{ .Runnable }} - Build your dataset{{ end }}
+{{ define "css" }}
+<link rel="stylesheet" href="../routes/static/build.css"/>
+{{ end }}
+{{ define "html" }}
+<div>
+    <div class="header">Options</div>
+    <div class="table" id="options">
+        <div class="row">
+            <div class="cell">Store new speeches</div>
+            <div class="cell">
+                <label class="toggle" id="store-new-speeches">
+                    <span class="slider"></span>
+                </label>
+            </div>
+        </div>
+    </div>
+</div>
+<div id="new-speeches">
+    <div class="header">New speeches</div>
+    <p>Listen to the audio, write the transcript and press "Enter" to validate or "Ctrl+Enter" to remove new speeches.</p>
+    <div class="speech-grid"></div>
+</div>
+<div id="validated-speeches">
+    <div class="header">Validated speeches</div>
+    <p>Listen to the audio, update the transcript and press "Enter" to update or "Ctrl+Enter" to remove.</p>
+    <div class="speech-grid"></div>
+</div>
+{{ end }}
+{{ define "js" }}
+<script type="text/javascript" src="../routes/static/build.js"></script>
+<script>
+    build.init();
+</script>
+{{ end }}
+{{ template "base" . }}

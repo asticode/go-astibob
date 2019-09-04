@@ -84,3 +84,10 @@ func ContentHandle(path string, c []byte) httprouter.Handle {
 		}
 	}
 }
+
+func DirHandle(path string) httprouter.Handle {
+	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
+		req.URL.Path = ps.ByName("path")
+		http.FileServer(http.Dir(path)).ServeHTTP(w, req)
+	}
+}

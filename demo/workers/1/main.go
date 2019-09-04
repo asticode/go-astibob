@@ -4,7 +4,6 @@ import (
 	"flag"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astibob/abilities/audio_input"
 	"github.com/asticode/go-astibob/abilities/text_to_speech"
 	"github.com/asticode/go-astibob/abilities/text_to_speech/speak"
 	"github.com/asticode/go-astibob/worker"
@@ -44,18 +43,6 @@ func main() {
 	w.RegisterRunnables(worker.Runnable{
 		AutoStart: true,
 		Runnable:  text_to_speech.NewRunnable("Text to Speech", s),
-	})
-
-	// Register listenables
-	w.RegisterListenables(worker.Listenable{
-		Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
-			OnSamples: func(samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) (err error) {
-				astilog.Warnf("samples: %+v - bit depth: %v - sample rate: %v - max silence audio level: %v", len(samples), bitDepth, sampleRate, maxSilenceAudioLevel)
-				return
-			},
-		}),
-		Runnable: "Audio input",
-		Worker:   "Worker #2",
 	})
 
 	// Serve

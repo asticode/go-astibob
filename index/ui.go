@@ -35,7 +35,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		c.SetListener(astiws.EventNameDisconnect, func(_ *astiws.Client, _ string, _ json.RawMessage) (err error) {
 			// Create disconnected message
 			var m *astibob.Message
-			if m, err = astibob.NewEventUIDisconnectedMessage(
+			if m, err = astibob.NewUIDisconnectedMessage(
 				*astibob.NewIndexIdentifier(),
 				nil,
 				name,
@@ -57,7 +57,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 
 		// Create welcome message
 		var m *astibob.Message
-		if m, err = astibob.NewEventUIWelcomeMessage(
+		if m, err = astibob.NewUIWelcomeMessage(
 			*astibob.NewIndexIdentifier(),
 			astibob.NewUIIdentifier(name),
 			astibob.WelcomeUI{
@@ -121,7 +121,7 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
-	if name, err = astibob.ParseEventUIDisconnectedPayload(m); err != nil {
+	if name, err = astibob.ParseUIDisconnectedPayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing message payload failed")
 		return
 	}

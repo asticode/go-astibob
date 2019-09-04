@@ -63,12 +63,12 @@ func New(name string, o Options) (w *Worker) {
 	w.cw.SetMessageHandler(w.handleIndexMessage)
 
 	// Add dispatcher handlers
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdListenablesRegisterMessage)}, w.registerListenables)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdRunnableStartMessage)}, w.startRunnableFromMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.CmdRunnableStopMessage)}, w.stopRunnableFromMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerRegisteredMessage)}, w.registerWorker)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerDisconnectedMessage)}, w.unregisterWorker)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.EventWorkerWelcomeMessage)}, w.finishRegistration)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.ListenablesRegisterMessage)}, w.registerListenables)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisteredMessage)}, w.registerWorker)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, w.unregisterWorker)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeMessage)}, w.finishRegistration)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
 		astibob.IndexIdentifierType: true,
 		astibob.UIIdentifierType:    true,
