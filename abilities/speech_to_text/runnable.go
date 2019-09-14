@@ -21,6 +21,7 @@ import (
 	"github.com/cryptix/wav"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
+	"github.com/asticode/go-astitools/limiter"
 )
 
 // Message names
@@ -66,6 +67,7 @@ type SpeechFile struct {
 type Runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
+	b *astilimiter.Bucket
 	c   *astisync.Chan
 	i   *os.File
 	mp  *sync.Mutex // Locks pg
@@ -114,6 +116,9 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 		},
 		OnStart: r.onStart,
 	})
+
+	// Create progress limiter
+	r.b = astilimiter.New().Add("progress", 20, time.Second)
 	return r
 }
 
@@ -159,6 +164,11 @@ func (r *Runnable) Close() {
 	// Close index
 	if r.i != nil {
 		r.i.Close()
+	}
+
+	// Close limiter
+	if r.b != nil {
+		r.b.Close()
 	}
 }
 
@@ -776,6 +786,11 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 }
 
 func (r *Runnable) progressFunc(p Progress) {
+	// Rate limit here in case Parser is spamming
+	if !r.b.Inc() {
+		return
+	}
+
 	// No progress
 	if r.pg == nil {
 		return
@@ -787,8 +802,6 @@ func (r *Runnable) progressFunc(p Progress) {
 	} else {
 		*r.pg = p
 	}
-
-	// TODO Add rate limiter in case Parser is spamming
 
 	// Create message
 	m, err := r.newProgressMessage(p)
