@@ -44,7 +44,6 @@ type Progress struct {
 	CurrentStep string   `json:"current_step"`
 	Error       error    `json:"-"`
 	Progress    float64  `json:"progress"`  // In percentage
-	Remaining   int      `json:"remaining"` // In seconds
 	Steps       []string `json:"steps"`
 }
 

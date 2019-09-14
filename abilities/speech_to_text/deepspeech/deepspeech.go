@@ -137,7 +137,6 @@ func (d *DeepSpeech) Train(speeches []speech_to_text.SpeechFile, progressFunc fu
 func (d *DeepSpeech) handleError(speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress)) (p speech_to_text.Progress, h []byte, err error) {
 	// Create progress
 	p = speech_to_text.Progress{
-		Remaining: -1,
 		Steps: []string{
 			checkingStep,
 			preparingStep,
