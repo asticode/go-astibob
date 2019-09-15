@@ -98,13 +98,33 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 		return
 	}
 
-	// TODO Shouldn't we reset both ui and worker pools in case ui or worker have disconnected since last time index
-	// was alive?
+	// Reset uis
+	w.resetUIs()
 
-	// Loop through uis
+	// Add uis
 	for _, u := range wl.UIs {
 		w.addUI(u)
 	}
+
+	// Index workers
+	iws := make(map[string]bool)
+	for _, w := range wl.Workers {
+		iws[w.Name] = true
+	}
+
+	// Remove useless other workers listenables
+	w.mo.Lock()
+	for r, ws := range w.ols {
+		for n := range ws {
+			if _, ok := iws[n]; !ok {
+				delete(w.ols[r], n)
+			}
+		}
+	}
+	w.mo.Unlock()
+
+	// Reset workers
+	w.resetWorkers()
 
 	// Loop through workers
 	for _, mw := range wl.Workers {
@@ -178,6 +198,15 @@ func (w *Worker) registerWorker(m *astibob.Message) (err error) {
 		return
 	}
 	return
+}
+
+func (w *Worker) resetWorkers() {
+	// Lock
+	w.mw.Lock()
+	defer w.mw.Unlock()
+
+	// Reset
+	w.ws = make(map[string]*worker)
 }
 
 func (w *Worker) addWorker(m astibob.Worker) {

@@ -19,6 +19,15 @@ func (w *Worker) registerUI(m *astibob.Message) (err error) {
 	return
 }
 
+func (w *Worker) resetUIs() {
+	// Lock
+	w.mu.Lock()
+	defer w.mu.Unlock()
+
+	// Reset
+	w.us = make(map[string]map[string]bool)
+}
+
 func (w *Worker) addUI(u astibob.UI) {
 	// Lock
 	w.mu.Lock()
