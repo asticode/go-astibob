@@ -18,7 +18,11 @@ let train = {
 
                 // Create progresser
                 train.progresser = asticode.progresser.new({
-                    error: function(error) { asticode.notifier.error(error) },
+                    error: function(error) {
+                        let e = document.getElementById("error")
+                        e.innerText = error
+                        e.style.display = "block"
+                    },
                     root: document.getElementById("progress"),
                 })
 
@@ -39,6 +43,9 @@ let train = {
     onMessage: function(data) {
         switch (data.name) {
             case "speech_to_text.progress":
+                // Refresh error
+                document.getElementById("error").style.display = "none"
+
                 // Update progress
                 train.progresser.update(data.payload)
                 break

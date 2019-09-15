@@ -1,5 +1,16 @@
+#error {
+    background-color: #f2dede;
+    border: solid 1px #dca7a7;
+    border-radius: 5px;
+    color: #a94442;
+    display: none;
+    margin-bottom: 20px;
+    padding: 15px;
+    text-align: center;
+    width: 100%;
+}
+
 #progress {
-    margin-top: 15px;
     width: 100%;
 }
 

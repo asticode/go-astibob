@@ -17,11 +17,11 @@ import (
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
 	astiaudio "github.com/asticode/go-astitools/audio"
+	astilimiter "github.com/asticode/go-astitools/limiter"
 	astisync "github.com/asticode/go-astitools/sync"
 	"github.com/cryptix/wav"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
-	"github.com/asticode/go-astitools/limiter"
 )
 
 // Message names
@@ -43,8 +43,21 @@ type Parser interface {
 type Progress struct {
 	CurrentStep string   `json:"current_step"`
 	Error       error    `json:"-"`
-	Progress    float64  `json:"progress"`  // In percentage
+	Progress    float64  `json:"progress"` // In percentage
 	Steps       []string `json:"steps"`
+}
+
+type ProgressJSON struct {
+	Progress
+	Error string `json:"error,omitempty"`
+}
+
+func newProgressJSON(p Progress) (pj *ProgressJSON) {
+	pj = &ProgressJSON{Progress: p}
+	if p.Error != nil {
+		pj.Error = errors.Cause(p.Error).Error()
+	}
+	return
 }
 
 func (p *Progress) done() bool {
@@ -66,10 +79,10 @@ type SpeechFile struct {
 type Runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
-	b *astilimiter.Bucket
+	b   *astilimiter.Bucket
 	c   *astisync.Chan
 	i   *os.File
-	mp  *sync.Mutex // Locks pg
+	mp  *sync.Mutex // Locks pg and t
 	ms  *sync.Mutex // Locks ss
 	msd *sync.Mutex // Locks sds
 	o   RunnableOptions
@@ -77,6 +90,7 @@ type Runnable struct {
 	pg  *Progress
 	sds map[string]*astiaudio.SilenceDetector
 	ss  map[string]*Speech
+	t   bool
 }
 
 type RunnableOptions struct {
@@ -702,7 +716,7 @@ func (r *Runnable) updateSpeech(rw http.ResponseWriter, req *http.Request, p htt
 }
 
 type TrainReferences struct {
-	Progress *Progress `json:"progress,omitempty"`
+	Progress *ProgressJSON `json:"progress,omitempty"`
 }
 
 func (r *Runnable) trainReferences(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
@@ -710,19 +724,17 @@ func (r *Runnable) trainReferences(rw http.ResponseWriter, req *http.Request, p 
 	rw.Header().Set("Content-Type", "application/json")
 
 	// Create references
+	rf := TrainReferences{}
+
+	// Add progress
 	r.mp.Lock()
-	rf := TrainReferences{
-		Progress: r.pg,
+	if r.pg != nil {
+		rf.Progress = newProgressJSON(*r.pg)
 	}
 	r.mp.Unlock()
 
 	// Write
 	astibob.WriteHTTPData(rw, rf)
-}
-
-type ProgressMessage struct {
-	Progress
-	Error string `json:"error"`
 }
 
 func (r *Runnable) newProgressMessage(p Progress) (m *astibob.Message, err error) {
@@ -735,14 +747,8 @@ func (r *Runnable) newProgressMessage(p Progress) (m *astibob.Message, err error
 	// Make sure the message is sent to the UI
 	m.To = &astibob.Identifier{Type: astibob.UIIdentifierType}
 
-	// Create payload
-	pm := ProgressMessage{Progress: p}
-	if p.Error != nil {
-		pm.Error = errors.Cause(p.Error).Error()
-	}
-
 	// Marshal
-	if m.Payload, err = json.Marshal(pm); err != nil {
+	if m.Payload, err = json.Marshal(newProgressJSON(p)); err != nil {
 		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
 		return
 	}
@@ -760,16 +766,20 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 
 	// Lock
 	r.mp.Lock()
-	defer r.mp.Unlock()
 
 	// Training in progress
-	if r.pg != nil {
+	if r.t {
+		r.mp.Unlock()
 		astibob.WriteHTTPError(rw, http.StatusBadRequest, errors.New("speech_to_text: training in progress"))
 		return
 	}
 
 	// Create progress
 	r.pg = &Progress{}
+	r.t = true
+
+	// Unlock
+	r.mp.Unlock()
 
 	// Create speech files
 	var fs []SpeechFile
@@ -785,21 +795,19 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 }
 
 func (r *Runnable) progressFunc(p Progress) {
+	// Lock
+	r.mp.Lock()
+
+	// Update progress
+	*r.pg = p
+	r.t = !p.done()
+
+	// Unlock
+	r.mp.Unlock()
+
 	// Rate limit here in case Parser is spamming
 	if !r.b.Inc() {
 		return
-	}
-
-	// No progress
-	if r.pg == nil {
-		return
-	}
-
-	// Update progress
-	if p.done() {
-		r.pg = nil
-	} else {
-		*r.pg = p
 	}
 
 	// Create message

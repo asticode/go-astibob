@@ -95,6 +95,12 @@ asticode.progresser = {
                     this.shouldReset = false
                 }
 
+                // Build the progresser
+                if (typeof this.wrapper === "undefined") this.build(progress)
+
+                // Update wrapper
+                if (typeof this.wrapper !== "undefined") this.wrapper.className = "astiprogresser"
+
                 // Check error
                 if (typeof progress.error !== "undefined" && progress.error !== "") {
                     // Update wrapper
@@ -105,11 +111,7 @@ asticode.progresser = {
 
                     // Schedule reset
                     this.shouldReset = true
-                    return
                 }
-
-                // Update wrapper
-                if (typeof this.wrapper !== "undefined") this.wrapper.className = "astiprogresser"
 
                 // Loop through steps
                 let reset = false
