@@ -22,36 +22,32 @@ type Options struct {
 }
 
 type Index struct {
-	c   *http.Client
-	d   *astibob.Dispatcher
-	mm  *sync.Mutex // Locks ums
-	mu  *sync.Mutex // Locks us
-	mw  *sync.Mutex // Locks ws
-	o   Options
-	t   *astitemplate.Templater
-	ums map[string]map[string]bool // UI message names indexed by message --> ui
-	us  map[string]astibob.UI      // UI indexed by name
-	w   *astiworker.Worker
-	ws  map[string]*worker // Workers indexed by name
-	wu  *astiws.Manager
-	ww  *astiws.Manager
+	c  *http.Client
+	d  *astibob.Dispatcher
+	mu *sync.Mutex // Locks us
+	mw *sync.Mutex // Locks ws
+	o  Options
+	t  *astitemplate.Templater
+	us map[string]map[string]bool // UI message names indexed by message --> ui
+	w  *astiworker.Worker
+	ws map[string]*worker // Workers indexed by name
+	wu *astiws.Manager
+	ww *astiws.Manager
 }
 
 // New creates a new index
 func New(o Options) (i *Index, err error) {
 	// Create index
 	i = &Index{
-		c:   &http.Client{},
-		mm:  &sync.Mutex{},
-		mu:  &sync.Mutex{},
-		mw:  &sync.Mutex{},
-		o:   o,
-		ums: make(map[string]map[string]bool),
-		us:  make(map[string]astibob.UI),
-		w:   astiworker.NewWorker(),
-		ws:  make(map[string]*worker),
-		wu:  astiws.NewManager(astiws.ManagerConfiguration{}),
-		ww:  astiws.NewManager(astiws.ManagerConfiguration{}),
+		c:  &http.Client{},
+		mu: &sync.Mutex{},
+		mw: &sync.Mutex{},
+		o:  o,
+		us: make(map[string]map[string]bool),
+		w:  astiworker.NewWorker(),
+		ws: make(map[string]*worker),
+		wu: astiws.NewManager(astiws.ManagerConfiguration{}),
+		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
 	}
 
 	// Default resources path
@@ -165,15 +161,14 @@ func sendMessage(m *astibob.Message, label string, wm *astiws.Manager, names ...
 	return
 }
 
-func (i *Index) uis() (us []astibob.UI) {
+func (i *Index) uiMessageNames() (ms []string) {
 	// Lock
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
-	// Loop through uis
-	for _, u := range i.us {
-		// Append
-		us = append(us, u)
+	// Loop through message names
+	for n := range i.us {
+		ms = append(ms, n)
 	}
 	return
 }

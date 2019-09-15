@@ -176,8 +176,8 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 		*astibob.NewIndexIdentifier(),
 		astibob.NewWorkerIdentifier(w.name),
 		astibob.WelcomeWorker{
-			UIs:     i.uis(),
-			Workers: i.workers(),
+			UIMessageNames: i.uiMessageNames(),
+			Workers:        i.workers(),
 		},
 	); err != nil {
 		err = errors.Wrap(err, "astibob: creating welcome message failed")

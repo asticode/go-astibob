@@ -37,7 +37,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 			var m *astibob.Message
 			if m, err = astibob.NewUIDisconnectedMessage(
 				*astibob.NewIndexIdentifier(),
-				&astibob.Identifier{Type: astibob.WorkerIdentifierType},
+				nil,
 				name,
 			); err != nil {
 				err = errors.Wrap(err, "astibob: creating disconnected message failed")
@@ -110,12 +110,12 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 		names = append(names, *m.To.Name)
 	} else {
 		// Lock
-		i.mm.Lock()
+		i.mu.Lock()
 
 		// No UI has requested this message
-		us, ok := i.ums[m.Name]
+		us, ok := i.us[m.Name]
 		if !ok {
-			i.mm.Unlock()
+			i.mu.Unlock()
 			return
 		}
 
@@ -125,7 +125,7 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 		}
 
 		// Unlock
-		i.mm.Unlock()
+		i.mu.Unlock()
 	}
 
 	// Send message
@@ -150,26 +150,39 @@ func (i *Index) registerUI(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Add ui
-	i.mu.Lock()
-	i.us[*m.From.Name] = u
-	i.mu.Unlock()
-
 	// Add message names
-	i.mm.Lock()
+	i.mu.Lock()
+	var ns []string
 	for _, n := range u.MessageNames {
-		// Create message name key
-		if _, ok := i.ums[n]; !ok {
-			i.ums[n] = make(map[string]bool)
+		// Message name key doesn't exist
+		if _, ok := i.us[n]; !ok {
+			// Create key
+			i.us[n] = make(map[string]bool)
+
+			// Append
+			ns = append(ns, n)
 		}
 
 		// Add ui
-		i.ums[n][u.Name] = true
+		i.us[n][u.Name] = true
 	}
-	i.mm.Unlock()
+	i.mu.Unlock()
 
 	// Log
 	astilog.Infof("index: ui %s has registered", *m.From.Name)
+
+	// Create message
+	if m, err = astibob.NewUIMessageNamesAddMessage(
+		*astibob.NewIndexIdentifier(),
+		&astibob.Identifier{Type: astibob.WorkerIdentifierType},
+		ns,
+	); err != nil {
+		err = errors.Wrap(err, "index: creating ui message names add failed")
+		return
+	}
+
+	// Dispatch
+	i.d.Dispatch(m)
 	return
 }
 
@@ -181,29 +194,42 @@ func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Delete ui
-	i.mu.Lock()
-	delete(i.us, name)
-	i.mu.Unlock()
-
 	// Delete message names
-	i.mm.Lock()
-	for n := range i.ums {
+	i.mu.Lock()
+	var ns []string
+	for n := range i.us {
 		// Remove ui
-		delete(i.ums[n], name)
+		delete(i.us[n], name)
 
-		// Remove message name if no UI needs it anymore
-		if len(i.ums[n]) == 0 {
-			delete(i.ums, n)
+		// Message name is not needed anymore
+		if len(i.us[n]) == 0 {
+			// Remove key
+			delete(i.us, n)
+
+			// Append
+			ns = append(ns, n)
 		}
 	}
-	i.mm.Unlock()
+	i.mu.Unlock()
 
 	// Unregister client
 	i.wu.UnregisterClient(name)
 
 	// Log
 	astilog.Infof("index: ui %s has disconnected", name)
+
+	// Create message
+	if m, err = astibob.NewUIMessageNamesDeleteMessage(
+		*astibob.NewIndexIdentifier(),
+		&astibob.Identifier{Type: astibob.WorkerIdentifierType},
+		ns,
+	); err != nil {
+		err = errors.Wrap(err, "index: creating ui message names delete failed")
+		return
+	}
+
+	// Dispatch
+	i.d.Dispatch(m)
 	return
 }
 

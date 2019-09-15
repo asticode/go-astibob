@@ -98,13 +98,13 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Reset uis
-	w.resetUIs()
-
-	// Add uis
-	for _, u := range wl.UIs {
-		w.addUI(u)
+	// Reset and add ui message names
+	w.mu.Lock()
+	w.us = make(map[string]bool)
+	for _, n := range wl.UIMessageNames {
+		w.us[n] = true
 	}
+	w.mu.Unlock()
 
 	// Index workers
 	iws := make(map[string]bool)

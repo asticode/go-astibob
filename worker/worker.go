@@ -34,7 +34,7 @@ type Worker struct {
 	o    Options
 	ols  map[string]map[string]map[string]bool // Other workers listenables indexed by runnable --> worker --> message
 	rs   map[string]astibob.Runnable
-	us   map[string]map[string]bool // UI messages names indexed by message --> ui
+	us   map[string]bool // UI messages names indexed by message
 	w    *astiworker.Worker
 	ws   map[string]*worker
 }
@@ -55,7 +55,7 @@ func New(name string, o Options) (w *Worker) {
 		o:    o,
 		ols:  make(map[string]map[string]map[string]bool),
 		rs:   make(map[string]astibob.Runnable),
-		us:   make(map[string]map[string]bool),
+		us:   make(map[string]bool),
 		w:    astiworker.NewWorker(),
 		ws:   make(map[string]*worker),
 	}
@@ -70,8 +70,8 @@ func New(name string, o Options) (w *Worker) {
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.ListenablesRegisterMessage)}, w.registerListenables)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIRegisterMessage)}, w.registerUI)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIDisconnectedMessage)}, w.unregisterUI)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIMessageNamesAddMessage)}, w.addUIMessageNames)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIMessageNamesDeleteMessage)}, w.deleteUIMessageNames)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisteredMessage)}, w.registerWorker)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, w.unregisterWorker)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeMessage)}, w.finishRegistration)

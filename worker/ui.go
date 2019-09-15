@@ -6,73 +6,38 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (w *Worker) registerUI(m *astibob.Message) (err error) {
+func (w *Worker) addUIMessageNames(m *astibob.Message) (err error) {
 	// Parse payload
-	var u astibob.UI
-	if u, err = astibob.ParseUIRegisterPayload(m); err != nil {
+	var names []string
+	if names, err = astibob.ParseUIMessageNamesAddPayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing message payload failed")
 		return
 	}
 
-	// Add ui
-	w.addUI(u)
+	// Add message names
+	w.mu.Lock()
+	for _, n := range names {
+		w.us[n] = true
+	}
+	w.mu.Unlock()
 	return
 }
 
-func (w *Worker) resetUIs() {
-	// Lock
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Reset
-	w.us = make(map[string]map[string]bool)
-}
-
-func (w *Worker) addUI(u astibob.UI) {
-	// Lock
-	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Loop through message names
-	for _, n := range u.MessageNames {
-		// Create message key
-		if _, ok := w.us[n]; !ok {
-			w.us[n] = make(map[string]bool)
-		}
-
-		// Add ui
-		w.us[n][u.Name] = true
-	}
-}
-
-func (w *Worker) unregisterUI(m *astibob.Message) (err error) {
+func (w *Worker) deleteUIMessageNames(m *astibob.Message) (err error) {
 	// Parse payload
-	var name string
-	if name, err = astibob.ParseUIDisconnectedPayload(m); err != nil {
+	var names []string
+	if names, err = astibob.ParseUIMessageNamesDeletePayload(m); err != nil {
 		err = errors.Wrap(err, "index: parsing message payload failed")
 		return
 	}
 
-	// Delete ui
-	w.delUI(name)
-	return
-}
-
-func (w *Worker) delUI(name string) {
-	// Lock
+	// Delete message names
 	w.mu.Lock()
-	defer w.mu.Unlock()
-
-	// Loop through message names
-	for n := range w.us {
-		// Delete UI
-		delete(w.us[n], name)
-
-		// Delete message if no UI needs it anymore
-		if len(w.us[n]) == 0 {
-			delete(w.us, n)
-		}
+	for _, n := range names {
+		delete(w.us, n)
 	}
+	w.mu.Unlock()
+	return
 }
 
 func (w *Worker) sendMessageToUI(m *astibob.Message) (err error) {

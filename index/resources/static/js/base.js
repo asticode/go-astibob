@@ -57,7 +57,7 @@ let base = {
                                         message_names: ms,
                                         name: base.from.name,
                                     },
-                                    to: {type: consts.identifierTypes.worker},
+                                    to: {type: consts.identifierTypes.index},
                                 })
 
                                 // Init menu

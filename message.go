@@ -24,6 +24,8 @@ const (
 	RunnableStopMessage        = "runnable.stop"
 	RunnableStoppedMessage     = "runnable.stopped"
 	UIDisconnectedMessage      = "ui.disconnected"
+	UIMessageNamesAddMessage    = "ui.message.names.add"
+	UIMessageNamesDeleteMessage = "ui.message.names.delete"
 	UIPingMessage              = "ui.ping"
 	UIRegisterMessage          = "ui.register"
 	UIWelcomeMessage           = "ui.welcome"
@@ -204,8 +206,8 @@ type UI struct {
 }
 
 type WelcomeWorker struct {
-	UIs     []UI     `json:"uis,omitempty"`
-	Workers []Worker `json:"workers,omitempty"`
+	UIMessageNames []string `json:"ui_message_names,omitempty"`
+	Workers        []Worker `json:"workers,omitempty"`
 }
 
 type Worker struct {
@@ -306,20 +308,48 @@ func NewUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *
 	return
 }
 
-func NewUIWelcomeMessage(from Identifier, to *Identifier, w WelcomeUI) (m *Message, err error) {
+func ParseUIDisconnectedPayload(m *Message) (name string, err error) {
+	if err = json.Unmarshal(m.Payload, &name); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
+func NewUIMessageNamesAddMessage(from Identifier, to *Identifier, names []string) (m *Message, err error) {
 	// Create message
-	m = newMessage(from, to, UIWelcomeMessage)
+	m = newMessage(from, to, UIMessageNamesAddMessage)
 
 	// Marshal payload
-	if m.Payload, err = json.Marshal(w); err != nil {
+	if m.Payload, err = json.Marshal(names); err != nil {
 		err = errors.Wrap(err, "astibob: marshaling payload failed")
 		return
 	}
 	return
 }
 
-func ParseUIDisconnectedPayload(m *Message) (name string, err error) {
-	if err = json.Unmarshal(m.Payload, &name); err != nil {
+func ParseUIMessageNamesAddPayload(m *Message) (names []string, err error) {
+	if err = json.Unmarshal(m.Payload, &names); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
+func NewUIMessageNamesDeleteMessage(from Identifier, to *Identifier, names []string) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, UIMessageNamesDeleteMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(names); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseUIMessageNamesDeletePayload(m *Message) (names []string, err error) {
+	if err = json.Unmarshal(m.Payload, &names); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
 		return
 	}
@@ -329,6 +359,18 @@ func ParseUIDisconnectedPayload(m *Message) (name string, err error) {
 func ParseUIRegisterPayload(m *Message) (u UI, err error) {
 	if err = json.Unmarshal(m.Payload, &u); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
+func NewUIWelcomeMessage(from Identifier, to *Identifier, w WelcomeUI) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, UIWelcomeMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(w); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
 		return
 	}
 	return
