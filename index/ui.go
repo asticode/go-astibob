@@ -37,7 +37,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 			var m *astibob.Message
 			if m, err = astibob.NewUIDisconnectedMessage(
 				*astibob.NewIndexIdentifier(),
-				nil,
+				&astibob.Identifier{Type: astibob.WorkerIdentifierType},
 				name,
 			); err != nil {
 				err = errors.Wrap(err, "astibob: creating disconnected message failed")
@@ -104,17 +104,72 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Get ui name
-	var ui string
+	// Get names
+	var names []string
 	if m.To.Name != nil {
-		ui = *m.To.Name
+		names = append(names, *m.To.Name)
+	} else {
+		// Lock
+		i.mm.Lock()
+
+		// No UI has requested this message
+		us, ok := i.ums[m.Name]
+		if !ok {
+			i.mm.Unlock()
+			return
+		}
+
+		// Get names
+		for n := range us {
+			names = append(names, n)
+		}
+
+		// Unlock
+		i.mm.Unlock()
 	}
 
 	// Send message
-	if err = sendMessage(m, ui, "ui", i.wu); err != nil {
+	if err = sendMessage(m, "ui", i.wu, names...); err != nil {
 		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}
+	return
+}
+
+func (i *Index) registerUI(m *astibob.Message) (err error) {
+	// From name
+	if m.From.Name == nil {
+		err = errors.New("index: from name is empty")
+		return
+	}
+
+	// Parse payload
+	var u astibob.UI
+	if u, err = astibob.ParseUIRegisterPayload(m); err != nil {
+		err = errors.Wrap(err, "index: parsing message payload failed")
+		return
+	}
+
+	// Add ui
+	i.mu.Lock()
+	i.us[*m.From.Name] = u
+	i.mu.Unlock()
+
+	// Add message names
+	i.mm.Lock()
+	for _, n := range u.MessageNames {
+		// Create message name key
+		if _, ok := i.ums[n]; !ok {
+			i.ums[n] = make(map[string]bool)
+		}
+
+		// Add ui
+		i.ums[n][u.Name] = true
+	}
+	i.mm.Unlock()
+
+	// Log
+	astilog.Infof("index: ui %s has registered", *m.From.Name)
 	return
 }
 
@@ -125,6 +180,24 @@ func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 		err = errors.Wrap(err, "index: parsing message payload failed")
 		return
 	}
+
+	// Delete ui
+	i.mu.Lock()
+	delete(i.us, name)
+	i.mu.Unlock()
+
+	// Delete message names
+	i.mm.Lock()
+	for n := range i.ums {
+		// Remove ui
+		delete(i.ums[n], name)
+
+		// Remove message name if no UI needs it anymore
+		if len(i.ums[n]) == 0 {
+			delete(i.ums, n)
+		}
+	}
+	i.mm.Unlock()
 
 	// Unregister client
 	i.wu.UnregisterClient(name)

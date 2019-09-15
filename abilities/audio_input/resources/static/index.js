@@ -1,12 +1,15 @@
 let index = {
     init: function() {
-        base.init(null, function() {
-            // Handle calibrate
-            document.getElementById("btn-calibrate").addEventListener("click", index.handleCalibrate)
-
-            // Finish
-            base.finish()
+        base.init({
+            onLoad: index.onLoad,
         })
+    },
+    onLoad: function() {
+        // Handle calibrate
+        document.getElementById("btn-calibrate").addEventListener("click", index.handleCalibrate)
+
+        // Finish
+        base.finish()
     },
     handleCalibrate: function() {
         // Create text

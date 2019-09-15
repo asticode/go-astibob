@@ -1,26 +1,24 @@
 let index = {
-    // Attributes
     workers: {},
     workersCount: 0,
 
-    // Init
-
     init: function () {
-        base.init(index.onMessage, function(data) {
-            // Loop through workers
-            if (typeof data.workers !== "undefined") {
-                for (let k = 0; k < data.workers.length; k++) {
-                    index.addWorker(data.workers[k])
-                }
-            }
-
-            // Finish
-            base.finish()
+        base.init({
+            onLoad: index.onLoad,
+            onMessage: index.onMessage,
         })
     },
+    onLoad: function(data) {
+        // Loop through workers
+        if (typeof data.workers !== "undefined") {
+            for (let k = 0; k < data.workers.length; k++) {
+                index.addWorker(data.workers[k])
+            }
+        }
 
-    // Websocket
-
+        // Finish
+        base.finish()
+    },
     onMessage: function(data) {
         switch (data.name) {
             case consts.messageNames.workerDisconnected:
@@ -31,9 +29,6 @@ let index = {
                 break
         }
     },
-
-    // Worker
-
     addWorker: function(data) {
         // Worker already exists
         if (typeof index.workers[data.name] !== "undefined") {
@@ -110,9 +105,6 @@ let index = {
             items.forEach(function(item) { item.style.display = "none" })
         }
     },
-
-    // Runnable
-
     addRunnable: function(worker, data) {
         // Runnable already exists
         if (typeof worker.runnables[data.name] !== "undefined") {

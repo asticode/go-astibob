@@ -92,14 +92,22 @@ func (w *Worker) sendRegister() (err error) {
 
 func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
-	var ws []astibob.Worker
-	if ws, err = astibob.ParseWorkerWelcomePayload(m); err != nil {
+	var wl astibob.WelcomeWorker
+	if wl, err = astibob.ParseWorkerWelcomePayload(m); err != nil {
 		err = errors.Wrap(err, "worker: parsing message payload failed")
 		return
 	}
 
+	// TODO Shouldn't we reset both ui and worker pools in case ui or worker have disconnected since last time index
+	// was alive?
+
+	// Loop through uis
+	for _, u := range wl.UIs {
+		w.addUI(u)
+	}
+
 	// Loop through workers
-	for _, mw := range ws {
+	for _, mw := range wl.Workers {
 		// Add worker
 		w.addWorker(mw)
 

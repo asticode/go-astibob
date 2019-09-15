@@ -22,28 +22,36 @@ type Options struct {
 }
 
 type Index struct {
-	c  *http.Client
-	d  *astibob.Dispatcher
-	mw *sync.Mutex // Locks ws
-	o  Options
-	t  *astitemplate.Templater
-	w  *astiworker.Worker
-	ws map[string]*worker // Workers indexed by name
-	wu *astiws.Manager
-	ww *astiws.Manager
+	c   *http.Client
+	d   *astibob.Dispatcher
+	mm  *sync.Mutex // Locks ums
+	mu  *sync.Mutex // Locks us
+	mw  *sync.Mutex // Locks ws
+	o   Options
+	t   *astitemplate.Templater
+	ums map[string]map[string]bool // UI message names indexed by message --> ui
+	us  map[string]astibob.UI      // UI indexed by name
+	w   *astiworker.Worker
+	ws  map[string]*worker // Workers indexed by name
+	wu  *astiws.Manager
+	ww  *astiws.Manager
 }
 
 // New creates a new index
 func New(o Options) (i *Index, err error) {
 	// Create index
 	i = &Index{
-		c:  &http.Client{},
-		mw: &sync.Mutex{},
-		o:  o,
-		w:  astiworker.NewWorker(),
-		ws: make(map[string]*worker),
-		wu: astiws.NewManager(astiws.ManagerConfiguration{}),
-		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
+		c:   &http.Client{},
+		mm:  &sync.Mutex{},
+		mu:  &sync.Mutex{},
+		mw:  &sync.Mutex{},
+		o:   o,
+		ums: make(map[string]map[string]bool),
+		us:  make(map[string]astibob.UI),
+		w:   astiworker.NewWorker(),
+		ws:  make(map[string]*worker),
+		wu:  astiws.NewManager(astiws.ManagerConfiguration{}),
+		ww:  astiws.NewManager(astiws.ManagerConfiguration{}),
 	}
 
 	// Default resources path
@@ -65,15 +73,16 @@ func New(o Options) (i *Index, err error) {
 	}
 
 	// Add dispatcher handlers
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIPingMessage)}, i.extendUIConnection)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{Names: map[string]bool{
 		astibob.RunnableCrashedMessage: true,
 		astibob.RunnableStartedMessage: true,
 		astibob.RunnableStoppedMessage: true,
 	}}, i.updateRunnableStatus)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIDisconnectedMessage)}, i.unregisterUI)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIPingMessage)}, i.extendUIConnection)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIRegisterMessage)}, i.registerUI)
 	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, i.delWorker)
+	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
 		astibob.RunnableIdentifierType: true,
 		astibob.WorkerIdentifierType:   true,
@@ -118,19 +127,22 @@ func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
 }
 
-func sendMessage(m *astibob.Message, name, label string, wm *astiws.Manager) (err error) {
+func sendMessage(m *astibob.Message, label string, wm *astiws.Manager, names ...string) (err error) {
 	// Get clients
 	var cs []*astiws.Client
-	if name != "" {
-		// Retrieve client from manager
-		c, ok := wm.Client(name)
-		if !ok {
-			err = fmt.Errorf("index: client %s doesn't exist", name)
-			return
-		}
+	if len(names) > 0 {
+		// Loop through names
+		for _, name := range names {
+			// Retrieve client from manager
+			c, ok := wm.Client(name)
+			if !ok {
+				err = fmt.Errorf("index: client %s doesn't exist", name)
+				return
+			}
 
-		// Append client
-		cs = append(cs, c)
+			// Append client
+			cs = append(cs, c)
+		}
 	} else {
 		// Loop through clients
 		wm.Clients(func(_ interface{}, c *astiws.Client) (err error) {
@@ -140,15 +152,28 @@ func sendMessage(m *astibob.Message, name, label string, wm *astiws.Manager) (er
 	}
 
 	// Loop through clients
-	for _, c := range cs {
+	for n, c := range cs {
 		// Log
-		astilog.Debugf("index: sending %s message to %s %s", m.Name, label, name)
+		astilog.Debugf("index: sending %s message to %s %s", m.Name, label, n)
 
 		// Write
 		if err = c.WriteJSON(m); err != nil {
 			err = errors.Wrap(err, "index: writing JSON message failed")
 			return
 		}
+	}
+	return
+}
+
+func (i *Index) uis() (us []astibob.UI) {
+	// Lock
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	// Loop through uis
+	for _, u := range i.us {
+		// Append
+		us = append(us, u)
 	}
 	return
 }

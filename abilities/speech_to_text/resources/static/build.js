@@ -5,33 +5,44 @@ let build = {
     validatedCount: 0,
 
     init: function() {
-        base.init(build.onMessage, function() {
-            // Get references
-            asticode.tools.sendHttp({
-                method: "GET",
-                url: "../routes/references/build",
-                error: base.httpError,
-                success: function(data) {
-                    // Update options
-                    build.options = data.responseJSON.options
-
-                    // Update store new speeches
-                    let e = document.querySelector("#store-new-speeches")
-                    e.className = "toggle " + (build.options.store_new_speeches ? "on": "off")
-                    e.addEventListener("click", build.updateOptions)
-
-                    // Loop through speeches
-                    data.responseJSON.speeches.forEach(function(s) {
-                        // Add speech
-                        build.addSpeech(s)
-                    })
-
-                    // Finish
-                    base.finish()
-                }
-            })
+        base.init({
+            messageNames: build.messageNames,
+            onLoad: build.onLoad,
+            onMessage: build.onMessage,
         })
     },
+    onLoad: function() {
+        // Get references
+        asticode.tools.sendHttp({
+            method: "GET",
+            url: "../routes/references/build",
+            error: base.httpError,
+            success: function(data) {
+                // Update options
+                build.options = data.responseJSON.options
+
+                // Update store new speeches
+                let e = document.querySelector("#store-new-speeches")
+                e.className = "toggle " + (build.options.store_new_speeches ? "on": "off")
+                e.addEventListener("click", build.updateOptions)
+
+                // Loop through speeches
+                data.responseJSON.speeches.forEach(function(s) {
+                    // Add speech
+                    build.addSpeech(s)
+                })
+
+                // Finish
+                base.finish()
+            }
+        })
+    },
+    messageNames: [
+        "speech_to_text.options.build.updated",
+        "speech_to_text.speech.created",
+        "speech_to_text.speech.deleted",
+        "speech_to_text.speech.updated",
+    ],
     onMessage: function(data) {
         switch(data.name) {
             case "speech_to_text.options.build.updated":

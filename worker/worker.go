@@ -28,11 +28,13 @@ type Worker struct {
 	ml   *sync.Mutex                           // Locks ls
 	mo   *sync.Mutex                           // Locks ols
 	mr   *sync.Mutex                           // Locks rs
+	mu   *sync.Mutex                           // Locks us
 	mw   *sync.Mutex                           // Locks ws
 	name string
 	o    Options
 	ols  map[string]map[string]map[string]bool // Other workers listenables indexed by runnable --> worker --> message
 	rs   map[string]astibob.Runnable
+	us   map[string]map[string]bool // UI messages names indexed by message --> ui
 	w    *astiworker.Worker
 	ws   map[string]*worker
 }
@@ -47,11 +49,13 @@ func New(name string, o Options) (w *Worker) {
 		ml:   &sync.Mutex{},
 		mo:   &sync.Mutex{},
 		mr:   &sync.Mutex{},
+		mu:   &sync.Mutex{},
 		mw:   &sync.Mutex{},
 		name: name,
 		o:    o,
 		ols:  make(map[string]map[string]map[string]bool),
 		rs:   make(map[string]astibob.Runnable),
+		us:   make(map[string]map[string]bool),
 		w:    astiworker.NewWorker(),
 		ws:   make(map[string]*worker),
 	}
@@ -66,13 +70,13 @@ func New(name string, o Options) (w *Worker) {
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.ListenablesRegisterMessage)}, w.registerListenables)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIRegisterMessage)}, w.registerUI)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIDisconnectedMessage)}, w.unregisterUI)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisteredMessage)}, w.registerWorker)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, w.unregisterWorker)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeMessage)}, w.finishRegistration)
-	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
-		astibob.IndexIdentifierType: true,
-		astibob.UIIdentifierType:    true,
-	}}}, w.sendMessageToIndex)
+	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.IndexIdentifierType}}, w.sendMessageToIndex)
+	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.UIIdentifierType}}, w.sendMessageToUI)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
 		astibob.RunnableIdentifierType: true, // Example: Cmds
 		astibob.WorkerIdentifierType:   true, // Example: Events

@@ -110,11 +110,14 @@ func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
 		return
 	}
 
-	// Get worker name
-	worker := m.To.WorkerName()
+	// Get names
+	var names []string
+	if worker := m.To.WorkerName(); worker != "" {
+		names = append(names, worker)
+	}
 
 	// Send message
-	if err = sendMessage(m, worker, "worker", i.ww); err != nil {
+	if err = sendMessage(m, "worker", i.ww, names...); err != nil {
 		err = errors.Wrap(err, "index: sending message failed")
 		return
 	}
@@ -172,7 +175,10 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	if m, err = astibob.NewWorkerWelcomeMessage(
 		*astibob.NewIndexIdentifier(),
 		astibob.NewWorkerIdentifier(w.name),
-		i.workers(),
+		astibob.WelcomeWorker{
+			UIs:     i.uis(),
+			Workers: i.workers(),
+		},
 	); err != nil {
 		err = errors.Wrap(err, "astibob: creating welcome message failed")
 		return

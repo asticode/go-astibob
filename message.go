@@ -25,6 +25,7 @@ const (
 	RunnableStoppedMessage     = "runnable.stopped"
 	UIDisconnectedMessage      = "ui.disconnected"
 	UIPingMessage              = "ui.ping"
+	UIRegisterMessage          = "ui.register"
 	UIWelcomeMessage           = "ui.welcome"
 	WorkerDisconnectedMessage  = "worker.disconnected"
 	WorkerRegisterMessage      = "worker.register"
@@ -137,11 +138,23 @@ func (i Identifier) Clone() (o *Identifier) {
 
 func (i *Identifier) match(id Identifier) bool {
 	// Check type
-	if i.Types != nil {
-		if id.Types != nil {
+	if !strOrMapMatch(astiptr.Str(i.Type), astiptr.Str(id.Type), i.Types, id.Types) {
+		return false
+	}
+
+	// Check worker
+	if i.Worker != nil && (id.Worker == nil || *i.Worker != *id.Worker) {
+		return false
+	}
+	return true
+}
+
+func strOrMapMatch(srcStr, dstStr *string, srcMap, dstMap map[string]bool) bool {
+	if srcMap != nil {
+		if dstMap != nil {
 			match := false
-			for t := range id.Types {
-				if _, ok := i.Types[t]; ok {
+			for t := range dstMap {
+				if _, ok := srcMap[t]; ok {
 					match = true
 					break
 				}
@@ -149,29 +162,19 @@ func (i *Identifier) match(id Identifier) bool {
 			if !match {
 				return false
 			}
-		} else {
-			if _, ok := i.Types[id.Type]; !ok {
+		} else if dstStr != nil {
+			if _, ok := srcMap[*dstStr]; !ok {
 				return false
 			}
 		}
-	} else {
-		if id.Types != nil {
-			if _, ok := id.Types[i.Type]; !ok {
+	} else if srcStr != nil {
+		if dstMap != nil {
+			if _, ok := dstMap[*srcStr]; !ok {
 				return false
 			}
-		} else if i.Type != id.Type {
+		} else if dstStr != nil && *srcStr != *dstStr {
 			return false
 		}
-	}
-
-	// Check name
-	if i.Name != nil && (id.Name == nil || *i.Name != *id.Name) {
-		return false
-	}
-
-	// Check worker
-	if i.Worker != nil && (id.Worker == nil || *i.Worker != *id.Worker) {
-		return false
 	}
 	return true
 }
@@ -192,6 +195,16 @@ func (i Identifier) WorkerName() string {
 
 type WelcomeUI struct {
 	Name    string   `json:"name"`
+	Workers []Worker `json:"workers,omitempty"`
+}
+
+type UI struct {
+	MessageNames []string `json:"message_names"`
+	Name         string   `json:"name"`
+}
+
+type WelcomeWorker struct {
+	UIs     []UI     `json:"uis,omitempty"`
 	Workers []Worker `json:"workers,omitempty"`
 }
 
@@ -269,26 +282,6 @@ func ParseRunnableStopPayload(m *Message) (name string, err error) {
 	return
 }
 
-func NewWorkerRegisterMessage(from Identifier, to *Identifier, w Worker) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, to, WorkerRegisterMessage)
-
-	// Marshal payload
-	if m.Payload, err = json.Marshal(w); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
-		return
-	}
-	return
-}
-
-func ParseWorkerRegisterPayload(m *Message) (w Worker, err error) {
-	if err = json.Unmarshal(m.Payload, &w); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
-		return
-	}
-	return
-}
-
 func NewRunnableCrashedMessage(from Identifier, to *Identifier) *Message {
 	return newMessage(from, to, RunnableCrashedMessage)
 }
@@ -333,6 +326,14 @@ func ParseUIDisconnectedPayload(m *Message) (name string, err error) {
 	return
 }
 
+func ParseUIRegisterPayload(m *Message) (u UI, err error) {
+	if err = json.Unmarshal(m.Payload, &u); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
 func NewWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string) (m *Message, err error) {
 	// Create message
 	m = newMessage(from, to, WorkerDisconnectedMessage)
@@ -347,6 +348,26 @@ func NewWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string
 
 func ParseWorkerDisconnectedPayload(m *Message) (worker string, err error) {
 	if err = json.Unmarshal(m.Payload, &worker); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
+}
+
+func NewWorkerRegisterMessage(from Identifier, to *Identifier, w Worker) (m *Message, err error) {
+	// Create message
+	m = newMessage(from, to, WorkerRegisterMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(w); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseWorkerRegisterPayload(m *Message) (w Worker, err error) {
+	if err = json.Unmarshal(m.Payload, &w); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
 		return
 	}
@@ -373,20 +394,20 @@ func ParseWorkerRegisteredPayload(m *Message) (w Worker, err error) {
 	return
 }
 
-func NewWorkerWelcomeMessage(from Identifier, to *Identifier, ws []Worker) (m *Message, err error) {
+func NewWorkerWelcomeMessage(from Identifier, to *Identifier, w WelcomeWorker) (m *Message, err error) {
 	// Create message
 	m = newMessage(from, to, WorkerWelcomeMessage)
 
 	// Marshal payload
-	if m.Payload, err = json.Marshal(ws); err != nil {
+	if m.Payload, err = json.Marshal(w); err != nil {
 		err = errors.Wrap(err, "astibob: marshaling payload failed")
 		return
 	}
 	return
 }
 
-func ParseWorkerWelcomePayload(m *Message) (ws []Worker, err error) {
-	if err = json.Unmarshal(m.Payload, &ws); err != nil {
+func ParseWorkerWelcomePayload(m *Message) (w WelcomeWorker, err error) {
+	if err = json.Unmarshal(m.Payload, &w); err != nil {
 		err = errors.Wrap(err, "astibob: unmarshaling failed")
 		return
 	}

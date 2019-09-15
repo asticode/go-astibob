@@ -3,7 +3,7 @@ let base = {
         type: consts.identifierTypes.ui,
     },
 
-    init: function(onMessage, onLoad) {
+    init: function(options) {
         // Init astitools
         asticode.loader.init();
         asticode.notifier.init();
@@ -36,12 +36,36 @@ let base = {
                                 // Update from
                                 base.from.name = data.payload.name
 
+                                // Get message names
+                                let ms = [
+                                    consts.messageNames.runnableCrashed,
+                                    consts.messageNames.runnableStarted,
+                                    consts.messageNames.runnableStopped,
+                                    consts.messageNames.workerDisconnected,
+                                    consts.messageNames.workerRegistered,
+                                ]
+
+                                // Add custom message names
+                                if (typeof options.messageNames !== "undefined" ) {
+                                    options.messageNames.forEach(function(m) { ms.push(m) })
+                                }
+
+                                // Send register message
+                                base.sendWebsocketMessage({
+                                    name: consts.messageNames.uiRegister,
+                                    payload: {
+                                        message_names: ms,
+                                        name: base.from.name,
+                                    },
+                                    to: {type: consts.identifierTypes.worker},
+                                })
+
                                 // Init menu
                                 menu.init(data.payload)
 
                                 // Custom callback
-                                if (typeof onLoad !== "undefined" && onLoad !== null) {
-                                    onLoad(data.payload)
+                                if (typeof options.onLoad !== "undefined") {
+                                    options.onLoad(data.payload)
                                 } else {
                                     base.finish()
                                 }
@@ -52,7 +76,7 @@ let base = {
                         menu.onMessage(data)
 
                         // Custom callback
-                        if (typeof onMessage !== "undefined" && onMessage !== null) onMessage(data)
+                        if (typeof options.onMessage !== "undefined") options.onMessage(data)
                     },
                     pingFunc: function() {
                         base.sendWebsocketMessage({

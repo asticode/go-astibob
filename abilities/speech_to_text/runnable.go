@@ -473,15 +473,6 @@ func (r *Runnable) storeSpeechToWav(ss []int32, bitDepth int, sampleRate float64
 	return
 }
 
-type BuildReferences struct {
-	Options  BuildOptions `json:"options"`
-	Speeches []Speech     `json:"speeches"`
-}
-
-type BuildOptions struct {
-	StoreNewSpeeches bool `json:"store_new_speeches"`
-}
-
 type int64Slice []int64
 
 func (p int64Slice) Len() int           { return len(p) }
@@ -514,6 +505,15 @@ func (r *Runnable) orderedSpeeches(fn func(s Speech)) {
 		}
 	}
 	return
+}
+
+type BuildReferences struct {
+	Options  BuildOptions `json:"options"`
+	Speeches []Speech     `json:"speeches"`
+}
+
+type BuildOptions struct {
+	StoreNewSpeeches bool `json:"store_new_speeches"`
 }
 
 func (r *Runnable) buildReferences(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
