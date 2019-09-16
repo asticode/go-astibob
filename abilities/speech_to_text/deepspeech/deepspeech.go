@@ -25,7 +25,7 @@ const (
 // Deepspeech constants
 const (
 	deepSpeechBitDepth   = 16
-	deepSpeechSampleRate = 16000
+	deepSpeechSampleRate = 44100
 )
 
 type DeepSpeech struct {
@@ -34,16 +34,18 @@ type DeepSpeech struct {
 }
 
 type Options struct {
-	AlphabetPath         string  `toml:"alphabet_path"`
-	BeamWidth            int     `toml:"beam_width"`
-	LMPath               string  `toml:"lm_path"`
-	LMWeight             float64 `toml:"lm_weight"`
-	ModelPath            string  `toml:"model_path"`
-	NCep                 int     `toml:"ncep"`
-	NContext             int     `toml:"ncontext"`
-	SpeechesDirPath      string  `toml:"speeches_dir_path"`
-	TriePath             string  `toml:"trie_path"`
-	ValidWordCountWeight float64 `toml:"1.85"`
+	AlphabetPath         string            `toml:"alphabet_path"`
+	BeamWidth            int               `toml:"beam_width"`
+	ClientPath           string            `toml:"client_path"`
+	LMPath               string            `toml:"lm_path"`
+	LMWeight             float64           `toml:"lm_weight"`
+	ModelPath            string            `toml:"model_path"`
+	NCep                 int               `toml:"ncep"`
+	NContext             int               `toml:"ncontext"`
+	PrepareDirPath       string            `toml:"prepare_dir_path"`
+	TrainingArgs         map[string]string `toml:"training_args"`
+	TriePath             string            `toml:"trie_path"`
+	ValidWordCountWeight float64           `toml:"1.85"`
 }
 
 func New(o Options) (d *DeepSpeech) {
@@ -65,8 +67,8 @@ func New(o Options) (d *DeepSpeech) {
 
 func (d *DeepSpeech) Init() (err error) {
 	// Get absolute path
-	if d.o.SpeechesDirPath, err = filepath.Abs(d.o.SpeechesDirPath); err != nil {
-		err = errors.Wrapf(err, "deepspeech: getting absolute path of %s failed", d.o.SpeechesDirPath)
+	if d.o.PrepareDirPath, err = filepath.Abs(d.o.PrepareDirPath); err != nil {
+		err = errors.Wrapf(err, "deepspeech: getting absolute path of %s failed", d.o.PrepareDirPath)
 		return
 	}
 	return

@@ -30,14 +30,19 @@ func main() {
 
 	// Create deepspeech
 	d := deepspeech.New(deepspeech.Options{
-		AlphabetPath:         "demo/tmp/deepspeech/model/alphabet.txt",
-		BeamWidth:            500,
-		LMPath:               "demo/tmp/deepspeech/model/lm.binary",
-		LMWeight:             0.75,
-		ModelPath:            "demo/tmp/deepspeech/model/output_graph.pb",
-		NCep:                 26,
-		NContext:             9,
-		SpeechesDirPath:      "demo/tmp/deepspeech/speeches",
+		AlphabetPath:   "demo/tmp/deepspeech/model/alphabet.txt",
+		BeamWidth:      1024,
+		ClientPath:     "demo/tmp/deepspeech/DeepSpeech/DeepSpeech.py",
+		LMPath:         "demo/tmp/deepspeech/model/lm.binary",
+		LMWeight:       0.75,
+		ModelPath:      "demo/tmp/deepspeech/model/output_graph.pb",
+		NCep:           26,
+		NContext:       9,
+		PrepareDirPath: "demo/tmp/deepspeech/prepare",
+		TrainingArgs: map[string]string{
+			"checkpoint_dir":    "demo/tmp/deepspeech/model/checkpoints",
+			"export_dir":        "demo/tmp/deepspeech/model",
+		},
 		TriePath:             "demo/tmp/deepspeech/model/trie",
 		ValidWordCountWeight: 1.85,
 	})

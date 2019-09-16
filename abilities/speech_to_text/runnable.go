@@ -121,6 +121,7 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 	r.BaseOperatable.AddRoute("/speeches/:name", http.MethodDelete, r.deleteSpeech)
 	r.BaseOperatable.AddRoute("/speeches/:name", http.MethodPatch, r.updateSpeech)
 	r.BaseOperatable.AddRoute("/train", http.MethodGet, r.train)
+	r.BaseOperatable.AddRoute("/train/cancel", http.MethodGet, r.cancelTraining)
 
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
@@ -479,8 +480,14 @@ func (r *Runnable) storeSpeechToWav(ss []int32, bitDepth int, sampleRate float64
 
 	// Loop through samples
 	for _, v := range ss {
+		// Create sample
+		var ss []byte
+		for idx := 0; idx < int(bitDepth/8); idx++ {
+			ss = append(ss, byte(v>>uint(idx*8)&0xff))
+		}
+
 		// Write sample
-		if err = w.WriteInt32(v); err != nil {
+		if err = w.WriteSample(ss); err != nil {
 			err = errors.Wrap(err, "speech_to_text: writing wav sample failed")
 			return
 		}
@@ -845,4 +852,24 @@ func (r *Runnable) progressFunc(p Progress) {
 
 	// Dispatch
 	r.Dispatch(m)
+}
+
+func (r *Runnable) cancelTraining(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
+	// Set content type
+	rw.Header().Set("Content-Type", "application/json")
+
+	// Lock
+	r.mp.Lock()
+
+	// No training in progress
+	if r.ctx == nil {
+		r.mp.Unlock()
+		return
+	}
+
+	// Cancel context
+	r.cancel()
+
+	// Unlock
+	r.mp.Unlock()
 }

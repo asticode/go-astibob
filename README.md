@@ -14,14 +14,7 @@ Don't forget to allow audio in your browser
 
 ### Deepspeech
 
-Make sure to have valid
-
---alphabet_config_path
---lm_binary_path
---decoder_library_path
---lm_trie_path
-
-Install:
+Install only for parsing:
 - create working dir
 - download a client `native_client.<your system>.tar.xz` matching your system at the bottom of [client](https://github.com/mozilla/DeepSpeech/releases/tag/v0.5.1)
 - create lib dir in working dir and extract the client content into it
@@ -36,3 +29,7 @@ CGO_CXXFLAGS="-I<full path to the include dir you've created>"
 CGO_LDFLAGS="-L<full path to the lib dir you've created>"
 LIBRARY_PATH=<full path to the lib dir you've created>:$LIBRARY_PATH
 LD_LIBRARY_PATH=<full path to the lib dir you've created>:$LD_LIBRARY_PATH
+
+Install for training too:
+- clone git clone https://github.com/mozilla/DeepSpeech into working dir
+- [install deepspeech](https://github.com/mozilla/DeepSpeech#training-your-own-model)

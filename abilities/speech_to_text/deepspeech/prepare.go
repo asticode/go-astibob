@@ -10,14 +10,10 @@ import (
 	"strconv"
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
-	astiaudio "github.com/asticode/go-astitools/audio"
+	"github.com/asticode/go-astitools/audio"
 	"github.com/cryptix/wav"
 	"github.com/pkg/errors"
 )
-
-func (d *DeepSpeech) prepareHashPath() string {
-	return filepath.Join(d.o.SpeechesDirPath, "hash")
-}
 
 func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
 	// Update progress
@@ -38,40 +34,36 @@ func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to
 	}
 
 	// Remove directory
-	if err = os.RemoveAll(d.o.SpeechesDirPath); err != nil {
-		err = errors.Wrapf(err, "deepspeech: removing %s failed", d.o.SpeechesDirPath)
+	if err = os.RemoveAll(d.o.PrepareDirPath); err != nil {
+		err = errors.Wrapf(err, "deepspeech: removing %s failed", d.o.PrepareDirPath)
 		return
 	}
 
 	// Create directory
-	if err = os.MkdirAll(d.o.SpeechesDirPath, 0755); err != nil {
-		err = errors.Wrapf(err, "deepspeech: mkdirall %s failed", d.o.SpeechesDirPath)
+	if err = os.MkdirAll(d.o.PrepareDirPath, 0755); err != nil {
+		err = errors.Wrapf(err, "deepspeech: mkdirall %s failed", d.o.PrepareDirPath)
 		return
 	}
 
-	// Create csv
-	var f *os.File
-	if f, err = os.Create(filepath.Join(d.o.SpeechesDirPath, "index.csv")); err != nil {
-		err = errors.Wrapf(err, "deepspeech: creating %s failed", filepath.Join(d.o.SpeechesDirPath, "index.csv"))
+	// Create indexes
+	var train, dev, test *index
+	if train, dev, test, err = d.createIndexes(); err != nil {
+		err = errors.Wrap(err, "deepspeech: creating indexes failed")
 		return
 	}
-	defer f.Close()
 
-	// Create csv writer
-	w := csv.NewWriter(f)
-
-	// Write csv header
-	if err = w.Write([]string{"wav_filename", "wav_filesize", "transcript"}); err != nil {
-		err = errors.Wrap(err, "deepspeech: writing csv header failed")
-		return
-	}
-	w.Flush()
+	// Make sure indexes are closed properly
+	defer func() {
+		train.f.Close()
+		dev.f.Close()
+		test.f.Close()
+	}()
 
 	// Loop through speeches
 	for idx, s := range speeches {
 		// Check context
 		if ctx.Err() != nil {
-			err = errors.Wrap(err, "deepspeech: context error")
+			err = ctx.Err()
 			return
 		}
 
@@ -83,18 +75,28 @@ func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to
 		}
 
 		// Stat audio file
-		var i os.FileInfo
-		if i, err = os.Stat(path); err != nil {
+		var fi os.FileInfo
+		if fi, err = os.Stat(path); err != nil {
 			err = errors.Wrapf(err, "deepspeech: stating %s failed", path)
 			return
 		}
 
+		// Choose index
+		var i *index
+		if float64(idx) < float64(len(speeches))*0.8 {
+			i = train
+		} else if float64(idx) < float64(len(speeches))*0.9 {
+			i = dev
+		} else {
+			i = test
+		}
+
 		// Write csv line
-		if err = w.Write([]string{path, strconv.Itoa(int(i.Size())), s.Text}); err != nil {
+		if err = i.w.Write([]string{path, strconv.Itoa(int(fi.Size())), s.Text}); err != nil {
 			err = errors.Wrap(err, "deepspeech: writing csv line failed")
 			return
 		}
-		w.Flush()
+		i.w.Flush()
 
 		// Update progress
 		p.Progress = float64(idx+1) / float64(len(speeches)) * 100.0
@@ -106,6 +108,58 @@ func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to
 		err = errors.Wrapf(err, "deepspeech: storing hash in %s failed", d.prepareHashPath())
 		return
 	}
+	return
+}
+
+func (d *DeepSpeech) prepareHashPath() string {
+	return filepath.Join(d.o.PrepareDirPath, "hash")
+}
+
+type index struct {
+	f *os.File
+	w *csv.Writer
+}
+
+func (d *DeepSpeech) createIndexes() (train, dev, test *index, err error) {
+	// Create train index
+	if train, err = d.createIndex(filepath.Join(d.o.PrepareDirPath, "train.csv")); err != nil {
+		err = errors.Wrap(err, "deepspeech: creating train index failed")
+		return
+	}
+
+	// Create dev index
+	if dev, err = d.createIndex(filepath.Join(d.o.PrepareDirPath, "dev.csv")); err != nil {
+		err = errors.Wrap(err, "deepspeech: creating dev index failed")
+		return
+	}
+
+	// Create test index
+	if test, err = d.createIndex(filepath.Join(d.o.PrepareDirPath, "test.csv")); err != nil {
+		err = errors.Wrap(err, "deepspeech: creating test index failed")
+		return
+	}
+	return
+}
+
+func (d *DeepSpeech) createIndex(path string) (i *index, err error) {
+	// Create index
+	i = &index{}
+
+	// Create csv
+	if i.f, err = os.Create(path); err != nil {
+		err = errors.Wrapf(err, "deepspeech: creating %s failed", path)
+		return
+	}
+
+	// Create csv writer
+	i.w = csv.NewWriter(i.f)
+
+	// Write csv header
+	if err = i.w.Write([]string{"wav_filename", "wav_filesize", "transcript"}); err != nil {
+		err = errors.Wrap(err, "deepspeech: writing csv header failed")
+		return
+	}
+	i.w.Flush()
 	return
 }
 
@@ -133,7 +187,7 @@ func (d *DeepSpeech) convertAudioFile(s speech_to_text.SpeechFile) (path string,
 	}
 
 	// Create path
-	path = filepath.Join(d.o.SpeechesDirPath, filepath.Base(s.Path))
+	path = filepath.Join(d.o.PrepareDirPath, filepath.Base(s.Path))
 
 	// Create dst
 	var dst *os.File
@@ -159,15 +213,21 @@ func (d *DeepSpeech) convertAudioFile(s speech_to_text.SpeechFile) (path string,
 	defer w.Close()
 
 	// Create sample rate converter
-	c := astiaudio.NewSampleRateConverter(float64(r.GetSampleRate()), float64(o.SampleRate), func(s int32) (err error) {
+	c := astiaudio.NewSampleRateConverter(float64(r.GetSampleRate()), float64(o.SampleRate), func(i int32) (err error) {
 		// Convert bit depth
-		if s, err = astiaudio.ConvertBitDepth(s, int(r.GetFile().SignificantBits), int(o.SignificantBits)); err != nil {
+		if i, err = astiaudio.ConvertBitDepth(i, int(r.GetFile().SignificantBits), int(o.SignificantBits)); err != nil {
 			err = errors.Wrap(err, "deepspeech: converting bit depth failed")
 			return
 		}
 
+		// Create sample
+		var s []byte
+		for idx := 0; idx < int(o.SignificantBits/8); idx++ {
+			s = append(s, byte(i>>uint(idx*8)&0xff))
+		}
+
 		// Write
-		if err = w.WriteSample([]byte{byte(s & 0xff), byte(s >> 8 & 0xff)}); err != nil {
+		if err = w.WriteSample(s); err != nil {
 			err = errors.Wrap(err, "deepspeech: writing wav sample failed")
 			return
 		}

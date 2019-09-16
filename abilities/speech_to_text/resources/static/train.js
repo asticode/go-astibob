@@ -13,6 +13,9 @@ let train = {
             url: "../routes/references/train",
             error: base.httpError,
             success: function(data) {
+                // Handle cancel
+                document.getElementById("btn-cancel").addEventListener("click", train.cancel)
+
                 // Handle train
                 document.getElementById("btn-train").addEventListener("click", train.train)
 
@@ -26,11 +29,8 @@ let train = {
                     root: document.getElementById("progress"),
                 })
 
-                // Check progress
-                if (typeof data.responseJSON.progress !== "undefined") {
-                    // Update progress
-                    train.progresser.update(data.responseJSON.progress)
-                }
+                // Update progress
+                train.updateProgress(data.responseJSON.progress)
 
                 // Finish
                 base.finish()
@@ -47,7 +47,7 @@ let train = {
                 document.getElementById("error").style.display = "none"
 
                 // Update progress
-                train.progresser.update(data.payload)
+                train.updateProgress(data.payload)
                 break
         }
     },
@@ -58,4 +58,26 @@ let train = {
             error: base.httpError,
         })
     },
+    cancel: function() {
+        asticode.tools.sendHttp({
+            method: "GET",
+            url: "../routes/train/cancel",
+            error: base.httpError,
+        })
+    },
+    updateProgress: function(progress) {
+        // Hide/Show buttons
+        if (typeof progress === "undefined" || typeof progress.error !== "undefined" || (progress.progress === 100 && progress.current_step === progress.steps[progress.steps.length - 1])) {
+            document.getElementById("btn-cancel").style.display = "none"
+            document.getElementById("btn-train").style.display = "block"
+        } else {
+            document.getElementById("btn-cancel").style.display = "block"
+            document.getElementById("btn-train").style.display = "none"
+        }
+
+        // Update progresser
+        if (typeof progress !== "undefined") {
+            train.progresser.update(progress)
+        }
+    }
 }
