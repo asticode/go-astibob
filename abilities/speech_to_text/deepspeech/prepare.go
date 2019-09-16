@@ -1,8 +1,10 @@
 package deepspeech
 
 import (
+	"context"
 	"encoding/csv"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -13,11 +15,27 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *DeepSpeech) prepare(speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
+func (d *DeepSpeech) prepareHashPath() string {
+	return filepath.Join(d.o.SpeechesDirPath, "hash")
+}
+
+func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
 	// Update progress
 	p.CurrentStep = preparingStep
 	p.Progress = 0
 	progressFunc(*p)
+
+	// Check whether hashes are the same
+	var same bool
+	if same, err = d.sameHashes(h, d.prepareHashPath()); err != nil {
+		err = errors.Wrap(err, "deepspeech: checking whether hashes are the same failed")
+		return
+	} else if same {
+		// Update progress
+		p.Progress = 100
+		progressFunc(*p)
+		return
+	}
 
 	// Remove directory
 	if err = os.RemoveAll(d.o.SpeechesDirPath); err != nil {
@@ -51,6 +69,12 @@ func (d *DeepSpeech) prepare(speeches []speech_to_text.SpeechFile, progressFunc 
 
 	// Loop through speeches
 	for idx, s := range speeches {
+		// Check context
+		if ctx.Err() != nil {
+			err = errors.Wrap(err, "deepspeech: context error")
+			return
+		}
+
 		// Convert audio file
 		var path string
 		if path, err = d.convertAudioFile(s); err != nil {
@@ -75,6 +99,12 @@ func (d *DeepSpeech) prepare(speeches []speech_to_text.SpeechFile, progressFunc 
 		// Update progress
 		p.Progress = float64(idx+1) / float64(len(speeches)) * 100.0
 		progressFunc(*p)
+	}
+
+	// Store hash
+	if err = ioutil.WriteFile(d.prepareHashPath(), h, 0666); err != nil {
+		err = errors.Wrapf(err, "deepspeech: storing hash in %s failed", d.prepareHashPath())
+		return
 	}
 	return
 }

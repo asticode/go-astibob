@@ -1,6 +1,10 @@
 package deepspeech
 
 import (
+	"bytes"
+	"context"
+	"crypto/sha1"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -14,7 +18,6 @@ import (
 
 // Steps
 const (
-	checkingStep  = "Checking"
 	preparingStep = "Preparing"
 	trainingStep  = "Training"
 )
@@ -113,9 +116,9 @@ func (d *DeepSpeech) Parse(samples []int32, bitDepth int, sampleRate float64) (t
 	return
 }
 
-func (d *DeepSpeech) Train(speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress)) {
+func (d *DeepSpeech) Train(ctx context.Context, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress)) {
 	// Train
-	p, h, err := d.handleError(speeches, progressFunc)
+	p, err := d.handleError(ctx, speeches, progressFunc)
 
 	// Handle error
 	if err != nil {
@@ -126,40 +129,75 @@ func (d *DeepSpeech) Train(speeches []speech_to_text.SpeechFile, progressFunc fu
 		progressFunc(p)
 		return
 	}
-
-	// Store hash
-	if err = ioutil.WriteFile(d.hashPath(), h, 0666); err != nil {
-		astilog.Error(errors.Wrap(err, "deepspeech: storing hash failed"))
-		return
-	}
 }
 
-func (d *DeepSpeech) handleError(speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress)) (p speech_to_text.Progress, h []byte, err error) {
+func (d *DeepSpeech) handleError(ctx context.Context, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress)) (p speech_to_text.Progress, err error) {
 	// Create progress
 	p = speech_to_text.Progress{
 		Steps: []string{
-			checkingStep,
 			preparingStep,
 			trainingStep,
 		},
 	}
 
-	// Check
-	if h, err = d.check(speeches, progressFunc, &p); err != nil {
-		err = errors.Wrap(err, "deepspeech: checking failed")
+	// Get current speeches hash
+	var h []byte
+	if h, err = d.speechesHash(speeches); err != nil {
+		err = errors.Wrap(err, "deepspeech: getting current speeches hash failed")
 		return
 	}
 
 	// Prepare
-	if err = d.prepare(speeches, progressFunc, &p); err != nil {
+	if err = d.prepare(ctx, h, speeches, progressFunc, &p); err != nil {
 		err = errors.Wrap(err, "deepspeech: preparing failed")
 		return
 	}
 
 	// Train
-	if err = d.train(speeches, progressFunc, &p); err != nil {
+	if err = d.train(ctx, h, speeches, progressFunc, &p); err != nil {
 		err = errors.Wrap(err, "deepspeech: training failed")
 		return
 	}
+	return
+}
+
+func (d *DeepSpeech) speechesHash(speeches []speech_to_text.SpeechFile) (h []byte, err error) {
+	// Marshal
+	var b []byte
+	if b, err = json.Marshal(speeches); err != nil {
+		err = errors.Wrap(err, "deepspeech: marshaling failed")
+	}
+
+	// Create hasher
+	hh := sha1.New()
+
+	// Write
+	if _, err = hh.Write(b); err != nil {
+		err = errors.Wrap(err, "deepspeech: writing in hasher failed")
+		return
+	}
+
+	// Sum
+	h = hh.Sum(nil)
+	return
+}
+
+func (d *DeepSpeech) sameHashes(h []byte, path string) (same bool, err error) {
+	// Get previous hash
+	var ph []byte
+	if ph, err = ioutil.ReadFile(path); err != nil && !os.IsNotExist(err) {
+		err = errors.Wrapf(err, "deepspeech: reading %s failed", path)
+		return
+	}
+	err = nil
+
+	// Hashes are the same
+	if err == nil && bytes.Equal(ph, h) {
+		same = true
+		return
+	}
+
+	// Reset error
+	err = nil
 	return
 }

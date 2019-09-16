@@ -24,6 +24,12 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 		// Set dispatch func
 		r.Runnable.SetDispatchFunc(w.dispatchFunc(r.Runnable.Metadata().Name))
 
+		// Set root context
+		r.Runnable.SetRootCtx(w.w.Context())
+
+		// Set task func
+		r.Runnable.SetTaskFunc(w.w.NewTask)
+
 		// Add dispatch handlers
 		w.d.On(astibob.DispatchConditions{To: w.runnableIdentifier(r.Runnable.Metadata().Name)}, r.Runnable.OnMessage)
 

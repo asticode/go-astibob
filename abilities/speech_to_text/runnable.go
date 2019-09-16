@@ -37,7 +37,7 @@ const (
 
 type Parser interface {
 	Parse(samples []int32, bitDepth int, sampleRate float64) (string, error)
-	Train(speeches []SpeechFile, progressFunc func(Progress))
+	Train(ctx context.Context, speeches []SpeechFile, progressFunc func(Progress))
 }
 
 type Progress struct {
@@ -79,18 +79,19 @@ type SpeechFile struct {
 type Runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
-	b   *astilimiter.Bucket
-	c   *astisync.Chan
-	i   *os.File
-	mp  *sync.Mutex // Locks pg and t
-	ms  *sync.Mutex // Locks ss
-	msd *sync.Mutex // Locks sds
-	o   RunnableOptions
-	p   Parser
-	pg  *Progress
-	sds map[string]*astiaudio.SilenceDetector
-	ss  map[string]*Speech
-	t   bool
+	b      *astilimiter.Bucket
+	c      *astisync.Chan
+	cancel context.CancelFunc
+	ctx    context.Context
+	i      *os.File
+	mp     *sync.Mutex // Locks pg and ctx
+	ms     *sync.Mutex // Locks ss
+	msd    *sync.Mutex // Locks sds
+	o      RunnableOptions
+	p      Parser
+	pg     *Progress
+	sds    map[string]*astiaudio.SilenceDetector
+	ss     map[string]*Speech
 }
 
 type RunnableOptions struct {
@@ -768,7 +769,7 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 	r.mp.Lock()
 
 	// Training in progress
-	if r.t {
+	if r.ctx != nil {
 		r.mp.Unlock()
 		astibob.WriteHTTPError(rw, http.StatusBadRequest, errors.New("speech_to_text: training in progress"))
 		return
@@ -776,7 +777,9 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 
 	// Create progress
 	r.pg = &Progress{}
-	r.t = true
+
+	// Create context
+	r.ctx, r.cancel = context.WithCancel(r.RootCtx())
 
 	// Unlock
 	r.mp.Unlock()
@@ -790,8 +793,17 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 		})
 	})
 
-	// Train
-	r.p.Train(fs, r.progressFunc)
+	// Create task
+	t := r.NewTask()
+
+	// Execute the rest in a goroutine
+	go func() {
+		// Task is done
+		defer t.Done()
+
+		// Train
+		r.p.Train(r.ctx, fs, r.progressFunc)
+	}()
 }
 
 func (r *Runnable) progressFunc(p Progress) {
@@ -800,7 +812,21 @@ func (r *Runnable) progressFunc(p Progress) {
 
 	// Update progress
 	*r.pg = p
-	r.t = !p.done()
+
+	// Progress is done
+	if p.done() {
+		// Log error
+		if p.Error != nil {
+			astilog.Error(errors.Wrap(p.Error, "speech_to_text: training failed"))
+		}
+
+		// Cancel context
+		r.cancel()
+
+		// Reset context
+		r.cancel = nil
+		r.ctx = nil
+	}
 
 	// Unlock
 	r.mp.Unlock()
