@@ -46,7 +46,7 @@ func main() {
 		BitDepth:             32,
 		BufferLength:         5000,
 		MaxSilenceAudioLevel: 5 * 1e6,
-		NumInputChannels:     1,
+		NumInputChannels:     2,
 		SampleRate:           sampleRate,
 	})
 	if err != nil {

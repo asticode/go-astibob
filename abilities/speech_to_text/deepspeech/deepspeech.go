@@ -1,18 +1,13 @@
 package deepspeech
 
 import (
-	"bytes"
 	"context"
-	"crypto/sha1"
-	"encoding/json"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
 	"github.com/asticode/go-astideepspeech"
 	"github.com/asticode/go-astilog"
-	astiaudio "github.com/asticode/go-astitools/audio"
 	"github.com/pkg/errors"
 )
 
@@ -22,10 +17,11 @@ const (
 	trainingStep  = "Training"
 )
 
-// Deepspeech constants
+// Deepspeech
 const (
-	deepSpeechBitDepth   = 16
-	deepSpeechSampleRate = 44100
+	deepSpeechBitDepth    = 16
+	deepSpeechNumChannels = 1
+	deepSpeechSampleRate  = 16000
 )
 
 type DeepSpeech struct {
@@ -43,6 +39,7 @@ type Options struct {
 	NCep                 int               `toml:"ncep"`
 	NContext             int               `toml:"ncontext"`
 	PrepareDirPath       string            `toml:"prepare_dir_path"`
+	PythonBinaryPath     string            `toml:"python_binary_path"`
 	TrainingArgs         map[string]string `toml:"training_args"`
 	TriePath             string            `toml:"trie_path"`
 	ValidWordCountWeight float64           `toml:"1.85"`
@@ -84,31 +81,24 @@ func (d *DeepSpeech) Close() {
 	}
 }
 
-func (d *DeepSpeech) Parse(samples []int32, bitDepth int, sampleRate float64) (t string, err error) {
+func (d *DeepSpeech) Parse(samples []int, bitDepth, numChannels, sampleRate int) (t string, err error) {
 	// No model
 	if d.m == nil {
 		return
 	}
 
-	// Create sample rate converter
+	// Create audio converter
 	var ss []int16
-	c := astiaudio.NewSampleRateConverter(sampleRate, deepSpeechSampleRate, func(s int32) (err error) {
-		// Convert bit depth
-		if s, err = astiaudio.ConvertBitDepth(s, bitDepth, deepSpeechBitDepth); err != nil {
-			err = errors.Wrap(err, "deepspeech: converting bit depth failed")
-			return
-		}
-
-		// Append sample
+	c := newAudioConverter(bitDepth, numChannels, sampleRate, func(s int) (err error) {
 		ss = append(ss, int16(s))
 		return
 	})
 
 	// Loop through samples
 	for _, s := range samples {
-		// Add to sample rate converter
-		if err = c.Add(s); err != nil {
-			err = errors.Wrap(err, "deepspeech: adding sample to sample rate converter failed")
+		// Add to audio converter
+		if err = c.add(s); err != nil {
+			err = errors.Wrap(err, "deepspeech: adding to audio converter failed")
 			return
 		}
 	}
@@ -142,64 +132,16 @@ func (d *DeepSpeech) handleError(ctx context.Context, speeches []speech_to_text.
 		},
 	}
 
-	// Get current speeches hash
-	var h []byte
-	if h, err = d.speechesHash(speeches); err != nil {
-		err = errors.Wrap(err, "deepspeech: getting current speeches hash failed")
-		return
-	}
-
 	// Prepare
-	if err = d.prepare(ctx, h, speeches, progressFunc, &p); err != nil {
+	if err = d.prepare(ctx, speeches, progressFunc, &p); err != nil {
 		err = errors.Wrap(err, "deepspeech: preparing failed")
 		return
 	}
 
 	// Train
-	if err = d.train(ctx, h, speeches, progressFunc, &p); err != nil {
+	if err = d.train(ctx, speeches, progressFunc, &p); err != nil {
 		err = errors.Wrap(err, "deepspeech: training failed")
 		return
 	}
-	return
-}
-
-func (d *DeepSpeech) speechesHash(speeches []speech_to_text.SpeechFile) (h []byte, err error) {
-	// Marshal
-	var b []byte
-	if b, err = json.Marshal(speeches); err != nil {
-		err = errors.Wrap(err, "deepspeech: marshaling failed")
-	}
-
-	// Create hasher
-	hh := sha1.New()
-
-	// Write
-	if _, err = hh.Write(b); err != nil {
-		err = errors.Wrap(err, "deepspeech: writing in hasher failed")
-		return
-	}
-
-	// Sum
-	h = hh.Sum(nil)
-	return
-}
-
-func (d *DeepSpeech) sameHashes(h []byte, path string) (same bool, err error) {
-	// Get previous hash
-	var ph []byte
-	if ph, err = ioutil.ReadFile(path); err != nil && !os.IsNotExist(err) {
-		err = errors.Wrapf(err, "deepspeech: reading %s failed", path)
-		return
-	}
-	err = nil
-
-	// Hashes are the same
-	if err == nil && bytes.Equal(ph, h) {
-		same = true
-		return
-	}
-
-	// Reset error
-	err = nil
 	return
 }

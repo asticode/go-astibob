@@ -8,20 +8,25 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
 
-	"sort"
-
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiaudio "github.com/asticode/go-astitools/audio"
 	astilimiter "github.com/asticode/go-astitools/limiter"
+	astipcm "github.com/asticode/go-astitools/pcm"
 	astisync "github.com/asticode/go-astitools/sync"
-	"github.com/cryptix/wav"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
+)
+
+// Audio formats
+const (
+	audioFormatPCM = 1
 )
 
 // Message names
@@ -36,7 +41,7 @@ const (
 )
 
 type Parser interface {
-	Parse(samples []int32, bitDepth int, sampleRate float64) (string, error)
+	Parse(samples []int, bitDepth, numChannels, sampleRate int) (string, error)
 	Train(ctx context.Context, speeches []SpeechFile, progressFunc func(Progress))
 }
 
@@ -90,7 +95,7 @@ type Runnable struct {
 	o      RunnableOptions
 	p      Parser
 	pg     *Progress
-	sds    map[string]*astiaudio.SilenceDetector
+	sds    map[string]*astipcm.SilenceDetector
 	ss     map[string]*Speech
 }
 
@@ -109,7 +114,7 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 		msd:            &sync.Mutex{},
 		o:              o,
 		p:              p,
-		sds:            make(map[string]*astiaudio.SilenceDetector),
+		sds:            make(map[string]*astipcm.SilenceDetector),
 		ss:             make(map[string]*Speech),
 	}
 
@@ -218,17 +223,19 @@ type Samples struct {
 	BitDepth             int                `json:"bit_depth"`
 	From                 astibob.Identifier `json:"from"`
 	MaxSilenceAudioLevel float64            `json:"max_silence_audio_level"`
-	SampleRate           float64            `json:"sample_rate"`
-	Samples              []int32            `json:"samples"`
+	NumChannels          int                `json:"num_channels"`
+	SampleRate           int                `json:"sample_rate"`
+	Samples              []int              `json:"samples"`
 }
 
-func NewSamplesMessage(from astibob.Identifier, samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) astibob.MessageContent {
+func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) astibob.MessageContent {
 	return astibob.MessageContent{
 		Name: samplesMessage,
 		Payload: Samples{
 			BitDepth:             bitDepth,
 			From:                 from,
 			MaxSilenceAudioLevel: maxSilenceAudioLevel,
+			NumChannels:          numChannels,
 			SampleRate:           sampleRate,
 			Samples:              samples,
 		},
@@ -276,7 +283,7 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 		r.msd.Lock()
 		sd, ok := r.sds[k]
 		if !ok {
-			sd = astiaudio.NewSilenceDetector(astiaudio.SilenceDetectorOptions{
+			sd = astipcm.NewSilenceDetector(astipcm.SilenceDetectorOptions{
 				MaxSilenceAudioLevel: s.MaxSilenceAudioLevel,
 				SampleRate:           s.SampleRate,
 			})
@@ -295,14 +302,14 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 		// Loop through valid samples
 		for _, vs := range vss {
 			// Parse speech
-			text, err := r.parseSpeech(s.From, vs, s.BitDepth, s.SampleRate)
+			text, err := r.parseSpeech(s.From, vs, s.BitDepth, s.NumChannels, s.SampleRate)
 			if err != nil {
 				astilog.Error(errors.Wrap(err, "speech_to_text: parsing samples failed"))
 			}
 
 			// Store speech
 			if r.o.StoreNewSpeeches && r.o.SpeechesDirPath != "" {
-				if err := r.storeSpeech(text, vs, s.BitDepth, s.SampleRate); err != nil {
+				if err := r.storeSpeech(text, vs, s.BitDepth, s.NumChannels, s.SampleRate); err != nil {
 					astilog.Error(errors.Wrap(err, "speech_to_text: storing speech failed"))
 				}
 			}
@@ -341,7 +348,7 @@ func parseTextPayload(m *astibob.Message) (t Text, err error) {
 	return
 }
 
-func (r *Runnable) parseSpeech(from astibob.Identifier, ss []int32, bitDepth int, sampleRate float64) (text string, err error) {
+func (r *Runnable) parseSpeech(from astibob.Identifier, ss []int, bitDepth, numChannels, sampleRate int) (text string, err error) {
 	// No parser
 	if r.p == nil {
 		return
@@ -350,7 +357,7 @@ func (r *Runnable) parseSpeech(from astibob.Identifier, ss []int32, bitDepth int
 	// Parse
 	astilog.Debugf("speech_to_text: parsing %d samples from runnable %s on worker %s", len(ss), *from.Name, *from.Worker)
 	start := time.Now()
-	if text, err = r.p.Parse(ss, bitDepth, sampleRate); err != nil {
+	if text, err = r.p.Parse(ss, bitDepth, numChannels, sampleRate); err != nil {
 		err = errors.Wrap(err, "speech_to_text: parsing speech failed")
 		return
 	}
@@ -414,10 +421,10 @@ func (r *Runnable) saveIndex() (err error) {
 	return
 }
 
-func (r *Runnable) storeSpeech(text string, ss []int32, bitDepth int, sampleRate float64) (err error) {
+func (r *Runnable) storeSpeech(text string, ss []int, bitDepth, numChannels, sampleRate int) (err error) {
 	// Store speech to wav
 	var s *Speech
-	if s, err = r.storeSpeechToWav(ss, bitDepth, sampleRate); err != nil {
+	if s, err = r.storeSpeechToWav(ss, bitDepth, numChannels, sampleRate); err != nil {
 		err = errors.Wrap(err, "speech_to_text: storing speech to wav failed")
 		return
 	}
@@ -448,7 +455,7 @@ func (r *Runnable) storeSpeech(text string, ss []int32, bitDepth int, sampleRate
 	return
 }
 
-func (r *Runnable) storeSpeechToWav(ss []int32, bitDepth int, sampleRate float64) (s *Speech, err error) {
+func (r *Runnable) storeSpeechToWav(ss []int, bitDepth, numChannels, sampleRate int) (s *Speech, err error) {
 	// Create wav file
 	var f *os.File
 	if f, err = ioutil.TempFile(r.o.SpeechesDirPath, "*.wav"); err != nil {
@@ -463,34 +470,21 @@ func (r *Runnable) storeSpeechToWav(ss []int32, bitDepth int, sampleRate float64
 		Name:      strings.TrimSuffix(filepath.Base(f.Name()), ".wav"),
 	}
 
-	// Create wav options
-	o := wav.File{
-		Channels:        1,
-		SampleRate:      uint32(sampleRate),
-		SignificantBits: uint16(bitDepth),
-	}
+	// Create encoder
+	e := wav.NewEncoder(f, sampleRate, bitDepth, numChannels, audioFormatPCM)
+	defer e.Close()
 
-	// Create wav writer
-	var w *wav.Writer
-	if w, err = o.NewWriter(f); err != nil {
-		err = errors.Wrap(err, "speech_to_text: creating wav writer failed")
+	// Write
+	if err = e.Write(&audio.IntBuffer{
+		Data: ss,
+		Format: &audio.Format{
+			NumChannels: numChannels,
+			SampleRate:  sampleRate,
+		},
+		SourceBitDepth: bitDepth,
+	}); err != nil {
+		err = errors.Wrap(err, "speech_to_text: writing wav sample failed")
 		return
-	}
-	defer w.Close()
-
-	// Loop through samples
-	for _, v := range ss {
-		// Create sample
-		var ss []byte
-		for idx := 0; idx < int(bitDepth/8); idx++ {
-			ss = append(ss, byte(v>>uint(idx*8)&0xff))
-		}
-
-		// Write sample
-		if err = w.WriteSample(ss); err != nil {
-			err = errors.Wrap(err, "speech_to_text: writing wav sample failed")
-			return
-		}
 	}
 	return
 }

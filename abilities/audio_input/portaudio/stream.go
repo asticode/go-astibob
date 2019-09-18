@@ -18,7 +18,7 @@ type StreamOptions struct {
 	MaxSilenceAudioLevel float64 `toml:"max_silence_audio_level"`
 	NumInputChannels     int     `toml:"num_input_channels"`
 	NumOutputChannels    int     `toml:"num_output_channels"`
-	SampleRate           float64 `toml:"sample_rate"`
+	SampleRate           int     `toml:"sample_rate"`
 }
 
 func (p *PortAudio) NewDefaultStream(o StreamOptions) (s *Stream, err error) {
@@ -32,7 +32,7 @@ func (p *PortAudio) NewDefaultStream(o StreamOptions) (s *Stream, err error) {
 	astilog.Debugf("portaudio: opening default stream %p", s)
 
 	// Open default stream
-	if s.s, err = portaudio.OpenDefaultStream(s.o.NumInputChannels, s.o.NumOutputChannels, s.o.SampleRate, len(s.b), s.b); err != nil {
+	if s.s, err = portaudio.OpenDefaultStream(s.o.NumInputChannels, s.o.NumOutputChannels, float64(s.o.SampleRate), len(s.b), s.b); err != nil {
 		err = errors.Wrapf(err, "portaudio: opening default stream %p failed", s)
 		return
 	}
@@ -43,7 +43,9 @@ func (s *Stream) BitDepth() int { return s.o.BitDepth }
 
 func (s *Stream) MaxSilenceAudioLevel() float64 { return s.o.MaxSilenceAudioLevel }
 
-func (s *Stream) SampleRate() float64 { return s.o.SampleRate }
+func (s *Stream) NumChannels() int { return s.o.NumInputChannels }
+
+func (s *Stream) SampleRate() int { return s.o.SampleRate }
 
 func (s *Stream) Close() (err error) {
 	// Log
@@ -81,7 +83,7 @@ func (s *Stream) Stop() (err error) {
 	return
 }
 
-func (s *Stream) Read() (rs []int32, err error) {
+func (s *Stream) Read() (rs []int, err error) {
 	// Read
 	if err = s.s.Read(); err != nil {
 		err = errors.Wrapf(err, "portaudio: reading from stream %p failed", s)
@@ -89,7 +91,8 @@ func (s *Stream) Read() (rs []int32, err error) {
 	}
 
 	// Clone buffer
-	rs = make([]int32, len(s.b))
-	copy(rs, s.b)
+	for _, v := range s.b {
+		rs = append(rs, int(v))
+	}
 	return
 }

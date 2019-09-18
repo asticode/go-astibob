@@ -14,4 +14,4 @@ w3:
 	CGO_CXXFLAGS="-I${CURDIR}/demo/tmp/deepspeech/include" \
 	LIBRARY_PATH=${CURDIR}/demo/tmp/deepspeech/lib:${LIBRARY_PATH} \
 	LD_LIBRARY_PATH=${CURDIR}/demo/tmp/deepspeech/lib:${LD_LIBRARY_PATH} \
-	go run demo/workers/3/main.go
+	go run demo/workers/3/main.go -v

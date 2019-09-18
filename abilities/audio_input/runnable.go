@@ -3,21 +3,16 @@ package audio_input
 import (
 	"context"
 	"encoding/json"
-
-	"net/http"
-
-	"sync"
-
-	"time"
-
-	"math"
-
 	"fmt"
+	"math"
+	"net/http"
+	"sync"
+	"time"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astichartjs"
 	"github.com/asticode/go-astilog"
-	astiaudio "github.com/asticode/go-astitools/audio"
+	astipcm "github.com/asticode/go-astitools/pcm"
 	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
@@ -37,8 +32,9 @@ var (
 type Stream interface {
 	BitDepth() int
 	MaxSilenceAudioLevel() float64
-	Read() ([]int32, error)
-	SampleRate() float64
+	NumChannels() int
+	Read() ([]int, error)
+	SampleRate() int
 	Start() error
 	Stop() error
 }
@@ -108,7 +104,7 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 		}
 
 		// Read
-		var b []int32
+		var b []int
 		if b, err = r.s.Read(); err != nil {
 			err = errors.Wrap(err, "audio_input: reading failed")
 			return
@@ -130,11 +126,12 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 type Samples struct {
 	BitDepth             int     `json:"bit_depth"`
 	MaxSilenceAudioLevel float64 `json:"max_silence_audio_level"`
-	SampleRate           float64 `json:"sample_rate"`
-	Samples              []int32 `json:"samples"`
+	NumChannels          int     `json:"num_channels"`
+	SampleRate           int     `json:"sample_rate"`
+	Samples              []int   `json:"samples"`
 }
 
-func (r *Runnable) newSamplesMessage(b []int32) (m *astibob.Message, err error) {
+func (r *Runnable) newSamplesMessage(b []int) (m *astibob.Message, err error) {
 	// Create message
 	m = astibob.NewMessage()
 
@@ -145,6 +142,7 @@ func (r *Runnable) newSamplesMessage(b []int32) (m *astibob.Message, err error) 
 	if m.Payload, err = json.Marshal(Samples{
 		BitDepth:             r.s.BitDepth(),
 		MaxSilenceAudioLevel: r.s.MaxSilenceAudioLevel(),
+		NumChannels:          r.s.NumChannels(),
 		Samples:              b,
 		SampleRate:           r.s.SampleRate(),
 	}); err != nil {
@@ -162,7 +160,7 @@ func parseSamplesPayload(m *astibob.Message) (ss Samples, err error) {
 	return
 }
 
-func (r *Runnable) onSamples(_ astibob.Identifier, samples []int32, _ int, _, _ float64) (err error) {
+func (r *Runnable) onSamples(_ astibob.Identifier, samples []int, _, _, _ int, _ float64) (err error) {
 	// Lock
 	r.mc.Lock()
 
@@ -213,7 +211,7 @@ func (r *Runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httpro
 }
 
 type calibration struct {
-	b      []int32
+	b      []int
 	c      *sync.Cond
 	cancel context.CancelFunc
 	ctx    context.Context
@@ -243,10 +241,10 @@ func (c *calibration) close() {
 	c.cancel()
 }
 
-func (c *calibration) add(s []int32) (done bool) {
+func (c *calibration) add(s []int) (done bool) {
 	// Get required number of samples
 	// We take one more step than requested for the chart to be fully drawn
-	n := int(c.s.SampleRate()*calibrationDuration.Seconds()) + int(c.s.SampleRate()*calibrationStepDuration.Seconds())
+	n := int(float64(c.s.SampleRate())*calibrationDuration.Seconds()) + int(float64(c.s.SampleRate())*calibrationStepDuration.Seconds())
 
 	// Lock
 	c.mb.Lock()
@@ -338,7 +336,7 @@ func (c *calibration) results() (o Calibration) {
 	}
 
 	// Get number of samples per steps
-	numberOfSamplesPerStep := int(math.Ceil(c.s.SampleRate() * calibrationStepDuration.Seconds()))
+	numberOfSamplesPerStep := int(math.Ceil(float64(c.s.SampleRate()) * calibrationStepDuration.Seconds()))
 
 	// Get number of steps
 	numberOfSteps := int(math.Ceil(float64(len(c.b)) / float64(numberOfSamplesPerStep)))
@@ -351,7 +349,7 @@ func (c *calibration) results() (o Calibration) {
 		end := start + numberOfSamplesPerStep
 
 		// Get samples
-		var samples []int32
+		var samples []int
 		if len(c.b) >= end {
 			samples = c.b[start:end]
 		} else {
@@ -359,13 +357,13 @@ func (c *calibration) results() (o Calibration) {
 		}
 
 		// Compute audio level
-		audioLevel := astiaudio.AudioLevel(samples)
+		audioLevel := astipcm.AudioLevel(samples)
 
 		// Get max audio level
 		o.MaxAudioLevel = math.Max(o.MaxAudioLevel, audioLevel)
 
 		// Add data to chart
-		maxX = float64(numberOfSamplesPerStep) / c.s.SampleRate() * float64(idx)
+		maxX = float64(numberOfSamplesPerStep) / float64(c.s.SampleRate()) * float64(idx)
 		o.Chart.Data.Datasets[0].Data = append(o.Chart.Data.Datasets[0].Data, astichartjs.DataPoint{
 			X: maxX,
 			Y: audioLevel,

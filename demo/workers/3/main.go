@@ -29,21 +29,36 @@ func main() {
 	defer w.Close()
 
 	// Create deepspeech
+	mp := "demo/tmp/deepspeech/model/custom"
 	d := deepspeech.New(deepspeech.Options{
-		AlphabetPath:   "demo/tmp/deepspeech/model/alphabet.txt",
+		AlphabetPath:   mp + "/alphabet.txt",
 		BeamWidth:      1024,
 		ClientPath:     "demo/tmp/deepspeech/DeepSpeech/DeepSpeech.py",
-		LMPath:         "demo/tmp/deepspeech/model/lm.binary",
+		LMPath:         mp + "/lm.binary",
 		LMWeight:       0.75,
-		ModelPath:      "demo/tmp/deepspeech/model/output_graph.pb",
+		ModelPath:      mp + "/output_graph.pb",
 		NCep:           26,
 		NContext:       9,
 		PrepareDirPath: "demo/tmp/deepspeech/prepare",
 		TrainingArgs: map[string]string{
-			"checkpoint_dir":    "demo/tmp/deepspeech/model/checkpoints",
-			"export_dir":        "demo/tmp/deepspeech/model",
+			"checkpoint_dir":   "demo/tmp/deepspeech/model/custom/checkpoints",
+			"dev_batch_size":   "4",
+			"epochs":           "50",
+			"export_dir":       "demo/tmp/deepspeech/model/custom",
+			"noearly_stop":     "",
+			"test_batch_size":  "4",
+			"train_batch_size": "20",
+
+			/* TODO Try those values provided by Mozilla
+			n_hidden 2048
+			learning_rate 0.0001
+			dropout_rate 0.15
+			epoch 75
+			lm_alpha 0.75
+			lm_beta 1.85
+			*/
 		},
-		TriePath:             "demo/tmp/deepspeech/model/trie",
+		TriePath:             mp + "/trie",
 		ValidWordCountWeight: 1.85,
 	})
 	defer d.Close()
@@ -73,12 +88,13 @@ func main() {
 	w.RegisterListenables(
 		worker.Listenable{
 			Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
-				OnSamples: func(from astibob.Identifier, samples []int32, bitDepth int, sampleRate, maxSilenceAudioLevel float64) (err error) {
+				OnSamples: func(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) (err error) {
 					// Send message
 					if err = w.SendMessages("Worker #3", "Speech to Text", speech_to_text.NewSamplesMessage(
 						from,
 						samples,
 						bitDepth,
+						numChannels,
 						sampleRate,
 						maxSilenceAudioLevel,
 					)); err != nil {
@@ -94,7 +110,8 @@ func main() {
 		worker.Listenable{
 			Listenable: speech_to_text.NewListenable(speech_to_text.ListenableOptions{
 				OnText: func(from astibob.Identifier, text string) (err error) {
-					astilog.Warnf("main: on text: worker: %s - runnable: %s - text: %s", *from.Name, *from.Worker, text)
+					// Log
+					astilog.Infof("main: new speech: %s", text)
 					return
 				},
 			}),

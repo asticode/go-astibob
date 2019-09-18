@@ -1,25 +1,39 @@
 package deepspeech
 
 import (
+	"bytes"
 	"context"
+	"crypto/sha1"
 	"encoding/csv"
-	"io"
+	"encoding/json"
 	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strconv"
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
-	"github.com/asticode/go-astitools/audio"
-	"github.com/cryptix/wav"
+	"github.com/go-audio/audio"
+	"github.com/go-audio/wav"
 	"github.com/pkg/errors"
 )
 
-func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
+// Audio formats
+const (
+	audioFormatPCM = 1
+)
+
+func (d *DeepSpeech) prepare(ctx context.Context, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
 	// Update progress
 	p.CurrentStep = preparingStep
 	p.Progress = 0
 	progressFunc(*p)
+
+	// Get current speeches hash
+	var h []byte
+	if h, err = d.speechesHash(speeches); err != nil {
+		err = errors.Wrap(err, "deepspeech: getting current speeches hash failed")
+		return
+	}
 
 	// Check whether hashes are the same
 	var same bool
@@ -81,22 +95,33 @@ func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to
 			return
 		}
 
-		// Choose index
-		var i *index
-		if float64(idx) < float64(len(speeches))*0.8 {
-			i = train
-		} else if float64(idx) < float64(len(speeches))*0.9 {
-			i = dev
+		// Choose indexes
+		var is []*index
+		if len(speeches) < 10 {
+			if idx == len(speeches)-1 {
+				is = []*index{train, dev, test}
+			} else {
+				is = []*index{train}
+			}
 		} else {
-			i = test
+			if float64(idx) < float64(len(speeches))*0.8 {
+				is = []*index{train}
+			} else if float64(idx) < float64(len(speeches))*0.9 {
+				is = []*index{dev}
+			} else {
+				is = []*index{test}
+			}
 		}
 
-		// Write csv line
-		if err = i.w.Write([]string{path, strconv.Itoa(int(fi.Size())), s.Text}); err != nil {
-			err = errors.Wrap(err, "deepspeech: writing csv line failed")
-			return
+		// Loop through indexes
+		for _, i := range is {
+			// Write csv line
+			if err = i.w.Write([]string{path, strconv.Itoa(int(fi.Size())), s.Text}); err != nil {
+				err = errors.Wrap(err, "deepspeech: writing csv line failed")
+				return
+			}
+			i.w.Flush()
 		}
-		i.w.Flush()
 
 		// Update progress
 		p.Progress = float64(idx+1) / float64(len(speeches)) * 100.0
@@ -111,8 +136,49 @@ func (d *DeepSpeech) prepare(ctx context.Context, h []byte, speeches []speech_to
 	return
 }
 
+func (d *DeepSpeech) speechesHash(speeches []speech_to_text.SpeechFile) (h []byte, err error) {
+	// Marshal
+	var b []byte
+	if b, err = json.Marshal(speeches); err != nil {
+		err = errors.Wrap(err, "deepspeech: marshaling failed")
+	}
+
+	// Create hasher
+	hh := sha1.New()
+
+	// Write
+	if _, err = hh.Write(b); err != nil {
+		err = errors.Wrap(err, "deepspeech: writing in hasher failed")
+		return
+	}
+
+	// Sum
+	h = hh.Sum(nil)
+	return
+}
+
 func (d *DeepSpeech) prepareHashPath() string {
 	return filepath.Join(d.o.PrepareDirPath, "hash")
+}
+
+func (d *DeepSpeech) sameHashes(h []byte, path string) (same bool, err error) {
+	// Get previous hash
+	var ph []byte
+	if ph, err = ioutil.ReadFile(path); err != nil && !os.IsNotExist(err) {
+		err = errors.Wrapf(err, "deepspeech: reading %s failed", path)
+		return
+	}
+	err = nil
+
+	// Hashes are the same
+	if err == nil && bytes.Equal(ph, h) {
+		same = true
+		return
+	}
+
+	// Reset error
+	err = nil
+	return
 }
 
 type index struct {
@@ -164,13 +230,6 @@ func (d *DeepSpeech) createIndex(path string) (i *index, err error) {
 }
 
 func (d *DeepSpeech) convertAudioFile(s speech_to_text.SpeechFile) (path string, err error) {
-	// Stat src
-	var i os.FileInfo
-	if i, err = os.Stat(s.Path); err != nil {
-		err = errors.Wrapf(err, "deepspeech: stating %s failed", s.Path)
-		return
-	}
-
 	// Open src
 	var src *os.File
 	if src, err = os.Open(s.Path); err != nil {
@@ -179,12 +238,11 @@ func (d *DeepSpeech) convertAudioFile(s speech_to_text.SpeechFile) (path string,
 	}
 	defer src.Close()
 
-	// Create wav reader
-	var r *wav.Reader
-	if r, err = wav.NewReader(src, i.Size()); err != nil {
-		err = errors.Wrap(err, "deepspeech: creating wav reader failed")
-		return
-	}
+	// Create decoder
+	dc := wav.NewDecoder(src)
+
+	// Read info
+	dc.ReadInfo()
 
 	// Create path
 	path = filepath.Join(d.o.PrepareDirPath, filepath.Base(s.Path))
@@ -197,60 +255,49 @@ func (d *DeepSpeech) convertAudioFile(s speech_to_text.SpeechFile) (path string,
 	}
 	defer dst.Close()
 
-	// Create wav options
-	o := wav.File{
-		Channels:        1,
-		SampleRate:      deepSpeechSampleRate,
-		SignificantBits: deepSpeechBitDepth,
-	}
+	// Create encoder
+	e := wav.NewEncoder(dst, deepSpeechSampleRate, deepSpeechBitDepth, deepSpeechNumChannels, audioFormatPCM)
+	defer e.Close()
 
-	// Create wav writer
-	var w *wav.Writer
-	if w, err = o.NewWriter(dst); err != nil {
-		err = errors.Wrap(err, "deepspeech: creating wav writer failed")
-		return
-	}
-	defer w.Close()
-
-	// Create sample rate converter
-	c := astiaudio.NewSampleRateConverter(float64(r.GetSampleRate()), float64(o.SampleRate), func(i int32) (err error) {
-		// Convert bit depth
-		if i, err = astiaudio.ConvertBitDepth(i, int(r.GetFile().SignificantBits), int(o.SignificantBits)); err != nil {
-			err = errors.Wrap(err, "deepspeech: converting bit depth failed")
-			return
-		}
-
-		// Create sample
-		var s []byte
-		for idx := 0; idx < int(o.SignificantBits/8); idx++ {
-			s = append(s, byte(i>>uint(idx*8)&0xff))
-		}
-
+	// Create audio converter
+	c := newAudioConverter(int(dc.BitDepth), int(dc.NumChans), int(dc.SampleRate), func(s int) (err error) {
 		// Write
-		if err = w.WriteSample(s); err != nil {
+		if err = e.Write(&audio.IntBuffer{
+			Data: []int{s},
+			Format: &audio.Format{
+				NumChannels: e.NumChans,
+				SampleRate:  e.SampleRate,
+			},
+			SourceBitDepth: e.BitDepth,
+		}); err != nil {
 			err = errors.Wrap(err, "deepspeech: writing wav sample failed")
 			return
 		}
 		return
 	})
 
-	// Loop through samples
+	// Loop through buffers
+	b := &audio.IntBuffer{Data: make([]int, 5000)}
 	for {
-		// Read sample
-		var s int32
-		if s, err = r.ReadSample(); err != nil {
-			if err != io.EOF {
-				err = errors.Wrap(err, "deepspeech: reading wav sample failed")
-				return
-			}
-			err = nil
+		// Get next buffer
+		var n int
+		if n, err = dc.PCMBuffer(b); err != nil {
+			err = errors.Wrap(err, "deepspeech: getting next buffer failed")
+			return
+		}
+
+		// Nothing written
+		if n == 0 {
 			break
 		}
 
-		// Add to sample rate converter
-		if err = c.Add(s); err != nil {
-			err = errors.Wrap(err, "deepspeech: adding sample to sample rate converter failed")
-			return
+		// Loop through samples
+		for idx := 0; idx < n; idx++ {
+			// Add to audio converter
+			if err = c.add(b.Data[idx]); err != nil {
+				err = errors.Wrap(err, "deepspeech: adding to audio converter failed")
+				return
+			}
 		}
 	}
 	return

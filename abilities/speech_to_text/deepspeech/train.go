@@ -4,9 +4,9 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -16,22 +16,21 @@ import (
 	"github.com/pkg/errors"
 )
 
-func (d *DeepSpeech) train(ctx context.Context, h []byte, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
+// Regexps
+var (
+	regexpEpoch = regexp.MustCompile("^I Finished training epoch ([\\d]+)")
+)
+
+func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
 	// Update progress
 	p.CurrentStep = trainingStep
 	p.Progress = 0
 	progressFunc(*p)
 
-	// Check whether hashes are the same
-	var same bool
-	if same, err = d.sameHashes(h, d.trainHashPath()); err != nil {
-		err = errors.Wrap(err, "deepspeech: checking whether hashes are the same failed")
-		return
-	} else if same {
-		// Update progress
-		p.Progress = 100
-		progressFunc(*p)
-		return
+	// Create name
+	name := "python3"
+	if d.o.PythonBinaryPath != "" {
+		name = d.o.PythonBinaryPath
 	}
 
 	// Create args
@@ -48,16 +47,58 @@ func (d *DeepSpeech) train(ctx context.Context, h []byte, speeches []speech_to_t
 	args["lm_binary_path"] = d.o.LMPath
 	args["lm_trie_path"] = d.o.TriePath
 	args["audio_sample_rate"] = strconv.Itoa(deepSpeechSampleRate)
+	args["noshow_progressbar"] = ""
+
+	// Default args
+	if _, ok := args["epochs"]; !ok {
+		args["epochs"] = "75"
+	}
+
+	// Get number of epochs
+	var numEpochs int
+	if numEpochs, err = strconv.Atoi(args["epochs"]); err != nil {
+		err = errors.Wrapf(err, "deepspeech: atoi of %s failed", args["epochs"])
+		return
+	}
 
 	// Create command
-	cmd := exec.CommandContext(ctx, d.o.ClientPath, argsToSlice(args)...)
+	cmd := exec.CommandContext(ctx, name, append([]string{"-u", d.o.ClientPath}, argsToSlice(args)...)...)
 
 	// Intercept stderr
 	var stderr [][]byte
-	cmd.Stderr = astiexec.NewStdWriter(func(i []byte) { stderr = append(stderr, i) })
+	cmd.Stderr = astiexec.NewStdWriter(func(i []byte) {
+		// Log
+		astilog.Debugf("deepspeech: stderr: %s", i)
+
+		// Append
+		stderr = append(stderr, i)
+	})
 
 	// Intercept stdout
-	cmd.Stdout = astiexec.NewStdWriter(func(i []byte) { astilog.Warnf("stdout: %s", i) })
+	var epoch int
+	var errStdOut error
+	cmd.Stdout = astiexec.NewStdWriter(func(i []byte) {
+		// Log
+		astilog.Debugf("deepspeech: stdout: %s", i)
+
+		// Parse epoch
+		if ms := regexpEpoch.FindStringSubmatch(string(i)); len(ms) >= 2 {
+			// Convert to int
+			if epoch, errStdOut = strconv.Atoi(ms[1]); err != nil {
+				astilog.Error(errors.Wrapf(errStdOut, "deepspeech: atoi of %s failed", ms[1]))
+			}
+
+			// Update progress
+			// We can't have the progress be 100 when epoch == numEpoch since at that time the binary is still running
+			// Epoch starts at 0
+			p.Progress = 1 + (float64(epoch) / float64(numEpochs) * 98)
+			progressFunc(*p)
+		}
+	})
+
+	// Create the illusion we're doing something :D
+	p.Progress = 1
+	progressFunc(*p)
 
 	// Run
 	astilog.Debugf("deepspeech: running %s", strings.Join(cmd.Args, " "))
@@ -67,12 +108,6 @@ func (d *DeepSpeech) train(ctx context.Context, h []byte, speeches []speech_to_t
 			m = fmt.Sprintf(" with stderr:\n\n%s\n\n", bytes.Join(stderr, []byte("\n")))
 		}
 		err = errors.Wrapf(err, "deepspeech: running %s failed%s", strings.Join(cmd.Args, " "), m)
-		return
-	}
-
-	// Store hash
-	if err = ioutil.WriteFile(d.trainHashPath(), h, 0666); err != nil {
-		err = errors.Wrapf(err, "deepspeech: storing hash in %s failed", d.prepareHashPath())
 		return
 	}
 
