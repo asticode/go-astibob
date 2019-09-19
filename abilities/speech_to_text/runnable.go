@@ -300,16 +300,19 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 		}
 
 		// Loop through valid samples
-		for _, vs := range vss {
+		for _, ss := range vss {
+			// Normalize samples
+			ss = astipcm.Normalize(ss, s.BitDepth)
+
 			// Parse speech
-			text, err := r.parseSpeech(s.From, vs, s.BitDepth, s.NumChannels, s.SampleRate)
+			text, err := r.parseSpeech(s.From, ss, s.BitDepth, s.NumChannels, s.SampleRate)
 			if err != nil {
 				astilog.Error(errors.Wrap(err, "speech_to_text: parsing samples failed"))
 			}
 
 			// Store speech
 			if r.o.StoreNewSpeeches && r.o.SpeechesDirPath != "" {
-				if err := r.storeSpeech(text, vs, s.BitDepth, s.NumChannels, s.SampleRate); err != nil {
+				if err := r.storeSpeech(text, ss, s.BitDepth, s.NumChannels, s.SampleRate); err != nil {
 					astilog.Error(errors.Wrap(err, "speech_to_text: storing speech failed"))
 				}
 			}
