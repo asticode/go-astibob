@@ -49,14 +49,12 @@ func main() {
 			"test_batch_size":  "4",
 			"train_batch_size": "20",
 
-			/* TODO Try those values provided by Mozilla
-			n_hidden 2048
-			learning_rate 0.0001
-			dropout_rate 0.15
-			epoch 75
-			lm_alpha 0.75
-			lm_beta 1.85
-			*/
+			// Mozilla values
+			"n_hidden":         "2048",
+			"learning_rate":    "0.0001",
+			"dropout_rate":     "0.15",
+			"lm_alpha":         "0.75",
+			"lm_beta":          "1.85",
 		},
 		TriePath:             mp + "/trie",
 		ValidWordCountWeight: 1.85,
