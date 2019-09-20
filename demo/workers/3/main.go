@@ -29,7 +29,7 @@ func main() {
 	defer w.Close()
 
 	// Create deepspeech
-	mp := "demo/tmp/deepspeech/model/custom"
+	mp := "demo/tmp/deepspeech/model/en"
 	d := deepspeech.New(deepspeech.Options{
 		AlphabetPath:   mp + "/alphabet.txt",
 		BeamWidth:      1024,
@@ -43,14 +43,12 @@ func main() {
 		TrainingArgs: map[string]string{
 			"checkpoint_dir":   "demo/tmp/deepspeech/model/custom/checkpoints",
 			"dev_batch_size":   "4",
-			"epochs":           "50",
 			"export_dir":       "demo/tmp/deepspeech/model/custom",
 			"noearly_stop":     "",
 			"test_batch_size":  "4",
 			"train_batch_size": "20",
 
 			// Mozilla values
-			"n_hidden":         "2048",
 			"learning_rate":    "0.0001",
 			"dropout_rate":     "0.15",
 			"lm_alpha":         "0.75",
@@ -109,7 +107,7 @@ func main() {
 			Listenable: speech_to_text.NewListenable(speech_to_text.ListenableOptions{
 				OnText: func(from astibob.Identifier, text string) (err error) {
 					// Log
-					astilog.Infof("main: new speech: %s", text)
+					astilog.Warnf("main: new speech: %s", text)
 					return
 				},
 			}),
