@@ -791,10 +791,12 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 	// Create speech files
 	var fs []SpeechFile
 	r.orderedSpeeches(func(s Speech) {
-		fs = append(fs, SpeechFile{
-			Path: filepath.Join(r.o.SpeechesDirPath, s.Name+".wav"),
-			Text: s.Text,
-		})
+		if s.IsValidated {
+			fs = append(fs, SpeechFile{
+				Path: filepath.Join(r.o.SpeechesDirPath, s.Name+".wav"),
+				Text: s.Text,
+			})
+		}
 	})
 
 	// Create task
