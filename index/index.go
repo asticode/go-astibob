@@ -3,7 +3,6 @@ package index
 import (
 	"fmt"
 	"net/http"
-	"path/filepath"
 	"sort"
 	"sync"
 
@@ -17,8 +16,7 @@ import (
 )
 
 type Options struct {
-	Server        astibob.ServerOptions `toml:"server"`
-	ResourcesPath string                `toml:"resources_path"`
+	Server astibob.ServerOptions `toml:"server"`
 }
 
 type Index struct {
@@ -27,6 +25,7 @@ type Index struct {
 	mu *sync.Mutex // Locks us
 	mw *sync.Mutex // Locks ws
 	o  Options
+	r  *resources
 	t  *astitemplate.Templater
 	us map[string]map[string]bool // UI message names indexed by message --> ui
 	w  *astiworker.Worker
@@ -43,6 +42,8 @@ func New(o Options) (i *Index, err error) {
 		mu: &sync.Mutex{},
 		mw: &sync.Mutex{},
 		o:  o,
+		r:  newResources(),
+		t:  astitemplate.NewTemplater(),
 		us: make(map[string]map[string]bool),
 		w:  astiworker.NewWorker(),
 		ws: make(map[string]*worker),
@@ -50,22 +51,17 @@ func New(o Options) (i *Index, err error) {
 		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
 	}
 
-	// Default resources path
-	if i.o.ResourcesPath == "" {
-		i.o.ResourcesPath = "index/resources"
-	}
-
 	// Create dispatcher
 	i.d = astibob.NewDispatcher(i.w.Context(), i.w.NewTask)
 
-	// Create templater
-	if i.t, err = astitemplate.NewTemplater(
-		filepath.Join(i.o.ResourcesPath, "templates", "pages"),
-		filepath.Join(i.o.ResourcesPath, "templates", "layouts"),
-		".html",
-	); err != nil {
-		err = errors.Wrapf(err, "index: creating templater with resources path %s failed", i.o.ResourcesPath)
-		return
+	// Loop through layouts
+	for _, c := range i.r.layouts() {
+		i.t.AddLayout(c)
+	}
+
+	// Loop through templates
+	for p, c := range i.r.templates() {
+		i.t.AddTemplate(p, c)
 	}
 
 	// Add dispatcher handlers

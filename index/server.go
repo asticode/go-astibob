@@ -3,8 +3,6 @@ package index
 import (
 	"net/http"
 
-	"path/filepath"
-
 	astihttp "github.com/asticode/go-astitools/http"
 	"github.com/julienschmidt/httprouter"
 )
@@ -14,8 +12,10 @@ func (i *Index) Serve() {
 	// Create router
 	r := httprouter.New()
 
-	// Static
-	r.ServeFiles("/static/*filepath", http.Dir(filepath.Join(i.o.ResourcesPath, "static")))
+	// Statics
+	for p, h := range i.r.statics() {
+		r.GET("/static"+p, h)
+	}
 
 	// Web
 	r.GET("/", i.homepage)

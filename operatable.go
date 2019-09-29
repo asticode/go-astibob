@@ -3,14 +3,7 @@ package astibob
 import (
 	"sync"
 
-	"net/http"
-
-	"mime"
-	"path/filepath"
-
-	"github.com/asticode/go-astilog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 type Operatable interface {
@@ -64,30 +57,4 @@ func (o *BaseOperatable) AddTemplate(n string, c []byte) {
 	o.mt.Lock()
 	defer o.mt.Unlock()
 	o.ts[n] = c
-}
-
-func ContentHandle(path string, c []byte) httprouter.Handle {
-	// Get mime type
-	t := mime.TypeByExtension(filepath.Ext(path))
-	if t == "" {
-		t = "binary"
-	}
-	return func(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-		// Set content type
-		rw.Header().Set("Content-Type", t)
-
-		// Write
-		if _, err := rw.Write(c); err != nil {
-			rw.WriteHeader(http.StatusInternalServerError)
-			astilog.Error(errors.Wrapf(err, "astibob: writing %s failed", r.URL.Path))
-			return
-		}
-	}
-}
-
-func DirHandle(path string) httprouter.Handle {
-	return func(w http.ResponseWriter, req *http.Request, ps httprouter.Params) {
-		req.URL.Path = ps.ByName("path")
-		http.FileServer(http.Dir(path)).ServeHTTP(w, req)
-	}
 }

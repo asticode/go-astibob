@@ -37,3 +37,7 @@ Install for training too:
 # Add an ability
  
 - use cmd/operatable to generate operatable.go
+
+# Update index
+
+- use cmd/index to generate resources.go
