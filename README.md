@@ -33,3 +33,7 @@ LD_LIBRARY_PATH=<full path to the lib dir you've created>:$LD_LIBRARY_PATH
 Install for training too:
 - clone git clone https://github.com/mozilla/DeepSpeech into working dir
 - [install deepspeech](https://github.com/mozilla/DeepSpeech#training-your-own-model)
+
+# Add an ability
+ 
+- use cmd/operatable to generate operatable.go

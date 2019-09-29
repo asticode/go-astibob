@@ -14,6 +14,7 @@ import (
 
 // Flags
 var (
+	ability   = flag.String("a", "", "the path to the directory containing the ability")
 	abilities = flag.String("as", "", "the path to the directory containing abilities")
 )
 
@@ -52,9 +53,23 @@ func main() {
 	astilog.FlagInit()
 
 	// Read dir
-	fs, err := ioutil.ReadDir(*abilities)
-	if err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: reading dir %s failed", *abilities))
+	var fs []os.FileInfo
+	var baseDir string
+	var err error
+	if *abilities != "" {
+		baseDir = *abilities
+		if fs, err = ioutil.ReadDir(*abilities); err != nil {
+			astilog.Fatal(errors.Wrapf(err, "main: reading dir %s failed", *abilities))
+		}
+	} else if *ability != "" {
+		baseDir = filepath.Dir(*ability)
+		f, err := os.Stat(*ability)
+		if err != nil {
+			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", *ability))
+		}
+		fs = append(fs, f)
+	} else {
+		astilog.Fatal("main: no input path provided")
 	}
 
 	// Parse template
@@ -74,12 +89,12 @@ func main() {
 		// Create data
 		d := Data{
 			Package:   f.Name(),
-			Static: make(map[string][]byte),
+			Static:    make(map[string][]byte),
 			Templates: make(map[string][]byte),
 		}
 
 		// Stat resources folder
-		rp := filepath.Join(*abilities, f.Name(), "resources")
+		rp := filepath.Join(baseDir, f.Name(), "resources")
 		if _, err = os.Stat(rp); err != nil && !os.IsNotExist(err) {
 			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", rp))
 		} else if os.IsNotExist(err) {
@@ -87,7 +102,7 @@ func main() {
 		}
 
 		// Stat static folder
-		sp := filepath.Join(*abilities, f.Name(), "resources", "static")
+		sp := filepath.Join(baseDir, f.Name(), "resources", "static")
 		if _, err = os.Stat(sp); err != nil && !os.IsNotExist(err) {
 			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", sp))
 		}
@@ -114,7 +129,7 @@ func main() {
 				}
 
 				// Add to data
-				d.Static["/static" + filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
+				d.Static["/static"+filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
 				return
 				return
 			}); err != nil {
@@ -123,7 +138,7 @@ func main() {
 		}
 
 		// Stat templates folder
-		tp := filepath.Join(*abilities, f.Name(), "resources", "templates")
+		tp := filepath.Join(baseDir, f.Name(), "resources", "templates")
 		if _, err = os.Stat(tp); err != nil && !os.IsNotExist(err) {
 			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", tp))
 		}
@@ -163,7 +178,7 @@ func main() {
 		}
 
 		// Create destination
-		dp := filepath.Join(*abilities, f.Name(), "operatable.go")
+		dp := filepath.Join(baseDir, f.Name(), "operatable.go")
 		f, err := os.Create(dp)
 		if err != nil {
 			astilog.Fatal(errors.Wrapf(err, "main: creating %s failed", dp))
