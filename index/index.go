@@ -144,9 +144,9 @@ func sendMessage(m *astibob.Message, label string, wm *astiws.Manager, names ...
 	}
 
 	// Loop through clients
-	for n, c := range cs {
+	for _, c := range cs {
 		// Log
-		astilog.Debugf("index: sending %s message to %s %s", m.Name, label, n)
+		astilog.Debugf("index: sending %s message to %s with client %p", m.Name, label, c)
 
 		// Write
 		if err = c.WriteJSON(m); err != nil {

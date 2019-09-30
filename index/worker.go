@@ -104,6 +104,12 @@ func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 }
 
 func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
+	// Only send messages coming from uis or index as it would create an endless loop if we'd send messages coming
+	// from workers
+	if m.From.Type == astibob.RunnableIdentifierType || m.From.Type == astibob.WorkerIdentifierType {
+		return
+	}
+
 	// Invalid to
 	if m.To == nil {
 		err = errors.New("index: invalid to")

@@ -142,7 +142,10 @@ func (w *Worker) startRunnable(name string) (err error) {
 	astilog.Infof("worker: starting runnable %s", name)
 
 	// Create started message
-	m := astibob.NewRunnableStartedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+	m := astibob.NewRunnableStartedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
+		astibob.UIIdentifierType:     true,
+		astibob.WorkerIdentifierType: true,
+	}})
 
 	// Dispatch
 	w.d.Dispatch(m)
@@ -162,10 +165,16 @@ func (w *Worker) startRunnable(name string) (err error) {
 
 		// Create message
 		if err == nil || err == astibob.ErrContextCancelled {
-			m = astibob.NewRunnableStoppedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewRunnableStoppedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
+				astibob.UIIdentifierType:     true,
+				astibob.WorkerIdentifierType: true,
+			}})
 			astilog.Infof("worker: runnable %s has stopped", name)
 		} else {
-			m = astibob.NewRunnableCrashedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Type: astibob.UIIdentifierType})
+			m = astibob.NewRunnableCrashedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
+				astibob.UIIdentifierType:     true,
+				astibob.WorkerIdentifierType: true,
+			}})
 			astilog.Infof("worker: runnable %s has crashed", name)
 		}
 

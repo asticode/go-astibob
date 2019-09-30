@@ -8,6 +8,7 @@ import (
 	"github.com/asticode/go-astibob/abilities/text_to_speech/speak"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
+	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/pkg/errors"
 )
 
@@ -27,8 +28,22 @@ func main() {
 	})
 	defer w.Close()
 
-	// Handle signals
-	w.HandleSignals()
+	// Say "Hello world" when the runnable has started
+	w.On(astibob.DispatchConditions{
+		From: &astibob.Identifier{
+			Name:   astiptr.Str("Text to Speech"),
+			Type:   astibob.RunnableIdentifierType,
+			Worker: astiptr.Str("Worker #1"),
+		},
+		Name: astiptr.Str(astibob.RunnableStartedMessage),
+	}, func(m *astibob.Message) (err error) {
+		// Send message
+		if err = w.SendMessages("Worker #1", "Text to Speech", text_to_speech.NewSayMessage("Hello world")); err != nil {
+			err = errors.Wrap(err, "main: sending message failed")
+			return
+		}
+		return
+	})
 
 	// Create speaker
 	s := speak.New(speak.Options{})
@@ -44,6 +59,9 @@ func main() {
 		AutoStart: true,
 		Runnable:  text_to_speech.NewRunnable("Text to Speech", s),
 	})
+
+	// Handle signals
+	w.HandleSignals()
 
 	// Serve
 	w.Serve()

@@ -94,6 +94,11 @@ func (w *Worker) Wait() {
 	w.w.Wait()
 }
 
+// On makes sure to handle messages with specific conditions
+func (w *Worker) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
+	w.d.On(c, h)
+}
+
 // Close closes the worker properly
 func (w *Worker) Close() error {
 	// Close dispatcher
@@ -158,46 +163,9 @@ func (w *worker) toMessage() (o astibob.Worker) {
 	return
 }
 
-func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
-	// Get from worker
-	fw := m.From.WorkerName()
-
-	// Only send message from the current worker
-	if fw != w.name {
-		return
-	}
-
-	// Invalid to
-	if m.To == nil {
-		err = errors.Wrap(err, "worker: no to")
-		return
-	}
-
-	// Get to worker
-	tw := m.To.WorkerName()
-	if tw == "" {
-		err = errors.New("worker: worker name is empty")
-		return
-	}
-
-	// Only send message to other workers
-	if tw == w.name {
-		return
-	}
-
-	// Get worker
-	w.mw.Lock()
-	mw, ok := w.ws[tw]
-	w.mw.Unlock()
-
-	// No worker
-	if !ok {
-		err = fmt.Errorf("worker: worker %s doesn't exist", tw)
-		return
-	}
-
+func (w *worker) sendMessage(c *http.Client, m *astibob.Message) (err error) {
 	// Log
-	astilog.Debugf("worker: sending message %s to worker %s", m.Name, tw)
+	astilog.Debugf("worker: sending message %s to worker %s", m.Name, w.name)
 
 	// Marshal
 	var b []byte
@@ -208,14 +176,14 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 
 	// Create request
 	var req *http.Request
-	if req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/messages", mw.addr), bytes.NewReader(b)); err != nil {
+	if req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/messages", w.addr), bytes.NewReader(b)); err != nil {
 		err = errors.Wrap(err, "worker: creating request failed")
 		return
 	}
 
 	// Send request
 	var resp *http.Response
-	if resp, err = w.ch.Do(req); err != nil {
+	if resp, err = c.Do(req); err != nil {
 		err = errors.Wrap(err, "worker: sending request failed")
 		return
 	}
@@ -233,6 +201,72 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 			err = fmt.Errorf("worker: response error message is %s", e.Message)
 		} else {
 			err = fmt.Errorf("worker: response status code is %d", resp.StatusCode)
+		}
+	}
+	return
+}
+
+func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
+	// Get from worker
+	fw := m.From.WorkerName()
+
+	// Only send message from the current worker
+	if fw != w.name {
+		return
+	}
+
+	// Invalid to
+	if m.To == nil {
+		err = errors.Wrap(err, "worker: no to")
+		return
+	}
+
+	// Get workers
+	var ws []*worker
+	if tw := m.To.WorkerName(); tw != "" {
+		// Only send message to other workers
+		if tw == w.name {
+			return
+		}
+
+		// Get worker
+		w.mw.Lock()
+		mw, ok := w.ws[tw]
+		w.mw.Unlock()
+
+		// No worker
+		if !ok {
+			err = fmt.Errorf("worker: worker %s doesn't exist", tw)
+			return
+		}
+
+		// Append
+		ws = append(ws, mw)
+	} else {
+		// Lock
+		w.mw.Lock()
+
+		// Loop through workers
+		for _, mw := range w.ws {
+			// Same worker
+			if mw.name == w.name {
+				continue
+			}
+
+			// Append
+			ws = append(ws, mw)
+		}
+
+		// Unlock
+		w.mw.Unlock()
+	}
+
+	// Loop through workers
+	for _, mw := range ws {
+		// Send message
+		if err = mw.sendMessage(w.ch, m); err != nil {
+			err = errors.Wrapf(err, "worker: sending message %s to worker %s failed", m.Name, mw.name)
+			return
 		}
 	}
 	return
