@@ -63,6 +63,7 @@ func main() {
 	})
 
 	// Register listenables
+	// This is mandatory for the Web UI to work properly
 	w.RegisterListenables(worker.Listenable{
 		Listenable: r,
 		Runnable:   "Audio input",
