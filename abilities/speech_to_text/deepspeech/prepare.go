@@ -95,26 +95,8 @@ func (d *DeepSpeech) prepare(ctx context.Context, speeches []speech_to_text.Spee
 			return
 		}
 
-		// Choose indexes
-		var is []*index
-		if len(speeches) < 10 {
-			if idx == len(speeches)-1 {
-				is = []*index{train, dev, test}
-			} else {
-				is = []*index{train}
-			}
-		} else {
-			if float64(idx) < float64(len(speeches))*0.8 {
-				is = []*index{train}
-			} else if float64(idx) < float64(len(speeches))*0.9 {
-				is = []*index{dev}
-			} else {
-				is = []*index{test}
-			}
-		}
-
 		// Loop through indexes
-		for _, i := range is {
+		for _, i := range d.indexes(idx, speeches, train, dev, test) {
 			// Write csv line
 			if err = i.w.Write([]string{path, strconv.Itoa(int(fi.Size())), s.Text}); err != nil {
 				err = errors.Wrap(err, "deepspeech: writing csv line failed")
@@ -132,6 +114,25 @@ func (d *DeepSpeech) prepare(ctx context.Context, speeches []speech_to_text.Spee
 	if err = ioutil.WriteFile(d.prepareHashPath(), h, 0666); err != nil {
 		err = errors.Wrapf(err, "deepspeech: storing hash in %s failed", d.prepareHashPath())
 		return
+	}
+	return
+}
+
+func (d *DeepSpeech) indexes(idx int, speeches []speech_to_text.SpeechFile, train, dev, test *index) (is []*index) {
+	if len(speeches) < 10 {
+		if idx == len(speeches)-1 {
+			is = []*index{train, dev, test}
+		} else {
+			is = []*index{train}
+		}
+	} else {
+		if float64(idx) < float64(len(speeches))*0.8 {
+			is = []*index{train}
+		} else if float64(idx) < float64(len(speeches))*0.9 {
+			is = []*index{dev}
+		} else {
+			is = []*index{test}
+		}
 	}
 	return
 }
