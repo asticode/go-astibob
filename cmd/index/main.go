@@ -80,9 +80,38 @@ func main() {
 		Templates: make(map[string][]byte),
 	}
 
-	// Walk through layouts
+	// Walk layouts
+	if err := walkLayouts(&d); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: walking layouts failed"))
+	}
+
+	// Walk statics
+	if err := walkStatics(&d); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: walking statics failed"))
+	}
+
+	// Walk templates
+	if err := walkTemplates(&d); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: walking templates failed"))
+	}
+
+	// Create destination
+	dp := filepath.Join("index/resources.go")
+	f, err := os.Create(dp)
+	if err != nil {
+		astilog.Fatal(errors.Wrapf(err, "main: creating %s failed", dp))
+	}
+	defer f.Close()
+
+	// Execute template
+	if err = t.Execute(f, d); err != nil {
+		astilog.Fatal(errors.Wrap(err, "main: executing template failed"))
+	}
+}
+
+func walkLayouts(d *Data) (err error) {
 	lp := "index/resources/templates/layouts"
-	if err := filepath.Walk(lp, func(path string, info os.FileInfo, e error) (err error) {
+	if err = filepath.Walk(lp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
 			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
@@ -105,12 +134,15 @@ func main() {
 		d.Layouts = append(d.Layouts, b)
 		return
 	}); err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: walking %s failed", lp))
+		err = errors.Wrapf(err, "main: walking %s failed", lp)
+		return
 	}
+	return
+}
 
-	// Walk through statics
+func walkStatics(d *Data) (err error) {
 	sp := "index/resources/static"
-	if err := filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
+	if err = filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
 			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
@@ -133,12 +165,15 @@ func main() {
 		d.Statics[filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
 		return
 	}); err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: walking %s failed", sp))
+		err = errors.Wrapf(err, "main: walking %s failed", sp)
+		return
 	}
+	return
+}
 
-	// Walk through templates
+func walkTemplates(d *Data) (err error) {
 	tp := "index/resources/templates/pages"
-	if err := filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
+	if err = filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
 			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
@@ -161,19 +196,8 @@ func main() {
 		d.Templates[filepath.ToSlash(strings.TrimPrefix(path, tp))] = b
 		return
 	}); err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: walking %s failed", tp))
+		err = errors.Wrapf(err, "main: walking %s failed", tp)
+		return
 	}
-
-	// Create destination
-	dp := filepath.Join("index/resources.go")
-	f, err := os.Create(dp)
-	if err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: creating %s failed", dp))
-	}
-	defer f.Close()
-
-	// Execute template
-	if err = t.Execute(f, d); err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: executing template failed"))
-	}
+	return
 }

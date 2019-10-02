@@ -101,80 +101,14 @@ func main() {
 			continue
 		}
 
-		// Stat static folder
-		sp := filepath.Join(baseDir, f.Name(), "resources", "static")
-		if _, err = os.Stat(sp); err != nil && !os.IsNotExist(err) {
-			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", sp))
+		// Process statics
+		if err = processStatics(filepath.Join(baseDir, f.Name()), &d); err != nil {
+			astilog.Fatal(errors.Wrap(err, "main: processing statics failed"))
 		}
 
-		// Loop through static
-		if err == nil {
-			if err = filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
-				// Check input error
-				if e != nil {
-					err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
-					return
-				}
-
-				// Only process files
-				if info.IsDir() {
-					return
-				}
-
-				// Read file
-				var b []byte
-				if b, err = ioutil.ReadFile(path); err != nil {
-					err = errors.Wrapf(err, "main: reading %s failed", path)
-					return
-				}
-
-				// Add to data
-				d.Static["/static"+filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
-				return
-				return
-			}); err != nil {
-				astilog.Fatal(errors.Wrapf(err, "main: looping through static in %s failed", sp))
-			}
-		}
-
-		// Stat templates folder
-		tp := filepath.Join(baseDir, f.Name(), "resources", "templates")
-		if _, err = os.Stat(tp); err != nil && !os.IsNotExist(err) {
-			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", tp))
-		}
-
-		// Loop through templates
-		if err == nil {
-			if err = filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
-				// Check input error
-				if e != nil {
-					err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
-					return
-				}
-
-				// Only process files
-				if info.IsDir() {
-					return
-				}
-
-				// Check extension
-				if filepath.Ext(path) != ".html" {
-					return
-				}
-
-				// Read file
-				var b []byte
-				if b, err = ioutil.ReadFile(path); err != nil {
-					err = errors.Wrapf(err, "main: reading %s failed", path)
-					return
-				}
-
-				// Add to data
-				d.Templates[filepath.ToSlash(strings.TrimSuffix(strings.TrimPrefix(path, tp), ".html"))] = b
-				return
-			}); err != nil {
-				astilog.Fatal(errors.Wrapf(err, "main: looping through templates in %s failed", tp))
-			}
+		// Process templates
+		if err = processTemplates(filepath.Join(baseDir, f.Name()), &d); err != nil {
+			astilog.Fatal(errors.Wrap(err, "main: processing templates failed"))
 		}
 
 		// Create destination
@@ -190,4 +124,89 @@ func main() {
 			astilog.Fatal(errors.Wrapf(err, "main: executing template for %s failed", rp))
 		}
 	}
+}
+
+func processStatics(basePath string, d *Data) (err error) {
+	// Stat static folder
+	sp := filepath.Join(basePath, "resources", "static")
+	if _, err = os.Stat(sp); err != nil && !os.IsNotExist(err) {
+		err = errors.Wrapf(err, "main: stating %s failed", sp)
+		return
+	}
+
+	// Loop through static
+	if err == nil {
+		if err = filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
+			// Check input error
+			if e != nil {
+				err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
+				return
+			}
+
+			// Only process files
+			if info.IsDir() {
+				return
+			}
+
+			// Read file
+			var b []byte
+			if b, err = ioutil.ReadFile(path); err != nil {
+				err = errors.Wrapf(err, "main: reading %s failed", path)
+				return
+			}
+
+			// Add to data
+			d.Static["/static"+filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
+			return
+		}); err != nil {
+			err = errors.Wrapf(err, "main: looping through static in %s failed", sp)
+			return
+		}
+	}
+	return
+}
+
+func processTemplates(basePath string, d *Data) (err error) {
+	// Stat templates folder
+	tp := filepath.Join(basePath, "resources", "templates")
+	if _, err = os.Stat(tp); err != nil && !os.IsNotExist(err) {
+		err = errors.Wrapf(err, "main: stating %s failed", tp)
+		return
+	}
+
+	// Loop through templates
+	if err == nil {
+		if err = filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
+			// Check input error
+			if e != nil {
+				err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
+				return
+			}
+
+			// Only process files
+			if info.IsDir() {
+				return
+			}
+
+			// Check extension
+			if filepath.Ext(path) != ".html" {
+				return
+			}
+
+			// Read file
+			var b []byte
+			if b, err = ioutil.ReadFile(path); err != nil {
+				err = errors.Wrapf(err, "main: reading %s failed", path)
+				return
+			}
+
+			// Add to data
+			d.Templates[filepath.ToSlash(strings.TrimSuffix(strings.TrimPrefix(path, tp), ".html"))] = b
+			return
+		}); err != nil {
+			err = errors.Wrapf(err, "main: looping through templates in %s failed", tp)
+			return
+		}
+	}
+	return
 }
