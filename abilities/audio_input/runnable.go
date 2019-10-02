@@ -165,11 +165,11 @@ func (r *Runnable) onSamples(_ astibob.Identifier, samples []int, _, _, _ int, _
 	r.mc.Lock()
 
 	// Loop through calibrations
-	for idx, c := range r.cs {
+	for idx := 0; idx < len(r.cs); idx++ {
 		// Add samples
 		var done bool
-		if c.ctx.Err() == nil {
-			done = c.add(samples)
+		if r.cs[idx].ctx.Err() == nil {
+			done = r.cs[idx].add(samples)
 		} else {
 			done = true
 		}
