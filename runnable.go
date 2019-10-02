@@ -46,7 +46,7 @@ type BaseRunnable struct {
 	startCancel  context.CancelFunc
 	startCtx     context.Context
 	status       string
-	taskFunc            astiworker.TaskFunc
+	taskFunc     astiworker.TaskFunc
 }
 
 func NewBaseRunnable(o BaseRunnableOptions) *BaseRunnable {
