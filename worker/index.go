@@ -63,7 +63,7 @@ func (w *Worker) sendRegister() (err error) {
 		}
 
 		// Add web homepage
-		if _, ok := r.(astibob.Operatable); ok {
+		if o, ok := r.(astibob.Operatable); ok && len(o.Templates()) > 0 {
 			rm.WebHomepage = fmt.Sprintf("/workers/%s/runnables/%s/web/index", url.QueryEscape(w.name), url.QueryEscape(r.Metadata().Name))
 		}
 

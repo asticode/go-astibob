@@ -1,6 +1,8 @@
 package worker
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
 
 	"github.com/asticode/go-astibob"
@@ -226,18 +228,79 @@ func (w *Worker) stopRunnable(name string) (err error) {
 	return
 }
 
-func (w *Worker) SendMessages(worker, runnable string, cs ...astibob.MessageContent) (err error) {
-	// Loop through contents
-	for _, c := range cs {
-		// Create message
-		var m *astibob.Message
-		if m, err = astibob.NewMessageFromContent(*w.workerIdentifier(), astibob.NewRunnableIdentifier(runnable, worker), c); err != nil {
-			err = errors.Wrap(err, "worker: creating message from content failed")
+type MessageOptions struct {
+	Message     Message
+	Runnable    string
+	Synchronous bool
+	Worker      string
+}
+
+type Message struct {
+	// Synchronous
+	Method string
+	URL    string
+
+	// Asynchronous
+	Name string
+
+	// Optional
+	Payload interface{}
+}
+
+func (w *Worker) SendMessage(o MessageOptions) (err error) {
+	// In case of a synchronous message we send an HTTP request to a provided url with a provided method
+	if o.Synchronous {
+		// No URL
+		if o.Message.URL == "" || o.Message.Method == "" {
+			err = errors.New("worker: no url or method provided, sending message synchronously failed")
 			return
 		}
 
-		// Dispatch
-		w.d.Dispatch(m)
+		// Get worker
+		w.mw.Lock()
+		mw, ok := w.ws[o.Worker]
+		w.mw.Unlock()
+
+		// No worker
+		if !ok {
+			err = fmt.Errorf("worker: worker %s doesn't exist", o.Worker)
+			return
+		}
+
+		// Marshal
+		var b []byte
+		if o.Message.Payload != nil {
+			if b, err = json.Marshal(o.Message.Payload); err != nil {
+				err = errors.Wrap(err, "worker: marshaling failed")
+				return
+			}
+		}
+
+		// Send request
+		if err = w.sendRequestToWorker(o.Message.Method, fmt.Sprintf("%s/runnables/%s/routes%s", mw.addr, o.Runnable, o.Message.URL), bytes.NewReader(b)); err != nil {
+			err = errors.Wrapf(err, "worker: sending request to worker %s failed", mw.name)
+			return
+		}
+		return
 	}
+
+	// Create message
+	m := astibob.NewMessage()
+
+	// Set basic info
+	m.From = *w.workerIdentifier()
+	m.To = astibob.NewRunnableIdentifier(o.Runnable, o.Worker)
+	m.Name = o.Message.Name
+
+	// Marshal payload
+	if o.Message.Payload != nil {
+		if m.Payload, err = json.Marshal(o.Message.Payload); err != nil {
+			err = errors.Wrap(err, "worker: marshaling payload failed")
+			return
+		}
+	}
+
+	// Dispatch
+	w.d.Dispatch(m)
 	return
 }

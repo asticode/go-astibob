@@ -17,42 +17,23 @@ const (
 
 // Message names
 const (
-	ListenablesRegisterMessage = "listenables.register"
-	RunnableCrashedMessage     = "runnable.crashed"
-	RunnableStartMessage       = "runnable.start"
-	RunnableStartedMessage     = "runnable.started"
-	RunnableStopMessage        = "runnable.stop"
-	RunnableStoppedMessage     = "runnable.stopped"
-	UIDisconnectedMessage      = "ui.disconnected"
+	ListenablesRegisterMessage  = "listenables.register"
+	RunnableCrashedMessage      = "runnable.crashed"
+	RunnableStartMessage        = "runnable.start"
+	RunnableStartedMessage      = "runnable.started"
+	RunnableStopMessage         = "runnable.stop"
+	RunnableStoppedMessage      = "runnable.stopped"
+	UIDisconnectedMessage       = "ui.disconnected"
 	UIMessageNamesAddMessage    = "ui.message.names.add"
 	UIMessageNamesDeleteMessage = "ui.message.names.delete"
-	UIPingMessage              = "ui.ping"
-	UIRegisterMessage          = "ui.register"
-	UIWelcomeMessage           = "ui.welcome"
-	WorkerDisconnectedMessage  = "worker.disconnected"
-	WorkerRegisterMessage      = "worker.register"
-	WorkerRegisteredMessage    = "worker.registered"
-	WorkerWelcomeMessage       = "worker.welcome"
+	UIPingMessage               = "ui.ping"
+	UIRegisterMessage           = "ui.register"
+	UIWelcomeMessage            = "ui.welcome"
+	WorkerDisconnectedMessage   = "worker.disconnected"
+	WorkerRegisterMessage       = "worker.register"
+	WorkerRegisteredMessage     = "worker.registered"
+	WorkerWelcomeMessage        = "worker.welcome"
 )
-
-type MessageContent struct {
-	Name    string      `json:"name"`
-	Payload interface{} `json:"payload"`
-}
-
-func NewMessageFromContent(from Identifier, to *Identifier, c MessageContent) (m *Message, err error) {
-	// Create message
-	m = newMessage(from, to, c.Name)
-
-	// Marshal payload
-	if c.Payload != nil {
-		if m.Payload, err = json.Marshal(c.Payload); err != nil {
-			err = errors.Wrap(err, "astibob: marshaling payload failed")
-			return
-		}
-	}
-	return
-}
 
 type Message struct {
 	From    Identifier      `json:"from"`

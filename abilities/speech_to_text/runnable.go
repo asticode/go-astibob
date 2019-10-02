@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astilog"
 	astilimiter "github.com/asticode/go-astitools/limiter"
 	astipcm "github.com/asticode/go-astitools/pcm"
@@ -228,8 +229,8 @@ type Samples struct {
 	Samples              []int              `json:"samples"`
 }
 
-func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) astibob.MessageContent {
-	return astibob.MessageContent{
+func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) worker.Message {
+	return worker.Message{
 		Name: samplesMessage,
 		Payload: Samples{
 			BitDepth:             bitDepth,

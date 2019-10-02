@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"sync"
 
@@ -163,49 +164,6 @@ func (w *worker) toMessage() (o astibob.Worker) {
 	return
 }
 
-func (w *worker) sendMessage(c *http.Client, m *astibob.Message) (err error) {
-	// Log
-	astilog.Debugf("worker: sending message %s to worker %s", m.Name, w.name)
-
-	// Marshal
-	var b []byte
-	if b, err = json.Marshal(m); err != nil {
-		err = errors.Wrap(err, "worker: marshaling failed")
-		return
-	}
-
-	// Create request
-	var req *http.Request
-	if req, err = http.NewRequest(http.MethodPost, fmt.Sprintf("%s/api/messages", w.addr), bytes.NewReader(b)); err != nil {
-		err = errors.Wrap(err, "worker: creating request failed")
-		return
-	}
-
-	// Send request
-	var resp *http.Response
-	if resp, err = c.Do(req); err != nil {
-		err = errors.Wrap(err, "worker: sending request failed")
-		return
-	}
-	defer resp.Body.Close()
-
-	// Check status code
-	if resp.StatusCode != http.StatusOK {
-		// Unmarshal
-		// We silence the error since there may not be an error message in the response
-		var e astibob.Error
-		json.NewDecoder(resp.Body).Decode(&e)
-
-		// Log
-		if e.Message != "" {
-			err = fmt.Errorf("worker: response error message is %s", e.Message)
-		} else {
-			err = fmt.Errorf("worker: response status code is %d", resp.StatusCode)
-		}
-	}
-	return
-}
-
 func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 	// Get from worker
 	fw := m.From.WorkerName()
@@ -263,11 +221,55 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 
 	// Loop through workers
 	for _, mw := range ws {
-		// Send message
-		if err = mw.sendMessage(w.ch, m); err != nil {
-			err = errors.Wrapf(err, "worker: sending message %s to worker %s failed", m.Name, mw.name)
+		// Log
+		astilog.Debugf("worker: sending message %s to worker %s", m.Name, mw.name)
+
+		// Marshal
+		var b []byte
+		if b, err = json.Marshal(m); err != nil {
+			err = errors.Wrap(err, "worker: marshaling failed")
 			return
 		}
+
+		// Send request
+		if err = w.sendRequestToWorker(http.MethodPost, fmt.Sprintf("%s/api/messages", mw.addr), bytes.NewReader(b)); err != nil {
+			err = errors.Wrapf(err, "worker: sending request to worker %s failed", mw.name)
+			return
+		}
+	}
+	return
+}
+
+func (w *Worker) sendRequestToWorker(method, url string, body io.Reader) (err error) {
+	// Create request
+	var req *http.Request
+	if req, err = http.NewRequest(method, url, body); err != nil {
+		err = errors.Wrap(err, "worker: creating request failed")
+		return
+	}
+
+	// Send request
+	var resp *http.Response
+	if resp, err = w.ch.Do(req); err != nil {
+		err = errors.Wrap(err, "worker: sending request failed")
+		return
+	}
+	defer resp.Body.Close()
+
+	// Check status code
+	if resp.StatusCode != http.StatusOK {
+		// Unmarshal
+		// We silence the error since there may not be an error message in the response
+		var e astibob.Error
+		json.NewDecoder(resp.Body).Decode(&e)
+
+		// Log
+		if e.Message != "" {
+			err = fmt.Errorf("worker: response error message is %s", e.Message)
+		} else {
+			err = fmt.Errorf("worker: response status code is %d", resp.StatusCode)
+		}
+		return
 	}
 	return
 }
