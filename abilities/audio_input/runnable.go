@@ -59,26 +59,23 @@ func NewRunnable(name string, s Stream) *Runnable {
 	// Add routes
 	r.AddRoute("/calibrate", http.MethodGet, r.calibrate)
 
+	// Set listenable
+	r.l = newListenable(ListenableOptions{OnSamples: r.onSamples})
+
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
 		Metadata: astibob.Metadata{
 			Description: "Reads an audio input and dispatches audio samples",
 			Name:        name,
 		},
-		OnStart: r.onStart,
+		OnMessage: r.l.OnMessage,
+		OnStart:   r.onStart,
 	})
-
-	// Set listenable
-	r.l = newListenable(ListenableOptions{OnSamples: r.onSamples})
 	return r
 }
 
 func (r *Runnable) MessageNames() []string {
 	return r.l.MessageNames()
-}
-
-func (r *Runnable) OnMessage(m *astibob.Message) error {
-	return r.l.OnMessage(m)
 }
 
 func (r *Runnable) onStart(ctx context.Context) (err error) {

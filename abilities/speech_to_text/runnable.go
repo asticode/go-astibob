@@ -135,7 +135,8 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 			Description: "Executes speech to text analysis when detecting silences in audio samples",
 			Name:        name,
 		},
-		OnStart: r.onStart,
+		OnMessage: r.onMessage,
+		OnStart:   r.onStart,
 	})
 
 	// Create progress limiter
@@ -209,7 +210,7 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 	return
 }
 
-func (r *Runnable) OnMessage(m *astibob.Message) (err error) {
+func (r *Runnable) onMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case samplesMessage:
 		if err = r.onSamples(m); err != nil {

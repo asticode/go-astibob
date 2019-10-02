@@ -25,7 +25,11 @@ type Worker struct {
 	ch   *http.Client
 	cw   *astiws.Client
 	d    *astibob.Dispatcher
+	ds   map[int]OnDone // On done callbacks indexed by message id
+	id   int
 	ls   map[string]map[string]map[string]bool // Worker's listenables indexed by worker --> runnable --> message
+	md   *sync.Mutex                           // Locks ds
+	mi   *sync.Mutex                           // Locks id
 	ml   *sync.Mutex                           // Locks ls
 	mo   *sync.Mutex                           // Locks ols
 	mr   *sync.Mutex                           // Locks rs
@@ -46,7 +50,10 @@ func New(name string, o Options) (w *Worker) {
 	w = &Worker{
 		ch:   &http.Client{},
 		cw:   astiws.NewClient(astiws.ClientConfiguration{}),
+		ds:   make(map[int]OnDone),
 		ls:   make(map[string]map[string]map[string]bool),
+		md:   &sync.Mutex{},
+		mi:   &sync.Mutex{},
 		ml:   &sync.Mutex{},
 		mo:   &sync.Mutex{},
 		mr:   &sync.Mutex{},
@@ -69,6 +76,7 @@ func New(name string, o Options) (w *Worker) {
 
 	// Add dispatcher handlers
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.ListenablesRegisterMessage)}, w.registerListenables)
+	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableDoneMessage)}, w.doneMessage)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
 	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIMessageNamesAddMessage)}, w.addUIMessageNames)

@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 
@@ -228,62 +227,22 @@ func (w *Worker) stopRunnable(name string) (err error) {
 	return
 }
 
+
 type MessageOptions struct {
-	Message     Message
-	Runnable    string
-	Synchronous bool
-	Worker      string
+	OnDone   OnDone
+	Message  Message
+	Runnable string
+	Worker   string
 }
 
+type OnDone func(success bool) error
+
 type Message struct {
-	// Synchronous
-	Method string
-	URL    string
-
-	// Asynchronous
-	Name string
-
-	// Optional
+	Name    string
 	Payload interface{}
 }
 
 func (w *Worker) SendMessage(o MessageOptions) (err error) {
-	// In case of a synchronous message we send an HTTP request to a provided url with a provided method
-	if o.Synchronous {
-		// No URL
-		if o.Message.URL == "" || o.Message.Method == "" {
-			err = errors.New("worker: no url or method provided, sending message synchronously failed")
-			return
-		}
-
-		// Get worker
-		w.mw.Lock()
-		mw, ok := w.ws[o.Worker]
-		w.mw.Unlock()
-
-		// No worker
-		if !ok {
-			err = fmt.Errorf("worker: worker %s doesn't exist", o.Worker)
-			return
-		}
-
-		// Marshal
-		var b []byte
-		if o.Message.Payload != nil {
-			if b, err = json.Marshal(o.Message.Payload); err != nil {
-				err = errors.Wrap(err, "worker: marshaling failed")
-				return
-			}
-		}
-
-		// Send request
-		if err = w.sendRequestToWorker(o.Message.Method, fmt.Sprintf("%s/runnables/%s/routes%s", mw.addr, o.Runnable, o.Message.URL), bytes.NewReader(b)); err != nil {
-			err = errors.Wrapf(err, "worker: sending request to worker %s failed", mw.name)
-			return
-		}
-		return
-	}
-
 	// Create message
 	m := astibob.NewMessage()
 
@@ -300,7 +259,47 @@ func (w *Worker) SendMessage(o MessageOptions) (err error) {
 		}
 	}
 
+	// On done
+	if o.OnDone != nil {
+		// Set id
+		w.mi.Lock()
+		w.id++
+		m.ID = w.id
+		w.mi.Unlock()
+
+		// Add callback
+		w.md.Lock()
+		w.ds[m.ID] = o.OnDone
+		w.md.Unlock()
+	}
+
 	// Dispatch
 	w.d.Dispatch(m)
+	return
+}
+
+func (w *Worker) doneMessage(m *astibob.Message) (err error) {
+	// Parse payload
+	var d astibob.RunnableDone
+	if d, err = astibob.ParseRunnableDonePayload(m); err != nil {
+		err = errors.Wrap(err, "worker: parsing runnable done payload failed")
+		return
+	}
+
+	// Get callback
+	w.md.Lock()
+	c, ok := w.ds[d.ID]
+	w.md.Unlock()
+
+	// No callback
+	if !ok {
+		return
+	}
+
+	// On done
+	if err = c(d.Success); err != nil {
+		err = errors.Wrap(err, "worker: on done failed")
+		return
+	}
 	return
 }

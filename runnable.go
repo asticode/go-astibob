@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/asticode/go-astilog"
+	astiptr "github.com/asticode/go-astitools/ptr"
 	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/pkg/errors"
 )
@@ -33,8 +35,9 @@ type Runnable interface {
 type DispatchFunc func(m *Message)
 
 type BaseRunnableOptions struct {
-	Metadata Metadata
-	OnStart  func(ctx context.Context) error
+	Metadata  Metadata
+	OnMessage func(m *Message) error
+	OnStart   func(ctx context.Context) error
 }
 
 type BaseRunnable struct {
@@ -68,7 +71,37 @@ func (r *BaseRunnable) Metadata() Metadata { return r.o.Metadata }
 
 func (r *BaseRunnable) NewTask() *astiworker.Task { return r.taskFunc() }
 
-func (r *BaseRunnable) OnMessage(m *Message) (err error) { return }
+func (r *BaseRunnable) OnMessage(m *Message) (err error) {
+	// We need to send a done message
+	if m.ID > 0 {
+		defer func() {
+			// Create message
+			m, err := NewRunnableDoneMessage(&Identifier{
+				Name: astiptr.Str(m.From.WorkerName()),
+				Type: WorkerIdentifierType,
+			}, RunnableDone{
+				ID:      m.ID,
+				Success: err == nil,
+			})
+			if err != nil {
+				astilog.Error(errors.Wrap(err, "astibob: creating runnable done message failed"))
+				return
+			}
+
+			// Dispatch
+			r.Dispatch(m)
+		}()
+	}
+
+	// Custom
+	if r.o.OnMessage != nil {
+		if err = r.o.OnMessage(m); err != nil {
+			err = errors.Wrap(err, "astibob: custom message handling failed")
+			return
+		}
+	}
+	return
+}
 
 func (r *BaseRunnable) RootCtx() context.Context { return r.rootCtx }
 

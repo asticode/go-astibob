@@ -19,6 +19,7 @@ const (
 const (
 	ListenablesRegisterMessage  = "listenables.register"
 	RunnableCrashedMessage      = "runnable.crashed"
+	RunnableDoneMessage         = "runnable.done"
 	RunnableStartMessage        = "runnable.start"
 	RunnableStartedMessage      = "runnable.started"
 	RunnableStopMessage         = "runnable.stop"
@@ -37,6 +38,7 @@ const (
 
 type Message struct {
 	From    Identifier      `json:"from"`
+	ID      int             `json:"id,omitempty"`
 	Name    string          `json:"name"`
 	Payload json.RawMessage `json:"payload,omitempty"`
 	To      *Identifier     `json:"to,omitempty"`
@@ -217,6 +219,11 @@ type Listenables struct {
 	Runnable string   `json:"runnable"`
 }
 
+type RunnableDone struct {
+	ID      int  `json:"id"`
+	Success bool `json:"success"`
+}
+
 func NewMessage() *Message {
 	return &Message{}
 }
@@ -267,6 +274,26 @@ func ParseRunnableStopPayload(m *Message) (name string, err error) {
 
 func NewRunnableCrashedMessage(from Identifier, to *Identifier) *Message {
 	return newMessage(from, to, RunnableCrashedMessage)
+}
+
+func NewRunnableDoneMessage(to *Identifier, d RunnableDone) (m *Message, err error) {
+	// Create message
+	m = newMessage(Identifier{}, to, RunnableDoneMessage)
+
+	// Marshal payload
+	if m.Payload, err = json.Marshal(d); err != nil {
+		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		return
+	}
+	return
+}
+
+func ParseRunnableDonePayload(m *Message) (d RunnableDone, err error) {
+	if err = json.Unmarshal(m.Payload, &d); err != nil {
+		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		return
+	}
+	return
 }
 
 func NewRunnableStartedMessage(from Identifier, to *Identifier) *Message {

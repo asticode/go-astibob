@@ -53,15 +53,15 @@ func (w *Worker) Serve() {
 func (w *Worker) ok(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}
 
 func (w *Worker) handleWorkerMessage(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	// Log
-	astilog.Debug("worker: handling worker message")
-
 	// Unmarshal
 	var m astibob.Message
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
 		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "worker: unmarshaling failed"))
 		return
 	}
+
+	// Log
+	astilog.Debugf("worker: handling worker message %s", m.Name)
 
 	// Dispatch
 	w.d.Dispatch(&m)
