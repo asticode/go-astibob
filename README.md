@@ -22,6 +22,7 @@ Here's a list of AIs built with `astibob` (if you're using `astibob` and want yo
 - the **Index** keeps an updated list of all **Workers** and forwards **Web UI** messages to **Workers** and vice versa
 - **Workers** have one or more **Abilities**
 - **Abilities** run simple tasks such as reading an audio input (e.g. a microphone), executing speech-to-text analyses or doing speech-synthesis
+- **Abilities** can communicate directly between each other even if on different **Workers**
 - all communication is done via JSON messages exchanged through HTTP or Websocket
 
 ## FAQ
