@@ -17,11 +17,12 @@ Here's a list of AIs built with `astibob` (if you're using `astibob` and want yo
 
 ![Overview](imgs/overview.png)
 
-- humans interact with the AI through the **Web UI**
+- humans operate the AI through the **Web UI**
 - the **Web UI** interacts with the AI through the **Index**
 - the **Index** keeps an updated list of all **Workers** and forwards **Web UI** messages to **Workers** and vice versa
-- **Workers** have one or more **Abilities**
+- **Workers** have one or more **Abilities** and are usually located on different machines
 - **Abilities** run simple tasks such as reading an audio input (e.g. a microphone), executing speech-to-text analyses or doing speech-synthesis
+- **Abilities** can communicate directly between each other even if on different **Workers**
 - all communication is done via JSON messages exchanged through HTTP or Websocket
 
 ## FAQ
@@ -120,11 +121,7 @@ w.RegisterListenables(
 
 // Handle an event and send a message to one of the runnables
 w.On(astibob.DispatchConditions{
-    From: &astibob.Identifier{
-        Name:   astiptr.Str("Runnable #1"),
-        Type:   astibob.RunnableIdentifierType,
-        Worker: astiptr.Str("Worker #1"),
-    },
+    From: astibob.NewRunnableIdentifier("Runnable #1", "Worker #1"),
     Name: astiptr.Str("Event #1"),
 }, func(m *astibob.Message) (err error) {
     // Send message
@@ -162,7 +159,7 @@ This ability allows you reading from an audio stream e.g. a microphone.
 
 ### Dependencies<a name='audio-input-dependencies'></a>
 
-It's strongly recommended to use [PortAudio](http://www.portaudio.com).
+It's strongly recommended to use [PortAudio](http://www.portaudio.com) and its [astibob wrapper](abilities/audio_input/portaudio).
 
 To know which devices are available on the machine run:
 
@@ -233,12 +230,12 @@ This ability allows you to execute speech-to-text analyses.
 
 ### Dependencies<a name='speech-to-text-dependencies'></a>
 
-It's strongly recommended to install DeepSpeech.
+It's strongly recommended to install [DeepSpeech](https://github.com/mozilla/DeepSpeech) and its [astibob wrapper](abilities/speech_to_text/deepspeech).
 
 #### I don't want to train a new model
 
 - create a working directory (for simplicity purposes, we'll assume its absolute path is `/path/to/deepspeech`)
-- download a client `native_client.<your system>.tar.xz"` matching your system at the bottom of [client](https://github.com/mozilla/DeepSpeech/releases/tag/v0.5.1)
+- download a client `native_client.<your system>.tar.xz"` matching your system at the bottom of [this page](https://github.com/mozilla/DeepSpeech/releases/tag/v0.5.1)
 - create the `/path/to/deepspeech/lib` directory and extract the `client` content inside it
 - create the `/path/to/deepspeech/include` directory and download [deepspeech.h](https://github.com/mozilla/DeepSpeech/raw/v0.5.1/native_client/deepspeech.h) inside it
 - create the `/path/to/deepspeech/model/en` directory, and download and extract [the english model](https://github.com/mozilla/DeepSpeech/releases/download/v0.5.1/deepspeech-0.5.1-models.tar.gz) inside it
@@ -313,14 +310,18 @@ w.RegisterRunnables(worker.Runnable{
 })
 
 // Send samples
-w.SendMessages("Worker #3", "Speech to Text", speech_to_text.NewSamplesMessage(
-    from,
-    samples,
-    bitDepth,
-    numChannels,
-    sampleRate,
-    maxSilenceAudioLevel,
-)
+w.SendMessage(worker.MessageOptions{
+    Message:  speech_to_text.NewSamplesMessage(
+        from,
+        samples,
+        bitDepth,
+        numChannels,
+        sampleRate,
+        maxSilenceAudioLevel,
+    ),
+    Runnable: "Speech to Text",
+    Worker:   "Worker #3",
+})
 ```
 
 ### Listenable
@@ -347,6 +348,8 @@ This ability allows you to run speech synthesis.
 
 ### Dependencies<a name='text-to-speech-dependencies'></a>
 
+It's strongly recommended to use [astibob wrapper](abilities/text_to_speech/speak).
+
 If you're using Linux it's strongly recommended to use [ESpeak](http://espeak.sourceforge.net/).
 
 ### Runnable
@@ -368,7 +371,11 @@ w.RegisterRunnables(worker.Runnable{
 })
 
 // Say something
-w.SendMessages("Worker #1", "Text to Speech", text_to_speech.NewSayMessage("Hello world!"))
+w.SendMessage(worker.MessageOptions{
+    Message:  text_to_speech.NewSayMessage("Hello world"),
+    Runnable: "Text to Speech",
+    Worker:   "Worker #1",
+})
 ```
 
 # Create your own ability
@@ -394,3 +401,7 @@ You can then use the `cmd/operatable` command to generate an `operatable.go` fil
 ## Listenable
 
 No shortcut here, you need to create an object that implements the **astibob.Listenable** interface yourself.
+
+# Contribute
+
+If you've created an awesome **Ability** and you feel it could be of interest to the community, create a PR [here](https://github.com/asticode/go-astibob/compare).
