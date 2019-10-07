@@ -246,6 +246,11 @@ func (w *Worker) SendMessage(o MessageOptions) (err error) {
 	// Create message
 	m := astibob.NewMessage()
 
+	// Default worker
+	if o.Worker == "" {
+		o.Worker = w.name
+	}
+
 	// Set basic info
 	m.From = *w.workerIdentifier()
 	m.To = astibob.NewRunnableIdentifier(o.Runnable, o.Worker)
