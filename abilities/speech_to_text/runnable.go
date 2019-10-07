@@ -202,6 +202,9 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 	}
 	r.msd.Unlock()
 
+	// Reset chan
+	r.c.Reset()
+
 	// Start chan
 	r.c.Start(ctx)
 
@@ -244,7 +247,7 @@ func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChan
 	}
 }
 
-func parseSamplesCmdPayload(m *astibob.Message) (s Samples, err error) {
+func parseSamplesPayload(m *astibob.Message) (s Samples, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
 		err = errors.Wrap(err, "speech_to_text: unmarshaling failed")
 		return
@@ -260,7 +263,7 @@ func (r *Runnable) onSamples(m *astibob.Message) (err error) {
 
 	// Parse payload
 	var s Samples
-	if s, err = parseSamplesCmdPayload(m); err != nil {
+	if s, err = parseSamplesPayload(m); err != nil {
 		err = errors.Wrap(err, "speech_to_text: parsing payload failed")
 		return
 	}

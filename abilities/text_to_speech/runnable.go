@@ -1,11 +1,13 @@
 package text_to_speech
 
 import (
+	"context"
 	"encoding/json"
-	"sync"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/worker"
+	"github.com/asticode/go-astilog"
+	astisync "github.com/asticode/go-astitools/sync"
 	"github.com/pkg/errors"
 )
 
@@ -20,14 +22,14 @@ type Speaker interface {
 
 type Runnable struct {
 	*astibob.BaseRunnable
-	m *sync.Mutex
+	c *astisync.Chan
 	s Speaker
 }
 
 func NewRunnable(name string, s Speaker) (r *Runnable) {
 	// Create runnable
 	r = &Runnable{
-		m: &sync.Mutex{},
+		c: astisync.NewChan(astisync.ChanOptions{}),
 		s: s,
 	}
 
@@ -38,7 +40,20 @@ func NewRunnable(name string, s Speaker) (r *Runnable) {
 			Name:        name,
 		},
 		OnMessage: r.onMessage,
+		OnStart:   r.onStart,
 	})
+	return
+}
+
+func (r *Runnable) onStart(ctx context.Context) (err error) {
+	// Reset chan
+	r.c.Reset()
+
+	// Start chan
+	r.c.Start(ctx)
+
+	// Stop chan
+	r.c.Stop()
 	return
 }
 
@@ -60,7 +75,7 @@ func NewSayMessage(s string) worker.Message {
 	}
 }
 
-func parseSayCmdPayload(m *astibob.Message) (s string, err error) {
+func parseSayPayload(m *astibob.Message) (s string, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
 		err = errors.Wrap(err, "text_to_speech: unmarshaling failed")
 		return
@@ -69,35 +84,29 @@ func parseSayCmdPayload(m *astibob.Message) (s string, err error) {
 }
 
 func (r *Runnable) onSay(m *astibob.Message) (err error) {
-	// Parse payload
-	var s string
-	if s, err = parseSayCmdPayload(m); err != nil {
-		err = errors.Wrap(err, "text_to_speech: parsing payload failed")
-		return
-	}
-
-	// Say
-	if err = r.say(s); err != nil {
-		err = errors.Wrap(err, "text_to_speech: saying failed")
-		return
-	}
-	return
-}
-
-func (r *Runnable) say(s string) (err error) {
 	// Check status
 	if r.Status() != astibob.RunningStatus {
 		return
 	}
 
-	// Lock
-	r.m.Lock()
-	defer r.m.Unlock()
-
-	// Say
-	if err = r.s.Say(s); err != nil {
-		err = errors.Wrap(err, "text_to_speech: say failed")
+	// Parse payload
+	var s string
+	if s, err = parseSayPayload(m); err != nil {
+		err = errors.Wrap(err, "text_to_speech: parsing payload failed")
 		return
 	}
+
+	// Make sure this is non blocking but still executed in FIFO order
+	r.c.Add(r.sayFunc(s))
 	return
+}
+
+func (r *Runnable) sayFunc(s string) func() {
+	return func() {
+		// Say
+		if err := r.s.Say(s); err != nil {
+			astilog.Error(errors.Wrap(err, "text_to_speech: say failed"))
+			return
+		}
+	}
 }
