@@ -14,6 +14,11 @@ type Listenable struct {
 func (w *Worker) RegisterListenables(ls ...Listenable) {
 	// Loop through listenables
 	for _, l := range ls {
+		// Default worker
+		if l.Worker == "" {
+			l.Worker = w.name
+		}
+
 		// Add dispatcher handler
 		w.d.On(astibob.DispatchConditions{
 			From: astibob.NewRunnableIdentifier(l.Runnable, l.Worker),
@@ -21,8 +26,7 @@ func (w *Worker) RegisterListenables(ls ...Listenable) {
 		}, l.Listenable.OnMessage)
 
 		// Add message names
-		ns := l.Listenable.MessageNames()
-		if len(ns) > 0 {
+		if ns := l.Listenable.MessageNames(); len(ns) > 0 {
 			// Lock
 			w.ml.Lock()
 
