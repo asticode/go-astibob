@@ -122,7 +122,7 @@ w.RegisterListenables(
 // Handle an event and send a message to one of the runnables
 w.On(astibob.DispatchConditions{
     From: astibob.NewRunnableIdentifier("Runnable #1", "Worker #1"),
-    Name: astiptr.Str("Event #1"),
+    Name: astikit.StrPtr("Event #1"),
 }, func(m *astibob.Message) (err error) {
     // Send message
     if err = w.SendMessages("Worker #1", "Runnable #1", pkg2.NewMessage1("Hello world")); err != nil {
@@ -183,7 +183,7 @@ defer p.Close()
 s, _ := p.NewDefaultStream(portaudio.StreamOptions{
     BitDepth:             32,
     BufferLength:         5000,
-    MaxSilenceLevel: 5 * 1e6,
+    MaxSilenceLevel:      5 * 1e6,
     NumInputChannels:     2,
     SampleRate:           44100,
 })
@@ -265,8 +265,6 @@ d := deepspeech.New(deepspeech.Options{
     LMPath:         mp + "/lm.binary",
     LMWeight:       0.75,
     ModelPath:      mp + "/output_graph.pb",
-    NCep:           26,
-    NContext:       9,
     PrepareDirPath: "/path/to/deepspeech/prepare",
     TrainingArgs: map[string]string{
         "checkpoint_dir":   "/path/to/deepspeech/model/custom/checkpoints",
@@ -317,7 +315,7 @@ w.SendMessage(worker.MessageOptions{
         bitDepth,
         numChannels,
         sampleRate,
-        MaxSilenceLevel,
+        maxSilenceLevel,
     ),
     Runnable: "Speech to Text",
     Worker:   "Worker #3",

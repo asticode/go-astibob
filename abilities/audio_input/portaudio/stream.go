@@ -13,12 +13,12 @@ type Stream struct {
 }
 
 type StreamOptions struct {
-	BitDepth             int     `toml:"bit_depth"`
-	BufferLength         int     `toml:"buffer_length"`
-	MaxSilenceLevel float64 `toml:"max_silence_level"`
-	NumInputChannels     int     `toml:"num_input_channels"`
-	NumOutputChannels    int     `toml:"num_output_channels"`
-	SampleRate           int     `toml:"sample_rate"`
+	BitDepth          int     `toml:"bit_depth"`
+	BufferLength      int     `toml:"buffer_length"`
+	MaxSilenceLevel   float64 `toml:"max_silence_level"`
+	NumInputChannels  int     `toml:"num_input_channels"`
+	NumOutputChannels int     `toml:"num_output_channels"`
+	SampleRate        int     `toml:"sample_rate"`
 }
 
 func (p *PortAudio) NewDefaultStream(o StreamOptions) (s *Stream, err error) {
