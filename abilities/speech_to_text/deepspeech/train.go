@@ -11,14 +11,14 @@ import (
 	"strings"
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astiexec "github.com/asticode/go-astitools/exec"
 	"github.com/pkg/errors"
 )
 
 // Regexps
 var (
-	regexpEpoch = regexp.MustCompile("^I Finished training epoch ([\\d]+)")
+	regexpEpoch = regexp.MustCompile(`^I Finished training epoch ([\d]+)`)
 )
 
 func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.SpeechFile, progressFunc func(speech_to_text.Progress), p *speech_to_text.Progress) (err error) {
@@ -66,34 +66,39 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 
 	// Intercept stderr
 	var stderr [][]byte
-	cmd.Stderr = astiexec.NewStdWriter(func(i []byte) {
-		// Log
-		astilog.Debugf("deepspeech: stderr: %s", i)
+	cmd.Stderr = astikit.NewWriterAdapter(astikit.WriterAdapterOptions{
+		Callback: func(i []byte) {
+			// Log
+			astilog.Debugf("deepspeech: stderr: %s", i)
 
-		// Append
-		stderr = append(stderr, i)
+			// Append
+			stderr = append(stderr, i)
+		},
+		Split: []byte("\n"),
 	})
 
 	// Intercept stdout
-	var epoch int
-	var errStdOut error
-	cmd.Stdout = astiexec.NewStdWriter(func(i []byte) {
-		// Log
-		astilog.Debugf("deepspeech: stdout: %s", i)
+	cmd.Stdout = astikit.NewWriterAdapter(astikit.WriterAdapterOptions{
+		Callback: func(i []byte) {
+			// Log
+			astilog.Debugf("deepspeech: stdout: %s", i)
 
-		// Parse epoch
-		if ms := regexpEpoch.FindStringSubmatch(string(i)); len(ms) >= 2 {
-			// Convert to int
-			if epoch, errStdOut = strconv.Atoi(ms[1]); err != nil {
-				astilog.Error(errors.Wrapf(errStdOut, "deepspeech: atoi of %s failed", ms[1]))
+			// Parse epoch
+			if ms := regexpEpoch.FindStringSubmatch(string(i)); len(ms) >= 2 {
+				// Convert to int
+				epoch, errStdOut := strconv.Atoi(ms[1])
+				if err != nil {
+					astilog.Error(errors.Wrapf(errStdOut, "deepspeech: atoi of %s failed", ms[1]))
+				}
+
+				// Update progress
+				// We can't have the progress be 100 when epoch == numEpoch since at that time the binary is still running
+				// Epoch starts at 0
+				p.Progress = 1 + (float64(epoch) / float64(numEpochs) * 98)
+				progressFunc(*p)
 			}
-
-			// Update progress
-			// We can't have the progress be 100 when epoch == numEpoch since at that time the binary is still running
-			// Epoch starts at 0
-			p.Progress = 1 + (float64(epoch) / float64(numEpochs) * 98)
-			progressFunc(*p)
-		}
+		},
+		Split: []byte("\n"),
 	})
 
 	// Create the illusion we're doing something :D
@@ -115,10 +120,6 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 	p.Progress = 100
 	progressFunc(*p)
 	return
-}
-
-func (d *DeepSpeech) trainHashPath() string {
-	return filepath.Join(filepath.Dir(d.o.ModelPath), "hash")
 }
 
 func argsToSlice(args map[string]string) (o []string) {

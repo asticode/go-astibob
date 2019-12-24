@@ -6,8 +6,8 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/worker"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astisync "github.com/asticode/go-astitools/sync"
 	"github.com/pkg/errors"
 )
 
@@ -22,14 +22,14 @@ type Speaker interface {
 
 type Runnable struct {
 	*astibob.BaseRunnable
-	c *astisync.Chan
+	c *astikit.Chan
 	s Speaker
 }
 
 func NewRunnable(name string, s Speaker) (r *Runnable) {
 	// Create runnable
 	r = &Runnable{
-		c: astisync.NewChan(astisync.ChanOptions{}),
+		c: astikit.NewChan(astikit.ChanOptions{}),
 		s: s,
 	}
 

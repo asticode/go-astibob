@@ -64,6 +64,7 @@ func (r *resources) templates() map[string]string {
 
 func main() {
 	// Set logger
+	astilog.SetHandyFlags()
 	flag.Parse()
 	astilog.FlagInit()
 

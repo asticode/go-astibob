@@ -6,8 +6,8 @@ import (
 	"net/http"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astihttp "github.com/asticode/go-astitools/http"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 )
@@ -44,10 +44,13 @@ func (w *Worker) Serve() {
 	w.mr.Unlock()
 
 	// Chain middlewares
-	h := astihttp.ChainMiddlewaresWithPrefix(r, []string{"/api/"}, astihttp.MiddlewareContentType("application/json"))
+	h := astikit.ChainHTTPMiddlewaresWithPrefix(r, []string{"/api/"}, astikit.HTTPMiddlewareContentType("application/json"))
 
 	// Serve
-	w.w.Serve(w.o.Server.Addr, h)
+	astikit.ServeHTTP(w.w, astikit.ServeHTTPOptions{
+		Addr:    w.o.Server.Addr,
+		Handler: h,
+	})
 }
 
 func (w *Worker) ok(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}

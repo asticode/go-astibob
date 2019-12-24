@@ -3,7 +3,7 @@ package astibob
 import (
 	"encoding/json"
 
-	astiptr "github.com/asticode/go-astitools/ptr"
+	"github.com/asticode/go-astikit"
 	"github.com/pkg/errors"
 )
 
@@ -77,22 +77,22 @@ func NewIndexIdentifier() *Identifier {
 
 func NewUIIdentifier(name string) *Identifier {
 	return &Identifier{
-		Name: astiptr.Str(name),
+		Name: astikit.StrPtr(name),
 		Type: UIIdentifierType,
 	}
 }
 
 func NewRunnableIdentifier(runnable, worker string) *Identifier {
 	return &Identifier{
-		Name:   astiptr.Str(runnable),
+		Name:   astikit.StrPtr(runnable),
 		Type:   RunnableIdentifierType,
-		Worker: astiptr.Str(worker),
+		Worker: astikit.StrPtr(worker),
 	}
 }
 
 func NewWorkerIdentifier(name string) *Identifier {
 	return &Identifier{
-		Name: astiptr.Str(name),
+		Name: astikit.StrPtr(name),
 		Type: WorkerIdentifierType,
 	}
 }
@@ -103,7 +103,7 @@ func (i Identifier) Clone() (o *Identifier) {
 
 	// Add name
 	if i.Name != nil {
-		o.Name = astiptr.Str(*i.Name)
+		o.Name = astikit.StrPtr(*i.Name)
 	}
 
 	// Add types
@@ -116,14 +116,14 @@ func (i Identifier) Clone() (o *Identifier) {
 
 	// Add worker
 	if i.Worker != nil {
-		o.Worker = astiptr.Str(*i.Worker)
+		o.Worker = astikit.StrPtr(*i.Worker)
 	}
 	return
 }
 
 func (i *Identifier) match(id Identifier) bool {
 	// Check type
-	if !strOrMapMatch(astiptr.Str(i.Type), astiptr.Str(id.Type), i.Types, id.Types) {
+	if !strOrMapMatch(astikit.StrPtr(i.Type), astikit.StrPtr(id.Type), i.Types, id.Types) {
 		return false
 	}
 

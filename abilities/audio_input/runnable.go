@@ -11,9 +11,8 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astichartjs"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astipcm "github.com/asticode/go-astitools/pcm"
-	astiptr "github.com/asticode/go-astitools/ptr"
 	"github.com/julienschmidt/httprouter"
 	"github.com/pkg/errors"
 )
@@ -31,7 +30,7 @@ var (
 
 type Stream interface {
 	BitDepth() int
-	MaxSilenceAudioLevel() float64
+	MaxSilenceLevel() float64
 	NumChannels() int
 	Read() ([]int, error)
 	SampleRate() int
@@ -117,15 +116,14 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 		// Dispatch
 		r.Dispatch(m)
 	}
-	return
 }
 
 type Samples struct {
-	BitDepth             int     `json:"bit_depth"`
-	MaxSilenceAudioLevel float64 `json:"max_silence_audio_level"`
-	NumChannels          int     `json:"num_channels"`
-	SampleRate           int     `json:"sample_rate"`
-	Samples              []int   `json:"samples"`
+	BitDepth        int     `json:"bit_depth"`
+	MaxSilenceLevel float64 `json:"max_silence_level"`
+	NumChannels     int     `json:"num_channels"`
+	SampleRate      int     `json:"sample_rate"`
+	Samples         []int   `json:"samples"`
 }
 
 func (r *Runnable) newSamplesMessage(b []int) (m *astibob.Message, err error) {
@@ -137,11 +135,11 @@ func (r *Runnable) newSamplesMessage(b []int) (m *astibob.Message, err error) {
 
 	// Marshal
 	if m.Payload, err = json.Marshal(Samples{
-		BitDepth:             r.s.BitDepth(),
-		MaxSilenceAudioLevel: r.s.MaxSilenceAudioLevel(),
-		NumChannels:          r.s.NumChannels(),
-		Samples:              b,
-		SampleRate:           r.s.SampleRate(),
+		BitDepth:        r.s.BitDepth(),
+		MaxSilenceLevel: r.s.MaxSilenceLevel(),
+		NumChannels:     r.s.NumChannels(),
+		Samples:         b,
+		SampleRate:      r.s.SampleRate(),
 	}); err != nil {
 		err = errors.Wrap(err, "audio_input: marshaling payload failed")
 		return
@@ -288,10 +286,10 @@ func (c *calibration) wait() (err error) {
 }
 
 type Calibration struct {
-	Chart                         astichartjs.Chart `json:"chart"`
-	CurrentMaxSilenceAudioLevel   float64           `json:"current_max_silence_audio_level"`
-	MaxAudioLevel                 float64           `json:"max_audio_level"`
-	SuggestedMaxSilenceAudioLevel float64           `json:"suggested_max_silence_audio_level"`
+	Chart                    astichartjs.Chart `json:"chart"`
+	CurrentMaxSilenceLevel   float64           `json:"current_max_silence_level"`
+	MaxLevel                 float64           `json:"max_level"`
+	SuggestedMaxSilenceLevel float64           `json:"suggested_max_silence_level"`
 }
 
 func (c *calibration) results() (o Calibration) {
@@ -302,7 +300,7 @@ func (c *calibration) results() (o Calibration) {
 				Datasets: []astichartjs.Dataset{{
 					BackgroundColor: astichartjs.ChartBackgroundColorGreen,
 					BorderColor:     astichartjs.ChartBorderColorGreen,
-					Label:           "Audio level",
+					Label:           "Level",
 				}},
 			},
 			Options: &astichartjs.Options{
@@ -311,7 +309,7 @@ func (c *calibration) results() (o Calibration) {
 						{
 							Position: astichartjs.ChartAxisPositionsBottom,
 							ScaleLabel: &astichartjs.ScaleLabel{
-								Display:     astiptr.Bool(true),
+								Display:     astikit.BoolPtr(true),
 								LabelString: "Duration (s)",
 							},
 							Type: astichartjs.ChartAxisTypesLinear,
@@ -320,13 +318,13 @@ func (c *calibration) results() (o Calibration) {
 					YAxes: []astichartjs.Axis{
 						{
 							ScaleLabel: &astichartjs.ScaleLabel{
-								Display:     astiptr.Bool(true),
-								LabelString: "Audio level",
+								Display:     astikit.BoolPtr(true),
+								LabelString: "Level",
 							},
 						},
 					},
 				},
-				Title: &astichartjs.Title{Display: astiptr.Bool(true)},
+				Title: &astichartjs.Title{Display: astikit.BoolPtr(true)},
 			},
 			Type: astichartjs.ChartTypeLine,
 		},
@@ -353,42 +351,42 @@ func (c *calibration) results() (o Calibration) {
 			samples = c.b[start:]
 		}
 
-		// Compute audio level
-		audioLevel := astipcm.AudioLevel(samples)
+		// Compute level
+		level := astikit.PCMLevel(samples)
 
-		// Get max audio level
-		o.MaxAudioLevel = math.Max(o.MaxAudioLevel, audioLevel)
+		// Get max level
+		o.MaxLevel = math.Max(o.MaxLevel, level)
 
 		// Add data to chart
 		maxX = float64(numberOfSamplesPerStep) / float64(c.s.SampleRate()) * float64(idx)
 		o.Chart.Data.Datasets[0].Data = append(o.Chart.Data.Datasets[0].Data, astichartjs.DataPoint{
 			X: maxX,
-			Y: audioLevel,
+			Y: level,
 		})
 	}
 
-	// Get current max silence audio level
-	o.CurrentMaxSilenceAudioLevel = c.s.MaxSilenceAudioLevel()
+	// Get current max silence level
+	o.CurrentMaxSilenceLevel = c.s.MaxSilenceLevel()
 
-	// Add current max silence audio level to chart
+	// Add current max silence level to chart
 	o.Chart.Data.Datasets = append(o.Chart.Data.Datasets, astichartjs.Dataset{
 		BackgroundColor: astichartjs.ChartBackgroundColorBlue,
 		BorderColor:     astichartjs.ChartBorderColorBlue,
-		Label:           "Current max silence audio level",
+		Label:           "Current max silence level",
 	})
-	o.Chart.Data.Datasets[1].Data = append(o.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: 0, Y: o.CurrentMaxSilenceAudioLevel})
-	o.Chart.Data.Datasets[1].Data = append(o.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: maxX, Y: o.CurrentMaxSilenceAudioLevel})
+	o.Chart.Data.Datasets[1].Data = append(o.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: 0, Y: o.CurrentMaxSilenceLevel})
+	o.Chart.Data.Datasets[1].Data = append(o.Chart.Data.Datasets[1].Data, astichartjs.DataPoint{X: maxX, Y: o.CurrentMaxSilenceLevel})
 
-	// Get suggested max silence audio level
-	o.SuggestedMaxSilenceAudioLevel = 0.3 * o.MaxAudioLevel
+	// Get suggested max silence level
+	o.SuggestedMaxSilenceLevel = 0.3 * o.MaxLevel
 
-	// Add suggested max silence audio level to chart
+	// Add suggested max silence level to chart
 	o.Chart.Data.Datasets = append(o.Chart.Data.Datasets, astichartjs.Dataset{
 		BackgroundColor: astichartjs.ChartBackgroundColorRed,
 		BorderColor:     astichartjs.ChartBorderColorRed,
-		Label:           "Suggested max silence audio level",
+		Label:           "Suggested max silence level",
 	})
-	o.Chart.Data.Datasets[2].Data = append(o.Chart.Data.Datasets[2].Data, astichartjs.DataPoint{X: 0, Y: o.SuggestedMaxSilenceAudioLevel})
-	o.Chart.Data.Datasets[2].Data = append(o.Chart.Data.Datasets[2].Data, astichartjs.DataPoint{X: maxX, Y: o.SuggestedMaxSilenceAudioLevel})
+	o.Chart.Data.Datasets[2].Data = append(o.Chart.Data.Datasets[2].Data, astichartjs.DataPoint{X: 0, Y: o.SuggestedMaxSilenceLevel})
+	o.Chart.Data.Datasets[2].Data = append(o.Chart.Data.Datasets[2].Data, astichartjs.DataPoint{X: maxX, Y: o.SuggestedMaxSilenceLevel})
 	return
 }

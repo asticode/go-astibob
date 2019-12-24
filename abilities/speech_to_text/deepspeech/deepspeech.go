@@ -36,8 +36,6 @@ type Options struct {
 	LMPath               string            `toml:"lm_path"`
 	LMWeight             float64           `toml:"lm_weight"`
 	ModelPath            string            `toml:"model_path"`
-	NCep                 int               `toml:"ncep"`
-	NContext             int               `toml:"ncontext"`
 	PrepareDirPath       string            `toml:"prepare_dir_path"`
 	PythonBinaryPath     string            `toml:"python_binary_path"`
 	TrainingArgs         map[string]string `toml:"training_args"`
@@ -52,11 +50,11 @@ func New(o Options) (d *DeepSpeech) {
 	// Only do the following if the model path exists
 	if _, err := os.Stat(d.o.ModelPath); err == nil {
 		// Create model
-		d.m = astideepspeech.New(o.ModelPath, o.NCep, o.NContext, o.AlphabetPath, o.BeamWidth)
+		d.m = astideepspeech.New(o.ModelPath, o.BeamWidth)
 
 		// Enable LM
 		if o.LMPath != "" {
-			d.m.EnableDecoderWithLM(o.AlphabetPath, o.LMPath, o.TriePath, o.LMWeight, o.ValidWordCountWeight)
+			d.m.EnableDecoderWithLM(o.LMPath, o.TriePath, o.LMWeight, o.ValidWordCountWeight)
 		}
 	}
 	return
@@ -104,7 +102,7 @@ func (d *DeepSpeech) Parse(samples []int, bitDepth, numChannels, sampleRate int)
 	}
 
 	// Parse
-	t = d.m.SpeechToText(ss, uint(len(ss)), deepSpeechSampleRate)
+	t = d.m.SpeechToText(ss, uint(len(ss)))
 	return
 }
 

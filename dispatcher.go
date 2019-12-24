@@ -5,9 +5,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astisync "github.com/asticode/go-astitools/sync"
-	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/pkg/errors"
 )
 
@@ -57,17 +56,17 @@ func (c DispatchConditions) match(m *Message) bool {
 
 type Dispatcher struct {
 	ctx context.Context
-	cs  map[string]*astisync.Chan
+	cs  map[string]*astikit.Chan
 	hs  []dispatcherHandler
 	mc  *sync.Mutex // Locks cs
 	mh  *sync.Mutex // Locks hs
-	t   astiworker.TaskFunc
+	t   astikit.TaskFunc
 }
 
-func NewDispatcher(ctx context.Context, t astiworker.TaskFunc) *Dispatcher {
+func NewDispatcher(ctx context.Context, t astikit.TaskFunc) *Dispatcher {
 	return &Dispatcher{
 		ctx: ctx,
-		cs:  make(map[string]*astisync.Chan),
+		cs:  make(map[string]*astikit.Chan),
 		mc:  &sync.Mutex{},
 		mh:  &sync.Mutex{},
 		t:   t,
@@ -91,7 +90,7 @@ func (d *Dispatcher) Dispatch(m *Message) {
 	defer d.mh.Unlock()
 
 	// Loop through handlers
-	var c *astisync.Chan
+	var c *astikit.Chan
 	for _, h := range d.hs {
 		// No match
 		if !h.c.match(m) {
@@ -113,11 +112,12 @@ func (d *Dispatcher) Dispatch(m *Message) {
 				astilog.Debugf("astibob: creating new dispatcher chan with key %s", k)
 
 				// Create chan
-				c = astisync.NewChan(astisync.ChanOptions{TaskFunc: d.t})
+				c = astikit.NewChan(astikit.ChanOptions{ProcessAll: true})
 				d.cs[k] = c
 
 				// Start chan
-				go c.Start(d.ctx)
+				t := d.t()
+				t.Do(func() { c.Start(d.ctx) })
 			}
 
 			// Unlock
@@ -144,7 +144,7 @@ func (d *Dispatcher) key(m *Message) string {
 	return "default"
 }
 
-func (d *Dispatcher) dispatch(c *astisync.Chan, m *Message, h MessageHandler) {
+func (d *Dispatcher) dispatch(c *astikit.Chan, m *Message, h MessageHandler) {
 	// Add to chan
 	c.Add(func() {
 		// Handle message

@@ -3,7 +3,7 @@ package index
 import (
 	"net/http"
 
-	astihttp "github.com/asticode/go-astitools/http"
+	"github.com/asticode/go-astikit"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -36,11 +36,14 @@ func (i *Index) Serve() {
 	r.GET("/workers/:worker/runnables/:runnable/web/*path", i.runnableWeb)
 
 	// Chain middlewares
-	h := astihttp.ChainMiddlewares(r, astihttp.MiddlewareBasicAuth(i.o.Server.Username, i.o.Server.Password))
-	h = astihttp.ChainMiddlewaresWithPrefix(h, []string{"/api/"}, astihttp.MiddlewareContentType("application/json"))
+	h := astikit.ChainHTTPMiddlewares(r, astikit.HTTPMiddlewareBasicAuth(i.o.Server.Username, i.o.Server.Password))
+	h = astikit.ChainHTTPMiddlewaresWithPrefix(h, []string{"/api/"}, astikit.HTTPMiddlewareContentType("application/json"))
 
 	// Serve
-	i.w.Serve(i.o.Server.Addr, h)
+	astikit.ServeHTTP(i.w, astikit.ServeHTTPOptions{
+		Addr:    i.o.Server.Addr,
+		Handler: h,
+	})
 }
 
 func (i *Index) ok(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {}

@@ -7,10 +7,8 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
-	astitemplate "github.com/asticode/go-astitools/template"
-	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
@@ -26,9 +24,9 @@ type Index struct {
 	mw *sync.Mutex // Locks ws
 	o  Options
 	r  *resources
-	t  *astitemplate.Templater
+	t  *astikit.Templater
 	us map[string]map[string]bool // UI message names indexed by message --> ui
-	w  *astiworker.Worker
+	w  *astikit.Worker
 	ws map[string]*worker // Workers indexed by name
 	wu *astiws.Manager
 	ww *astiws.Manager
@@ -43,9 +41,9 @@ func New(o Options) (i *Index, err error) {
 		mw: &sync.Mutex{},
 		o:  o,
 		r:  newResources(),
-		t:  astitemplate.NewTemplater(),
+		t:  astikit.NewTemplater(),
 		us: make(map[string]map[string]bool),
-		w:  astiworker.NewWorker(),
+		w:  astikit.NewWorker(astikit.WorkerOptions{Logger: astilog.GetLogger()}),
 		ws: make(map[string]*worker),
 		wu: astiws.NewManager(astiws.ManagerConfiguration{}),
 		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
@@ -70,11 +68,11 @@ func New(o Options) (i *Index, err error) {
 		astibob.RunnableStartedMessage: true,
 		astibob.RunnableStoppedMessage: true,
 	}}, i.updateRunnableStatus)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIDisconnectedMessage)}, i.unregisterUI)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIPingMessage)}, i.extendUIConnection)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIRegisterMessage)}, i.registerUI)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, i.delWorker)
-	i.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisterMessage)}, i.addWorker)
+	i.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.UIDisconnectedMessage)}, i.unregisterUI)
+	i.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.UIPingMessage)}, i.extendUIConnection)
+	i.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.UIRegisterMessage)}, i.registerUI)
+	i.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.WorkerDisconnectedMessage)}, i.delWorker)
+	i.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.WorkerRegisterMessage)}, i.addWorker)
 	i.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
 		astibob.RunnableIdentifierType: true,
 		astibob.WorkerIdentifierType:   true,

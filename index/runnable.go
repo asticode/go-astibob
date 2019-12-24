@@ -158,7 +158,6 @@ func (i *Index) runnableRoutes(rw http.ResponseWriter, r *http.Request, p httpro
 				astilog.Error(errors.Wrapf(err, "index: copying response body of %s failed", url))
 				return
 			}
-			return
 		},
 	)
 }

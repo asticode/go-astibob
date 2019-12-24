@@ -142,6 +142,7 @@ func (d *DeepSpeech) speechesHash(speeches []speech_to_text.SpeechFile) (h []byt
 	var b []byte
 	if b, err = json.Marshal(speeches); err != nil {
 		err = errors.Wrap(err, "deepspeech: marshaling failed")
+		return
 	}
 
 	// Create hasher

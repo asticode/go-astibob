@@ -4,9 +4,8 @@ import (
 	"context"
 	"sync"
 
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
-	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/pkg/errors"
 )
 
@@ -26,7 +25,7 @@ type Runnable interface {
 	OnMessage(m *Message) error
 	SetDispatchFunc(f DispatchFunc)
 	SetRootCtx(ctx context.Context)
-	SetTaskFunc(f astiworker.TaskFunc)
+	SetTaskFunc(f astikit.TaskFunc)
 	Start(ctx context.Context) error
 	Status() string
 	Stop()
@@ -49,7 +48,7 @@ type BaseRunnable struct {
 	startCancel  context.CancelFunc
 	startCtx     context.Context
 	status       string
-	taskFunc     astiworker.TaskFunc
+	taskFunc     astikit.TaskFunc
 }
 
 func NewBaseRunnable(o BaseRunnableOptions) *BaseRunnable {
@@ -69,7 +68,7 @@ func (r *BaseRunnable) Dispatch(m *Message) {
 
 func (r *BaseRunnable) Metadata() Metadata { return r.o.Metadata }
 
-func (r *BaseRunnable) NewTask() *astiworker.Task { return r.taskFunc() }
+func (r *BaseRunnable) NewTask() *astikit.Task { return r.taskFunc() }
 
 func (r *BaseRunnable) OnMessage(m *Message) (err error) {
 	// We need to send a done message
@@ -77,7 +76,7 @@ func (r *BaseRunnable) OnMessage(m *Message) (err error) {
 		defer func() {
 			// Create message
 			m, err := NewRunnableDoneMessage(&Identifier{
-				Name: astiptr.Str(m.From.WorkerName()),
+				Name: astikit.StrPtr(m.From.WorkerName()),
 				Type: WorkerIdentifierType,
 			}, RunnableDone{
 				ID:      m.ID,
@@ -109,7 +108,7 @@ func (r *BaseRunnable) SetDispatchFunc(f DispatchFunc) { r.dispatchFunc = f }
 
 func (r *BaseRunnable) SetRootCtx(ctx context.Context) { r.rootCtx = ctx }
 
-func (r *BaseRunnable) SetTaskFunc(f astiworker.TaskFunc) { r.taskFunc = f }
+func (r *BaseRunnable) SetTaskFunc(f astikit.TaskFunc) { r.taskFunc = f }
 
 func (r *BaseRunnable) Status() string { return r.status }
 
@@ -156,5 +155,4 @@ func (r *BaseRunnable) Stop() {
 		// Reset once
 		r.oStart = &sync.Once{}
 	})
-	return
 }

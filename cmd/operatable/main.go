@@ -49,6 +49,7 @@ func newBaseOperatable() (o *astibob.BaseOperatable) {
 
 func main() {
 	// Parse flags
+	astilog.SetHandyFlags()
 	flag.Parse()
 	astilog.FlagInit()
 

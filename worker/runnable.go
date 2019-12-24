@@ -73,7 +73,6 @@ func (w *Worker) dispatchFunc(name string) astibob.DispatchFunc {
 		for _, m := range ms {
 			w.d.Dispatch(m)
 		}
-		return
 	}
 }
 
@@ -226,7 +225,6 @@ func (w *Worker) stopRunnable(name string) (err error) {
 	r.Stop()
 	return
 }
-
 
 type MessageOptions struct {
 	OnDone   OnDone

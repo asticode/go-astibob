@@ -15,7 +15,7 @@ type Stream struct {
 type StreamOptions struct {
 	BitDepth             int     `toml:"bit_depth"`
 	BufferLength         int     `toml:"buffer_length"`
-	MaxSilenceAudioLevel float64 `toml:"max_silence_audio_level"`
+	MaxSilenceLevel float64 `toml:"max_silence_level"`
 	NumInputChannels     int     `toml:"num_input_channels"`
 	NumOutputChannels    int     `toml:"num_output_channels"`
 	SampleRate           int     `toml:"sample_rate"`
@@ -41,7 +41,7 @@ func (p *PortAudio) NewDefaultStream(o StreamOptions) (s *Stream, err error) {
 
 func (s *Stream) BitDepth() int { return s.o.BitDepth }
 
-func (s *Stream) MaxSilenceAudioLevel() float64 { return s.o.MaxSilenceAudioLevel }
+func (s *Stream) MaxSilenceLevel() float64 { return s.o.MaxSilenceLevel }
 
 func (s *Stream) NumChannels() int { return s.o.NumInputChannels }
 
@@ -53,7 +53,7 @@ func (s *Stream) Close() (err error) {
 
 	// Close
 	if err = s.s.Close(); err != nil {
-		err = errors.Wrapf(err, "portaudio: closing stream %s failed", s)
+		err = errors.Wrapf(err, "portaudio: closing stream %p failed", s)
 		return
 	}
 	return

@@ -51,16 +51,16 @@ let index = {
         document.getElementById("calibration-results").innerHTML = `<table>
     <tbody>
         <tr>
-            <td>Max audio level</td>
-            <td>` + Math.round(data.max_audio_level) + `</td>
+            <td>Max level</td>
+            <td>` + Math.round(data.max_level) + `</td>
         </tr>
         <tr>
-            <td>Current max silence audio level</td>
-            <td>` + Math.round(data.current_max_silence_audio_level) + `</td>
+            <td>Current max silence level</td>
+            <td>` + Math.round(data.current_max_silence_level) + `</td>
         </tr>
         <tr>
-            <td>Suggested max silence audio level</td>
-            <td>` + Math.round(data.suggested_max_silence_audio_level) + `</td>
+            <td>Suggested max silence level</td>
+            <td>` + Math.round(data.suggested_max_silence_level) + `</td>
         </tr>
     </tbody>
 </table>

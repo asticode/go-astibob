@@ -183,7 +183,7 @@ defer p.Close()
 s, _ := p.NewDefaultStream(portaudio.StreamOptions{
     BitDepth:             32,
     BufferLength:         5000,
-    MaxSilenceAudioLevel: 5 * 1e6,
+    MaxSilenceLevel: 5 * 1e6,
     NumInputChannels:     2,
     SampleRate:           44100,
 })
@@ -213,7 +213,7 @@ w.RegisterListenables(worker.Listenable{
 w.RegisterListenables(
     worker.Listenable{
         Listenable: audio_input.NewListenable(audio_input.ListenableOptions{
-            OnSamples: func(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) (err error) {
+            OnSamples: func(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceLevel float64) (err error) {
                 // TODO Do something with the samples
                 return
             },
@@ -317,7 +317,7 @@ w.SendMessage(worker.MessageOptions{
         bitDepth,
         numChannels,
         sampleRate,
-        maxSilenceAudioLevel,
+        MaxSilenceLevel,
     ),
     Runnable: "Speech to Text",
     Worker:   "Worker #3",

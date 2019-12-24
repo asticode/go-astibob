@@ -6,7 +6,7 @@ import (
 )
 
 type ListenableOptions struct {
-	OnSamples func(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) error
+	OnSamples func(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceLevel float64) error
 }
 
 type Listenable struct {
@@ -49,7 +49,7 @@ func (l *Listenable) onSamples(m *astibob.Message) (err error) {
 
 	// Custom
 	if l.o.OnSamples != nil {
-		if err = l.o.OnSamples(m.From, s.Samples, s.BitDepth, s.NumChannels, s.SampleRate, s.MaxSilenceAudioLevel); err != nil {
+		if err = l.o.OnSamples(m.From, s.Samples, s.BitDepth, s.NumChannels, s.SampleRate, s.MaxSilenceLevel); err != nil {
 			err = errors.Wrap(err, "audio_input: custom on samples failed")
 			return
 		}

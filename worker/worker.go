@@ -9,9 +9,8 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astiptr "github.com/asticode/go-astitools/ptr"
-	astiworker "github.com/asticode/go-astitools/worker"
 	"github.com/asticode/go-astiws"
 	"github.com/pkg/errors"
 )
@@ -40,7 +39,7 @@ type Worker struct {
 	ols  map[string]map[string]map[string]bool // Other workers listenables indexed by runnable --> worker --> message
 	rs   map[string]astibob.Runnable
 	us   map[string]bool // UI messages names indexed by message
-	w    *astiworker.Worker
+	w    *astikit.Worker
 	ws   map[string]*worker
 }
 
@@ -64,7 +63,7 @@ func New(name string, o Options) (w *Worker) {
 		ols:  make(map[string]map[string]map[string]bool),
 		rs:   make(map[string]astibob.Runnable),
 		us:   make(map[string]bool),
-		w:    astiworker.NewWorker(),
+		w:    astikit.NewWorker(astikit.WorkerOptions{Logger: astilog.GetLogger()}),
 		ws:   make(map[string]*worker),
 	}
 
@@ -75,15 +74,15 @@ func New(name string, o Options) (w *Worker) {
 	w.cw.SetMessageHandler(w.handleIndexMessage)
 
 	// Add dispatcher handlers
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.ListenablesRegisterMessage)}, w.registerListenables)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableDoneMessage)}, w.doneMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIMessageNamesAddMessage)}, w.addUIMessageNames)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.UIMessageNamesDeleteMessage)}, w.deleteUIMessageNames)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerRegisteredMessage)}, w.registerWorker)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerDisconnectedMessage)}, w.unregisterWorker)
-	w.d.On(astibob.DispatchConditions{Name: astiptr.Str(astibob.WorkerWelcomeMessage)}, w.finishRegistration)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.ListenablesRegisterMessage)}, w.registerListenables)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.RunnableDoneMessage)}, w.doneMessage)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.RunnableStartMessage)}, w.startRunnableFromMessage)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.RunnableStopMessage)}, w.stopRunnableFromMessage)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.UIMessageNamesAddMessage)}, w.addUIMessageNames)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.UIMessageNamesDeleteMessage)}, w.deleteUIMessageNames)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.WorkerRegisteredMessage)}, w.registerWorker)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.WorkerDisconnectedMessage)}, w.unregisterWorker)
+	w.d.On(astibob.DispatchConditions{Name: astikit.StrPtr(astibob.WorkerWelcomeMessage)}, w.finishRegistration)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.IndexIdentifierType}}, w.sendMessageToIndex)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Type: astibob.UIIdentifierType}}, w.sendMessageToUI)
 	w.d.On(astibob.DispatchConditions{To: &astibob.Identifier{Types: map[string]bool{
@@ -149,25 +148,6 @@ func newWorker(i astibob.Worker) (w *worker) {
 	// Loop through runnables
 	for _, r := range i.Runnables {
 		w.rs[r.Name] = r
-	}
-	return
-}
-
-func (w *worker) toMessage() (o astibob.Worker) {
-	// Lock
-	w.mr.Lock()
-	defer w.mr.Unlock()
-
-	// Create worker
-	o = astibob.Worker{
-		Addr: w.addr,
-		Name: w.name,
-	}
-
-	// Loop through runnables
-	for _, r := range w.rs {
-		// Append
-		o.Runnables = append(o.Runnables, r)
 	}
 	return
 }

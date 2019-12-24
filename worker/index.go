@@ -10,7 +10,7 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astilog"
-	astiworker "github.com/asticode/go-astitools/worker"
+	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/pkg/errors"
 )
@@ -23,10 +23,9 @@ func (w *Worker) RegisterToIndex() {
 		h.Set("Authorization", "Basic "+base64.StdEncoding.EncodeToString([]byte(w.o.Index.Username+":"+w.o.Index.Password)))
 	}
 
-	// Dial
-	w.w.Dial(astiworker.DialOptions{
+	// Dial and read
+	w.cw.DialAndRead(w.w, astiws.DialAndReadOptions{
 		Addr:   "ws://" + w.o.Index.Addr + "/websockets/worker",
-		Client: w.cw,
 		Header: h,
 		OnDial: w.sendRegister,
 		OnReadError: func(err error) {
@@ -219,7 +218,6 @@ func (w *Worker) addWorker(m astibob.Worker) {
 
 	// Update pool
 	w.ws[nw.name] = nw
-	return
 }
 
 func (w *Worker) unregisterWorker(m *astibob.Message) (err error) {
@@ -254,5 +252,4 @@ func (w *Worker) delWorker(name string) {
 
 	// Update pool
 	delete(w.ws, name)
-	return
 }

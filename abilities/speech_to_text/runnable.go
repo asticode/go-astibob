@@ -15,10 +15,8 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/worker"
+	"github.com/asticode/go-astikit"
 	"github.com/asticode/go-astilog"
-	astilimiter "github.com/asticode/go-astitools/limiter"
-	astipcm "github.com/asticode/go-astitools/pcm"
-	astisync "github.com/asticode/go-astitools/sync"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/julienschmidt/httprouter"
@@ -85,8 +83,8 @@ type SpeechFile struct {
 type Runnable struct {
 	*astibob.BaseOperatable
 	*astibob.BaseRunnable
-	b      *astilimiter.Bucket
-	c      *astisync.Chan
+	b      *astikit.LimiterBucket
+	c      *astikit.Chan
 	cancel context.CancelFunc
 	ctx    context.Context
 	i      *os.File
@@ -96,7 +94,7 @@ type Runnable struct {
 	o      RunnableOptions
 	p      Parser
 	pg     *Progress
-	sds    map[string]*astipcm.SilenceDetector
+	sds    map[string]*astikit.PCMSilenceDetector
 	ss     map[string]*Speech
 }
 
@@ -109,13 +107,13 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 	// Create runnable
 	r := &Runnable{
 		BaseOperatable: newBaseOperatable(),
-		c:              astisync.NewChan(astisync.ChanOptions{}),
+		c:              astikit.NewChan(astikit.ChanOptions{}),
 		mp:             &sync.Mutex{},
 		ms:             &sync.Mutex{},
 		msd:            &sync.Mutex{},
 		o:              o,
 		p:              p,
-		sds:            make(map[string]*astipcm.SilenceDetector),
+		sds:            make(map[string]*astikit.PCMSilenceDetector),
 		ss:             make(map[string]*Speech),
 	}
 
@@ -140,7 +138,7 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 	})
 
 	// Create progress limiter
-	r.b = astilimiter.New().Add("progress", 20, time.Second)
+	r.b = astikit.NewLimiter().Add("progress", 20, time.Second)
 	return r
 }
 
@@ -152,7 +150,7 @@ func (r *Runnable) Init() (err error) {
 
 	// Make sure speeches directory exists
 	if err = os.MkdirAll(r.o.SpeechesDirPath, 0755); err != nil {
-		err = errors.Wrapf(err, "speech_to_text: mkdirall %s failed")
+		err = errors.Wrapf(err, "speech_to_text: mkdirall %s failed", r.o.SpeechesDirPath)
 		return
 	}
 
@@ -225,24 +223,24 @@ func (r *Runnable) onMessage(m *astibob.Message) (err error) {
 }
 
 type Samples struct {
-	BitDepth             int                `json:"bit_depth"`
-	From                 astibob.Identifier `json:"from"`
-	MaxSilenceAudioLevel float64            `json:"max_silence_audio_level"`
-	NumChannels          int                `json:"num_channels"`
-	SampleRate           int                `json:"sample_rate"`
-	Samples              []int              `json:"samples"`
+	BitDepth        int                `json:"bit_depth"`
+	From            astibob.Identifier `json:"from"`
+	MaxSilenceLevel float64            `json:"max_silence_level"`
+	NumChannels     int                `json:"num_channels"`
+	SampleRate      int                `json:"sample_rate"`
+	Samples         []int              `json:"samples"`
 }
 
-func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceAudioLevel float64) worker.Message {
+func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChannels, sampleRate int, maxSilenceLevel float64) worker.Message {
 	return worker.Message{
 		Name: samplesMessage,
 		Payload: Samples{
-			BitDepth:             bitDepth,
-			From:                 from,
-			MaxSilenceAudioLevel: maxSilenceAudioLevel,
-			NumChannels:          numChannels,
-			SampleRate:           sampleRate,
-			Samples:              samples,
+			BitDepth:        bitDepth,
+			From:            from,
+			MaxSilenceLevel: maxSilenceLevel,
+			NumChannels:     numChannels,
+			SampleRate:      sampleRate,
+			Samples:         samples,
 		},
 	}
 }
@@ -288,9 +286,9 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 		r.msd.Lock()
 		sd, ok := r.sds[k]
 		if !ok {
-			sd = astipcm.NewSilenceDetector(astipcm.SilenceDetectorOptions{
-				MaxSilenceAudioLevel: s.MaxSilenceAudioLevel,
-				SampleRate:           s.SampleRate,
+			sd = astikit.NewPCMSilenceDetector(astikit.PCMSilenceDetectorOptions{
+				MaxSilenceLevel: s.MaxSilenceLevel,
+				SampleRate:      s.SampleRate,
 			})
 			r.sds[k] = sd
 		}
@@ -307,7 +305,7 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 		// Loop through valid samples
 		for _, ss := range vss {
 			// Normalize samples
-			ss = astipcm.Normalize(ss, s.BitDepth)
+			ss = astikit.PCMNormalize(ss, s.BitDepth)
 
 			// Parse speech
 			text, err := r.parseSpeech(s.From, ss, s.BitDepth, s.NumChannels, s.SampleRate)
@@ -369,7 +367,7 @@ func (r *Runnable) parseSpeech(from astibob.Identifier, ss []int, bitDepth, numC
 		err = errors.Wrap(err, "speech_to_text: parsing speech failed")
 		return
 	}
-	astilog.Debugf("speech_to_text: parsed %d samples from runnable %s on worker %s in %s", len(ss), *from.Name, *from.Worker, time.Now().Sub(start))
+	astilog.Debugf("speech_to_text: parsed %d samples from runnable %s on worker %s in %s", len(ss), *from.Name, *from.Worker, time.Since(start))
 
 	// Dispatch text
 	if text != "" {
@@ -528,7 +526,6 @@ func (r *Runnable) orderedSpeeches(fn func(s Speech)) {
 			fn(s)
 		}
 	}
-	return
 }
 
 type BuildReferences struct {
