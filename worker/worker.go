@@ -10,9 +10,7 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
-	"github.com/pkg/errors"
 )
 
 type Options struct {
@@ -26,6 +24,7 @@ type Worker struct {
 	d    *astibob.Dispatcher
 	ds   map[int]OnDone // On done callbacks indexed by message id
 	id   int
+	l    astikit.SeverityLogger
 	ls   map[string]map[string]map[string]bool // Worker's listenables indexed by worker --> runnable --> message
 	md   *sync.Mutex                           // Locks ds
 	mi   *sync.Mutex                           // Locks id
@@ -44,12 +43,13 @@ type Worker struct {
 }
 
 // New creates a new worker
-func New(name string, o Options) (w *Worker) {
+func New(name string, o Options, l astikit.StdLogger) (w *Worker) {
 	// Create worker
 	w = &Worker{
 		ch:   &http.Client{},
-		cw:   astiws.NewClient(astiws.ClientConfiguration{}),
+		cw:   astiws.NewClient(astiws.ClientConfiguration{}, l),
 		ds:   make(map[int]OnDone),
+		l:    astikit.AdaptStdLogger(l),
 		ls:   make(map[string]map[string]map[string]bool),
 		md:   &sync.Mutex{},
 		mi:   &sync.Mutex{},
@@ -63,12 +63,12 @@ func New(name string, o Options) (w *Worker) {
 		ols:  make(map[string]map[string]map[string]bool),
 		rs:   make(map[string]astibob.Runnable),
 		us:   make(map[string]bool),
-		w:    astikit.NewWorker(astikit.WorkerOptions{Logger: astilog.GetLogger()}),
+		w:    astikit.NewWorker(astikit.WorkerOptions{Logger: l}),
 		ws:   make(map[string]*worker),
 	}
 
 	// Create dispatcher
-	w.d = astibob.NewDispatcher(w.w.Context(), w.w.NewTask)
+	w.d = astibob.NewDispatcher(w.w.Context(), w.w.NewTask, w.l)
 
 	// Add websocket message handler
 	w.cw.SetMessageHandler(w.handleIndexMessage)
@@ -115,7 +115,7 @@ func (w *Worker) Close() error {
 	// Close client
 	if w.cw != nil {
 		if err := w.cw.Close(); err != nil {
-			astilog.Error(errors.Wrap(err, "worker: closing client failed"))
+			w.l.Error(fmt.Errorf("worker: closing client failed: %w", err))
 		}
 	}
 	return nil
@@ -163,7 +163,7 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 
 	// Invalid to
 	if m.To == nil {
-		err = errors.Wrap(err, "worker: no to")
+		err = fmt.Errorf("worker: no to")
 		return
 	}
 
@@ -210,18 +210,18 @@ func (w *Worker) sendMessageToWorker(m *astibob.Message) (err error) {
 	// Loop through workers
 	for _, mw := range ws {
 		// Log
-		astilog.Debugf("worker: sending message %s to worker %s", m.Name, mw.name)
+		w.l.Debugf("worker: sending message %s to worker %s", m.Name, mw.name)
 
 		// Marshal
 		var b []byte
 		if b, err = json.Marshal(m); err != nil {
-			err = errors.Wrap(err, "worker: marshaling failed")
+			err = fmt.Errorf("worker: marshaling failed: %w", err)
 			return
 		}
 
 		// Send request
 		if err = w.sendRequestToWorker(http.MethodPost, fmt.Sprintf("%s/api/messages", mw.addr), bytes.NewReader(b)); err != nil {
-			err = errors.Wrapf(err, "worker: sending request to worker %s failed", mw.name)
+			err = fmt.Errorf("worker: sending request to worker %s failed: %w", mw.name, err)
 			return
 		}
 	}
@@ -232,14 +232,14 @@ func (w *Worker) sendRequestToWorker(method, url string, body io.Reader) (err er
 	// Create request
 	var req *http.Request
 	if req, err = http.NewRequest(method, url, body); err != nil {
-		err = errors.Wrap(err, "worker: creating request failed")
+		err = fmt.Errorf("worker: creating request failed: %w", err)
 		return
 	}
 
 	// Send request
 	var resp *http.Response
 	if resp, err = w.ch.Do(req); err != nil {
-		err = errors.Wrap(err, "worker: sending request failed")
+		err = fmt.Errorf("worker: sending request failed: %w", err)
 		return
 	}
 	defer resp.Body.Close()

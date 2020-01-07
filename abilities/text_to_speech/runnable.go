@@ -3,12 +3,11 @@ package text_to_speech
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 // Message names
@@ -23,18 +22,21 @@ type Speaker interface {
 type Runnable struct {
 	*astibob.BaseRunnable
 	c *astikit.Chan
+	l astikit.SeverityLogger
 	s Speaker
 }
 
-func NewRunnable(name string, s Speaker) (r *Runnable) {
+func NewRunnable(name string, s Speaker, l astikit.StdLogger) (r *Runnable) {
 	// Create runnable
 	r = &Runnable{
 		c: astikit.NewChan(astikit.ChanOptions{}),
+		l: astikit.AdaptStdLogger(l),
 		s: s,
 	}
 
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
+		Logger: l,
 		Metadata: astibob.Metadata{
 			Description: "Converts text into spoken voice output using a form of speech synthesis",
 			Name:        name,
@@ -61,7 +63,7 @@ func (r *Runnable) onMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case sayMessage:
 		if err = r.onSay(m); err != nil {
-			err = errors.Wrap(err, "text_to_speech: on say failed")
+			err = fmt.Errorf("text_to_speech: on say failed: %w", err)
 			return
 		}
 	}
@@ -77,7 +79,7 @@ func NewSayMessage(s string) worker.Message {
 
 func parseSayPayload(m *astibob.Message) (s string, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
-		err = errors.Wrap(err, "text_to_speech: unmarshaling failed")
+		err = fmt.Errorf("text_to_speech: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -92,7 +94,7 @@ func (r *Runnable) onSay(m *astibob.Message) (err error) {
 	// Parse payload
 	var s string
 	if s, err = parseSayPayload(m); err != nil {
-		err = errors.Wrap(err, "text_to_speech: parsing payload failed")
+		err = fmt.Errorf("text_to_speech: parsing payload failed: %w", err)
 		return
 	}
 
@@ -105,7 +107,7 @@ func (r *Runnable) sayFunc(s string) func() {
 	return func() {
 		// Say
 		if err := r.s.Say(s); err != nil {
-			astilog.Error(errors.Wrap(err, "text_to_speech: say failed"))
+			r.l.Error(fmt.Errorf("text_to_speech: say failed: %w", err))
 			return
 		}
 	}

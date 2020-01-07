@@ -3,24 +3,25 @@ package portaudio
 import (
 	"fmt"
 
-	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astikit"
 	"github.com/gordonklaus/portaudio"
-	"github.com/pkg/errors"
 )
 
-type PortAudio struct{}
+type PortAudio struct {
+	l astikit.SeverityLogger
+}
 
-func New() *PortAudio {
-	return &PortAudio{}
+func New(l astikit.StdLogger) *PortAudio {
+	return &PortAudio{l: astikit.AdaptStdLogger(l)}
 }
 
 func (p *PortAudio) Initialize() (err error) {
 	// Log
-	astilog.Debug("portaudio: initializing portaudio")
+	p.l.Debug("portaudio: initializing portaudio")
 
 	// Initialize
 	if err = portaudio.Initialize(); err != nil {
-		err = errors.Wrap(err, "portaudio: initializing portaudio failed")
+		err = fmt.Errorf("portaudio: initializing portaudio failed: %w", err)
 		return
 	}
 	return
@@ -28,11 +29,11 @@ func (p *PortAudio) Initialize() (err error) {
 
 func (p *PortAudio) Close() (err error) {
 	// Log
-	astilog.Debug("astiportaudio: terminating portaudio")
+	p.l.Debug("astiportaudio: terminating portaudio")
 
 	// Terminate
 	if err = portaudio.Terminate(); err != nil {
-		err = errors.Wrap(err, "astiportaudio: terminating portaudio failed")
+		err = fmt.Errorf("astiportaudio: terminating portaudio failed: %w", err)
 		return
 	}
 	return

@@ -12,9 +12,7 @@ import (
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astichartjs"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 // Message names
@@ -43,17 +41,21 @@ type Runnable struct {
 	*astibob.BaseRunnable
 	cs []*calibration
 	l  *Listenable
+	lg astikit.SeverityLogger
 	mc *sync.Mutex // Locks cs
 	s  Stream
 }
 
-func NewRunnable(name string, s Stream) *Runnable {
+func NewRunnable(name string, s Stream, l astikit.StdLogger) *Runnable {
 	// Create runnable
 	r := &Runnable{
-		BaseOperatable: newBaseOperatable(),
-		mc:             &sync.Mutex{},
-		s:              s,
+		lg: astikit.AdaptStdLogger(l),
+		mc: &sync.Mutex{},
+		s:  s,
 	}
+
+	// Add base operatable
+	r.BaseOperatable = newBaseOperatable(r.lg)
 
 	// Add routes
 	r.AddRoute("/calibrate", http.MethodGet, r.calibrate)
@@ -63,6 +65,7 @@ func NewRunnable(name string, s Stream) *Runnable {
 
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
+		Logger: l,
 		Metadata: astibob.Metadata{
 			Description: "Reads an audio input and dispatches audio samples",
 			Name:        name,
@@ -80,14 +83,14 @@ func (r *Runnable) MessageNames() []string {
 func (r *Runnable) onStart(ctx context.Context) (err error) {
 	// Start stream
 	if err = r.s.Start(); err != nil {
-		err = errors.Wrap(err, "audio_input: starting stream failed")
+		err = fmt.Errorf("audio_input: starting stream failed: %w", err)
 		return
 	}
 
 	// Make sure to stop stream
 	defer func() {
 		if err := r.s.Stop(); err != nil {
-			astilog.Error(errors.Wrap(err, "audio_input: stopping stream failed"))
+			r.lg.Error(fmt.Errorf("audio_input: stopping stream failed: %w", err))
 			return
 		}
 	}()
@@ -102,14 +105,14 @@ func (r *Runnable) onStart(ctx context.Context) (err error) {
 		// Read
 		var b []int
 		if b, err = r.s.Read(); err != nil {
-			err = errors.Wrap(err, "audio_input: reading failed")
+			err = fmt.Errorf("audio_input: reading failed: %w", err)
 			return
 		}
 
 		// Create message
 		var m *astibob.Message
 		if m, err = r.newSamplesMessage(b); err != nil {
-			err = errors.Wrap(err, "audio_input: creating samples message failed")
+			err = fmt.Errorf("audio_input: creating samples message failed: %w", err)
 			return
 		}
 
@@ -141,7 +144,7 @@ func (r *Runnable) newSamplesMessage(b []int) (m *astibob.Message, err error) {
 		Samples:         b,
 		SampleRate:      r.s.SampleRate(),
 	}); err != nil {
-		err = errors.Wrap(err, "audio_input: marshaling payload failed")
+		err = fmt.Errorf("audio_input: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -149,7 +152,7 @@ func (r *Runnable) newSamplesMessage(b []int) (m *astibob.Message, err error) {
 
 func parseSamplesPayload(m *astibob.Message) (ss Samples, err error) {
 	if err = json.Unmarshal(m.Payload, &ss); err != nil {
-		err = errors.Wrap(err, "audio_input: unmarshaling failed")
+		err = fmt.Errorf("audio_input: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -187,7 +190,7 @@ func (r *Runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httpro
 
 	// Check status
 	if r.Status() != astibob.RunningStatus {
-		astibob.WriteHTTPError(rw, http.StatusBadRequest, fmt.Errorf("audio_input: status is %s", r.Status()))
+		astibob.WriteHTTPError(r.lg, rw, http.StatusBadRequest, fmt.Errorf("audio_input: status is %s", r.Status()))
 		return
 	}
 
@@ -197,12 +200,12 @@ func (r *Runnable) calibrate(rw http.ResponseWriter, req *http.Request, p httpro
 
 	// Wait
 	if err := c.wait(); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "audio_input: waiting failed"))
+		astibob.WriteHTTPError(r.lg, rw, http.StatusInternalServerError, fmt.Errorf("audio_input: waiting failed: %w", err))
 		return
 	}
 
 	// Write results
-	astibob.WriteHTTPData(rw, c.results())
+	astibob.WriteHTTPData(r.lg, rw, c.results())
 }
 
 type calibration struct {

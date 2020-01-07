@@ -2,22 +2,16 @@ package astibob
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 // Statuses
 const (
 	RunningStatus = "running"
 	StoppedStatus = "stopped"
-)
-
-// Errors
-var (
-	ErrContextCancelled = errors.New("astibob: context cancelled")
 )
 
 type Runnable interface {
@@ -34,6 +28,7 @@ type Runnable interface {
 type DispatchFunc func(m *Message)
 
 type BaseRunnableOptions struct {
+	Logger    astikit.StdLogger
 	Metadata  Metadata
 	OnMessage func(m *Message) error
 	OnStart   func(ctx context.Context) error
@@ -41,6 +36,7 @@ type BaseRunnableOptions struct {
 
 type BaseRunnable struct {
 	dispatchFunc DispatchFunc
+	l            astikit.SeverityLogger
 	o            BaseRunnableOptions
 	oStart       *sync.Once
 	oStop        *sync.Once
@@ -53,6 +49,7 @@ type BaseRunnable struct {
 
 func NewBaseRunnable(o BaseRunnableOptions) *BaseRunnable {
 	return &BaseRunnable{
+		l:      astikit.AdaptStdLogger(o.Logger),
 		o:      o,
 		oStart: &sync.Once{},
 		oStop:  &sync.Once{},
@@ -83,7 +80,7 @@ func (r *BaseRunnable) OnMessage(m *Message) (err error) {
 				Success: err == nil,
 			})
 			if err != nil {
-				astilog.Error(errors.Wrap(err, "astibob: creating runnable done message failed"))
+				r.l.Error(fmt.Errorf("astibob: creating runnable done message failed: %w", err))
 				return
 			}
 
@@ -95,7 +92,7 @@ func (r *BaseRunnable) OnMessage(m *Message) (err error) {
 	// Custom
 	if r.o.OnMessage != nil {
 		if err = r.o.OnMessage(m); err != nil {
-			err = errors.Wrap(err, "astibob: custom message handling failed")
+			err = fmt.Errorf("astibob: custom message handling failed: %w", err)
 			return
 		}
 	}
@@ -127,7 +124,7 @@ func (r *BaseRunnable) Start(ctx context.Context) (err error) {
 		// Start
 		if r.o.OnStart != nil {
 			if err = r.o.OnStart(r.startCtx); err != nil {
-				err = errors.Wrap(err, "astibob: OnStart failed")
+				err = fmt.Errorf("astibob: OnStart failed: %w", err)
 			}
 		} else {
 			<-r.startCtx.Done()
@@ -135,7 +132,7 @@ func (r *BaseRunnable) Start(ctx context.Context) (err error) {
 
 		// Check context
 		if r.startCtx.Err() != nil {
-			err = ErrContextCancelled
+			err = r.startCtx.Err()
 		}
 
 		// Update status

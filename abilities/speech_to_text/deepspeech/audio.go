@@ -1,8 +1,9 @@
 package deepspeech
 
 import (
+	"fmt"
+
 	"github.com/asticode/go-astikit"
-	"github.com/pkg/errors"
 )
 
 type audioConverter struct {
@@ -19,13 +20,13 @@ func newAudioConverter(bitDepth, numChannels, sampleRate int, fn astikit.PCMSamp
 	c.cc = astikit.NewPCMChannelsConverter(numChannels, deepSpeechNumChannels, func(s int) (err error) {
 		// Convert bit depth
 		if s, err = astikit.ConvertPCMBitDepth(s, bitDepth, deepSpeechBitDepth); err != nil {
-			err = errors.Wrap(err, "deepspeech: converting bit depth failed")
+			err = fmt.Errorf("deepspeech: converting bit depth failed: %w", err)
 			return
 		}
 
 		// Custom
 		if err = fn(s); err != nil {
-			err = errors.Wrap(err, "deepspeech: custom sample func failed")
+			err = fmt.Errorf("deepspeech: custom sample func failed: %w", err)
 			return
 		}
 		return
@@ -35,7 +36,7 @@ func newAudioConverter(bitDepth, numChannels, sampleRate int, fn astikit.PCMSamp
 	c.sc = astikit.NewPCMSampleRateConverter(sampleRate, deepSpeechSampleRate, numChannels, func(s int) (err error) {
 		// Add to channels converter
 		if err = c.cc.Add(s); err != nil {
-			err = errors.Wrap(err, "deepspeech: adding to channels converter failed")
+			err = fmt.Errorf("deepspeech: adding to channels converter failed: %w", err)
 			return
 		}
 		return
@@ -46,7 +47,7 @@ func newAudioConverter(bitDepth, numChannels, sampleRate int, fn astikit.PCMSamp
 func (c *audioConverter) add(s int) (err error) {
 	// Add to sample rate converter
 	if err = c.sc.Add(s); err != nil {
-		err = errors.Wrap(err, "deepspeech: adding to sample rate converter failed")
+		err = fmt.Errorf("deepspeech: adding to sample rate converter failed: %w", err)
 		return
 	}
 	return

@@ -1,8 +1,9 @@
 package speech_to_text
 
 import (
+	"fmt"
+
 	"github.com/asticode/go-astibob"
-	"github.com/pkg/errors"
 )
 
 type ListenableOptions struct {
@@ -32,7 +33,7 @@ func (l *Listenable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case textMessage:
 		if err = l.onText(m); err != nil {
-			err = errors.Wrap(err, "speech_to_text: on text failed")
+			err = fmt.Errorf("speech_to_text: on text failed: %w", err)
 			return
 		}
 	}
@@ -43,14 +44,14 @@ func (l *Listenable) onText(m *astibob.Message) (err error) {
 	// Parse payload
 	var t Text
 	if t, err = parseTextPayload(m); err != nil {
-		err = errors.Wrap(err, "speech_to_text: parsing text payload failed")
+		err = fmt.Errorf("speech_to_text: parsing text payload failed: %w", err)
 		return
 	}
 
 	// Custom
 	if l.o.OnText != nil {
 		if err = l.o.OnText(t.From, t.Text); err != nil {
-			err = errors.Wrap(err, "speech_to_text: custom on text failed")
+			err = fmt.Errorf("speech_to_text: custom on text failed: %w", err)
 			return
 		}
 	}

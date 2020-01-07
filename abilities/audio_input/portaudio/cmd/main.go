@@ -1,10 +1,10 @@
 package main
 
 import (
+	"fmt"
 	"log"
 
 	"github.com/asticode/go-astibob/abilities/audio_input/portaudio"
-	"github.com/pkg/errors"
 )
 
 func main() {
@@ -13,7 +13,7 @@ func main() {
 
 	// Initialize
 	if err := p.Initialize(); err != nil {
-		log.Fatal(errors.Wrap(err, "main: initializing failed"))
+		log.Fatal(fmt.Errorf("main: initializing failed: %w", err))
 	}
 	defer p.Close()
 

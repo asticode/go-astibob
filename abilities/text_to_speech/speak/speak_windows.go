@@ -1,31 +1,31 @@
 package speak
 
 import (
-	"github.com/asticode/go-astilog"
+	"errors"
+
 	"github.com/go-ole/go-ole"
 	"github.com/go-ole/go-ole/oleutil"
-	"github.com/pkg/errors"
 )
 
 func (s *Speaker) Initialize() (err error) {
 	// Initialize ole
-	astilog.Debug("speaker: initializing ole")
+	s.l.Debug("speaker: initializing ole")
 	if err = ole.CoInitialize(0); err != nil {
-		err = errors.Wrap(err, "speaker: initializing ole failed")
+		err = fmt.Errof("speaker: initializing ole failed: %w", err)
 		return
 	}
 
 	// Create SAPI.SpVoice object
-	astilog.Debug("speaker: creating SAPI.SpVoice ole object")
+	s.l.Debug("speaker: creating SAPI.SpVoice ole object")
 	if s.windowsIUnknown, err = oleutil.CreateObject("SAPI.SpVoice"); err != nil {
-		err = errors.Wrap(err, "speaker: creating SAPI.SpVoice ole object failed")
+		err = fmt.Errof("speaker: creating SAPI.SpVoice ole object failed: %w", err)
 		return
 	}
 
 	// Get IDispatch
-	astilog.Debug("speaker: getting ole IDispatch")
+	s.l.Debug("speaker: getting ole IDispatch")
 	if s.windowsIDispatch, err = s.windowsIUnknown.QueryInterface(ole.IID_IDispatch); err != nil {
-		err = errors.Wrap(err, "speaker: getting ole IDispatch failed")
+		err = fmt.Errof("speaker: getting ole IDispatch failed: %w", err)
 		return
 	}
 	return
@@ -33,15 +33,15 @@ func (s *Speaker) Initialize() (err error) {
 
 func (s *Speaker) Close() (err error) {
 	// Release IDispatch
-	astilog.Debug("speaker: releasing IDispatch")
+	s.l.Debug("speaker: releasing IDispatch")
 	s.windowsIDispatch.Release()
 
 	// Release IUnknown
-	astilog.Debug("speaker: releasing IUnkown")
+	s.l.Debug("speaker: releasing IUnkown")
 	s.windowsIUnknown.Release()
 
 	// Uninitialize ole
-	astilog.Debug("speaker: uninitializing ole")
+	s.l.Debug("speaker: uninitializing ole")
 	ole.CoUninitialize()
 	return
 }
@@ -56,13 +56,13 @@ func (s *Speaker) Say(i string) (err error) {
 	// Say
 	var v *ole.VARIANT
 	if v, err = oleutil.CallMethod(s.windowsIDispatch, "Speak", i); err != nil {
-		err = errors.Wrap(err, "speaker: calling Speak on IDispatch failed")
+		err = fmt.Errof("speaker: calling Speak on IDispatch failed: %w", err)
 		return
 	}
 
 	// Clear variant
 	if err = v.Clear(); err != nil {
-		err = errors.Wrap(err, "speaker: clearing variant failed")
+		err = fmt.Errof("speaker: clearing variant failed: %w", err)
 		return
 	}
 	return

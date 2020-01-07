@@ -2,17 +2,16 @@ package index
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"sort"
 	"sync"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 type worker struct {
@@ -73,8 +72,9 @@ func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p
 		c.SetMessageHandler(i.handleWorkerMessage(c))
 		return nil
 	}); err != nil {
-		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok || v.Code != websocket.CloseNormalClosure {
-			astilog.Error(errors.Wrap(err, "index: handling worker websocket failed"))
+		var e *websocket.CloseError
+		if ok := errors.As(err, &e); !ok || e.Code != websocket.CloseNormalClosure {
+			i.l.Error(fmt.Errorf("index: handling worker websocket failed: %w", err))
 		}
 		return
 	}
@@ -83,12 +83,12 @@ func (i *Index) handleWorkerWebsocket(rw http.ResponseWriter, r *http.Request, p
 func (i *Index) handleWorkerMessage(c *astiws.Client) astiws.MessageHandler {
 	return func(p []byte) (err error) {
 		// Log
-		astilog.Debugf("index: handling worker message %s", p)
+		i.l.Debugf("index: handling worker message %s", p)
 
 		// Unmarshal
 		m := astibob.NewMessage()
 		if err = json.Unmarshal(p, m); err != nil {
-			err = errors.Wrap(err, "index: unmarshaling failed")
+			err = fmt.Errorf("index: unmarshaling failed: %w", err)
 			return
 		}
 
@@ -123,8 +123,8 @@ func (i *Index) sendMessageToWorker(m *astibob.Message) (err error) {
 	}
 
 	// Send message
-	if err = sendMessage(m, "worker", i.ww, names...); err != nil {
-		err = errors.Wrap(err, "index: sending message failed")
+	if err = sendMessage(i.l, m, "worker", i.ww, names...); err != nil {
+		err = fmt.Errorf("index: sending message failed: %w", err)
 		return
 	}
 	return
@@ -134,7 +134,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var mw astibob.Worker
 	if mw, err = astibob.ParseWorkerRegisterPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing payload failed")
+		err = fmt.Errorf("index: parsing payload failed: %w", err)
 		return
 	}
 
@@ -165,7 +165,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 			}},
 			w.name,
 		); err != nil {
-			err = errors.Wrap(err, "astibob: creating disconnected message failed")
+			err = fmt.Errorf("astibob: creating disconnected message failed: %w", err)
 			return
 		}
 
@@ -175,7 +175,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 	})
 
 	// Log
-	astilog.Infof("index: worker %s has registered", w.name)
+	i.l.Infof("index: worker %s has registered", w.name)
 
 	// Create welcome message
 	if m, err = astibob.NewWorkerWelcomeMessage(
@@ -186,7 +186,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 			Workers:        i.workers(),
 		},
 	); err != nil {
-		err = errors.Wrap(err, "astibob: creating welcome message failed")
+		err = fmt.Errorf("index: creating welcome message failed: %w", err)
 		return
 	}
 
@@ -202,7 +202,7 @@ func (i *Index) addWorker(m *astibob.Message) (err error) {
 		}},
 		mw,
 	); err != nil {
-		err = errors.Wrap(err, "astibob: creating registered message failed")
+		err = fmt.Errorf("index: creating registered message failed: %w", err)
 		return
 	}
 
@@ -215,7 +215,7 @@ func (i *Index) delWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
 	if name, err = astibob.ParseWorkerDisconnectedPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing message payload failed")
+		err = fmt.Errorf("index: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -228,6 +228,6 @@ func (i *Index) delWorker(m *astibob.Message) (err error) {
 	i.ww.UnregisterClient(name)
 
 	// Log
-	astilog.Infof("index: worker %s has disconnected", name)
+	i.l.Infof("index: worker %s has disconnected", name)
 	return
 }

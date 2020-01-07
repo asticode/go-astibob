@@ -2,14 +2,13 @@ package main
 
 import (
 	"flag"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 // Flags
@@ -32,14 +31,15 @@ import (
 	{{ if gt (len .Static) 0 }}"net/http"
 
 	{{ end }}"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astikit"
 )
 
-func newBaseOperatable() (o *astibob.BaseOperatable) {
+func newBaseOperatable(l astikit.SeverityLogger) (o *astibob.BaseOperatable) {
 	// Create operatable
 	o = astibob.NewBaseOperatable()
 {{ if gt (len .Static) 0 }}
 	// Add static
-	{{ range $k, $v := .Static }}o.AddRoute("{{ $k }}", http.MethodGet, astibob.ContentHandle("{{ $k }}", []byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} }))
+	{{ range $k, $v := .Static }}o.AddRoute("{{ $k }}", http.MethodGet, astibob.ContentHandle("{{ $k }}", []byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} }, l))
 	{{ end }}
 {{ end }}{{ if gt (len .Templates) 0 }}	// Add templates
 	{{ range $k, $v := .Templates }}o.AddTemplate("{{ $k }}", []byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} })
@@ -48,10 +48,9 @@ func newBaseOperatable() (o *astibob.BaseOperatable) {
 `
 
 func main() {
-	// Parse flags
-	astilog.SetHandyFlags()
+	// Set logger
 	flag.Parse()
-	astilog.FlagInit()
+	log.SetFlags(0)
 
 	// Read dir
 	var fs []os.FileInfo
@@ -60,24 +59,24 @@ func main() {
 	if *abilities != "" {
 		baseDir = *abilities
 		if fs, err = ioutil.ReadDir(*abilities); err != nil {
-			astilog.Fatal(errors.Wrapf(err, "main: reading dir %s failed", *abilities))
+			log.Fatal(fmt.Errorf("main: reading dir %s failed: %w", *abilities, err))
 		}
 	} else if *ability != "" {
 		baseDir = filepath.Dir(*ability)
 		f, err := os.Stat(*ability)
 		if err != nil {
-			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", *ability))
+			log.Fatal(fmt.Errorf("main: stating %s failed: %w", *ability, err))
 		}
 		fs = append(fs, f)
 	} else {
-		astilog.Fatal("main: no input path provided")
+		log.Fatal("main: no input path provided")
 	}
 
 	// Parse template
 	r := template.New("root")
 	t, err := r.Parse(s)
 	if err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: parsing template failed"))
+		log.Fatal(fmt.Errorf("main: parsing template failed: %w", err))
 	}
 
 	// Loop through files
@@ -97,32 +96,32 @@ func main() {
 		// Stat resources folder
 		rp := filepath.Join(baseDir, f.Name(), "resources")
 		if _, err = os.Stat(rp); err != nil && !os.IsNotExist(err) {
-			astilog.Fatal(errors.Wrapf(err, "main: stating %s failed", rp))
+			log.Fatal(fmt.Errorf("main: stating %s failed: %w", rp, err))
 		} else if os.IsNotExist(err) {
 			continue
 		}
 
 		// Process statics
 		if err = processStatics(filepath.Join(baseDir, f.Name()), &d); err != nil {
-			astilog.Fatal(errors.Wrap(err, "main: processing statics failed"))
+			log.Fatal(fmt.Errorf("main: processing statics failed: %w", err))
 		}
 
 		// Process templates
 		if err = processTemplates(filepath.Join(baseDir, f.Name()), &d); err != nil {
-			astilog.Fatal(errors.Wrap(err, "main: processing templates failed"))
+			log.Fatal(fmt.Errorf("main: processing templates failed: %w", err))
 		}
 
 		// Create destination
 		dp := filepath.Join(baseDir, f.Name(), "operatable.go")
 		f, err := os.Create(dp)
 		if err != nil {
-			astilog.Fatal(errors.Wrapf(err, "main: creating %s failed", dp))
+			log.Fatal(fmt.Errorf("main: creating %s failed: %w", dp, err))
 		}
 		defer f.Close()
 
 		// Execute template
 		if err = t.Execute(f, d); err != nil {
-			astilog.Fatal(errors.Wrapf(err, "main: executing template for %s failed", rp))
+			log.Fatal(fmt.Errorf("main: executing template for %s failed: %w", rp, err))
 		}
 	}
 }
@@ -131,7 +130,7 @@ func processStatics(basePath string, d *Data) (err error) {
 	// Stat static folder
 	sp := filepath.Join(basePath, "resources", "static")
 	if _, err = os.Stat(sp); err != nil && !os.IsNotExist(err) {
-		err = errors.Wrapf(err, "main: stating %s failed", sp)
+		err = fmt.Errorf("main: stating %s failed: %w", sp, err)
 		return
 	}
 
@@ -140,7 +139,7 @@ func processStatics(basePath string, d *Data) (err error) {
 		if err = filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
 			// Check input error
 			if e != nil {
-				err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
+				err = fmt.Errorf("main: walking templates has an input error for path %s: %w", path, e)
 				return
 			}
 
@@ -152,7 +151,7 @@ func processStatics(basePath string, d *Data) (err error) {
 			// Read file
 			var b []byte
 			if b, err = ioutil.ReadFile(path); err != nil {
-				err = errors.Wrapf(err, "main: reading %s failed", path)
+				err = fmt.Errorf("main: reading %s failed: %w", path, err)
 				return
 			}
 
@@ -160,7 +159,7 @@ func processStatics(basePath string, d *Data) (err error) {
 			d.Static["/static"+filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
 			return
 		}); err != nil {
-			err = errors.Wrapf(err, "main: looping through static in %s failed", sp)
+			err = fmt.Errorf("main: looping through static in %s failed: %w", sp, err)
 			return
 		}
 	}
@@ -171,7 +170,7 @@ func processTemplates(basePath string, d *Data) (err error) {
 	// Stat templates folder
 	tp := filepath.Join(basePath, "resources", "templates")
 	if _, err = os.Stat(tp); err != nil && !os.IsNotExist(err) {
-		err = errors.Wrapf(err, "main: stating %s failed", tp)
+		err = fmt.Errorf("main: stating %s failed: %w", tp, err)
 		return
 	}
 
@@ -180,7 +179,7 @@ func processTemplates(basePath string, d *Data) (err error) {
 		if err = filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
 			// Check input error
 			if e != nil {
-				err = errors.Wrapf(e, "main: walking templates has an input error for path %s", path)
+				err = fmt.Errorf("main: walking templates has an input error for path %s: %w", path, e)
 				return
 			}
 
@@ -197,7 +196,7 @@ func processTemplates(basePath string, d *Data) (err error) {
 			// Read file
 			var b []byte
 			if b, err = ioutil.ReadFile(path); err != nil {
-				err = errors.Wrapf(err, "main: reading %s failed", path)
+				err = fmt.Errorf("main: reading %s failed: %w", path, err)
 				return
 			}
 
@@ -205,7 +204,7 @@ func processTemplates(basePath string, d *Data) (err error) {
 			d.Templates[filepath.ToSlash(strings.TrimSuffix(strings.TrimPrefix(path, tp), ".html"))] = b
 			return
 		}); err != nil {
-			err = errors.Wrapf(err, "main: looping through templates in %s failed", tp)
+			err = fmt.Errorf("main: looping through templates in %s failed: %w", tp, err)
 			return
 		}
 	}

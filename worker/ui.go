@@ -1,16 +1,16 @@
 package worker
 
 import (
+	"fmt"
+
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 func (w *Worker) addUIMessageNames(m *astibob.Message) (err error) {
 	// Parse payload
 	var names []string
 	if names, err = astibob.ParseUIMessageNamesAddPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing message payload failed")
+		err = fmt.Errorf("worker: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -27,7 +27,7 @@ func (w *Worker) deleteUIMessageNames(m *astibob.Message) (err error) {
 	// Parse payload
 	var names []string
 	if names, err = astibob.ParseUIMessageNamesDeletePayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing message payload failed")
+		err = fmt.Errorf("worker: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -55,11 +55,11 @@ func (w *Worker) sendMessageToUI(m *astibob.Message) (err error) {
 	w.mu.Unlock()
 
 	// Log
-	astilog.Debugf("worker: sending %s message to ui", m.Name)
+	w.l.Debugf("worker: sending %s message to ui", m.Name)
 
 	// Write
 	if err = w.cw.WriteJSON(m); err != nil {
-		err = errors.Wrap(err, "worker: writing JSON message failed")
+		err = fmt.Errorf("worker: writing JSON message failed: %w", err)
 		return
 	}
 	return

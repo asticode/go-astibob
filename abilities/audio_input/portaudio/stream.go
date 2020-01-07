@@ -1,13 +1,15 @@
 package portaudio
 
 import (
-	"github.com/asticode/go-astilog"
+	"fmt"
+
+	"github.com/asticode/go-astikit"
 	"github.com/gordonklaus/portaudio"
-	"github.com/pkg/errors"
 )
 
 type Stream struct {
 	b []int32
+	l astikit.SeverityLogger
 	o StreamOptions
 	s *portaudio.Stream
 }
@@ -25,15 +27,16 @@ func (p *PortAudio) NewDefaultStream(o StreamOptions) (s *Stream, err error) {
 	// Create stream
 	s = &Stream{
 		b: make([]int32, o.BufferLength),
+		l: p.l,
 		o: o,
 	}
 
 	// Log
-	astilog.Debugf("portaudio: opening default stream %p", s)
+	p.l.Debugf("portaudio: opening default stream %p", s)
 
 	// Open default stream
 	if s.s, err = portaudio.OpenDefaultStream(s.o.NumInputChannels, s.o.NumOutputChannels, float64(s.o.SampleRate), len(s.b), s.b); err != nil {
-		err = errors.Wrapf(err, "portaudio: opening default stream %p failed", s)
+		err = fmt.Errorf("portaudio: opening default stream %p failed: %w", s, err)
 		return
 	}
 	return
@@ -49,11 +52,11 @@ func (s *Stream) SampleRate() int { return s.o.SampleRate }
 
 func (s *Stream) Close() (err error) {
 	// Log
-	astilog.Debugf("portaudio: closing stream %p", s)
+	s.l.Debugf("portaudio: closing stream %p", s)
 
 	// Close
 	if err = s.s.Close(); err != nil {
-		err = errors.Wrapf(err, "portaudio: closing stream %p failed", s)
+		err = fmt.Errorf("portaudio: closing stream %p failed: %w", s, err)
 		return
 	}
 	return
@@ -61,11 +64,11 @@ func (s *Stream) Close() (err error) {
 
 func (s *Stream) Start() (err error) {
 	// Log
-	astilog.Debugf("portaudio: starting stream %p", s)
+	s.l.Debugf("portaudio: starting stream %p", s)
 
 	// Start
 	if err = s.s.Start(); err != nil {
-		err = errors.Wrapf(err, "portaudio: starting stream %p failed", s)
+		err = fmt.Errorf("portaudio: starting stream %p failed: %w", s, err)
 		return
 	}
 	return
@@ -73,11 +76,11 @@ func (s *Stream) Start() (err error) {
 
 func (s *Stream) Stop() (err error) {
 	// Log
-	astilog.Debugf("portaudio: stopping stream %p", s)
+	s.l.Debugf("portaudio: stopping stream %p", s)
 
 	// Stop
 	if err = s.s.Stop(); err != nil {
-		err = errors.Wrapf(err, "portaudio: stopping stream %p failed", s)
+		err = fmt.Errorf("portaudio: stopping stream %p failed: %w", s, err)
 		return
 	}
 	return
@@ -86,7 +89,7 @@ func (s *Stream) Stop() (err error) {
 func (s *Stream) Read() (rs []int, err error) {
 	// Read
 	if err = s.s.Read(); err != nil {
-		err = errors.Wrapf(err, "portaudio: reading from stream %p failed", s)
+		err = fmt.Errorf("portaudio: reading from stream %p failed: %w", s, err)
 		return
 	}
 

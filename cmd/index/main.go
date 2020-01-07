@@ -1,15 +1,13 @@
 package main
 
 import (
-	"flag"
+	"fmt"
 	"io/ioutil"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"text/template"
-
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 type Data struct {
@@ -22,6 +20,7 @@ const s = `package index
 
 import (
 	"github.com/asticode/go-astibob"
+	"github.com/asticode/go-astikit"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -31,7 +30,7 @@ type resources struct {
 	ts map[string]string            // Templates indexed by path
 }
 
-func newResources() (r *resources) {
+func newResources(l astikit.SeverityLogger) (r *resources) {
 	// Create resources
 	r = &resources{
 		ss: make(map[string]httprouter.Handle),
@@ -42,7 +41,7 @@ func newResources() (r *resources) {
 	{{ range $_, $v := .Layouts }}r.ls = append(r.ls, string([]byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} }))
 	{{ end }}
 	// Add static handles
-	{{ range $k, $v := .Statics }}r.ss["{{ $k }}"] = astibob.ContentHandle("{{ $k }}", []byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} })
+	{{ range $k, $v := .Statics }}r.ss["{{ $k }}"] = astibob.ContentHandle("{{ $k }}", []byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} }, l)
 	{{ end }}
 	// Add templates
 	{{ range $k, $v := .Templates }}r.ts["{{ $k }}"] = string([]byte{ {{ range $_, $b := $v }}{{ printf "%#x," $b }}{{ end }} })
@@ -64,15 +63,13 @@ func (r *resources) templates() map[string]string {
 
 func main() {
 	// Set logger
-	astilog.SetHandyFlags()
-	flag.Parse()
-	astilog.FlagInit()
+	log.SetFlags(0)
 
 	// Parse template
 	r := template.New("root")
 	t, err := r.Parse(s)
 	if err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: parsing template failed"))
+		log.Fatal(fmt.Errorf("main: parsing template failed: %w", err))
 	}
 
 	// Create data
@@ -83,30 +80,30 @@ func main() {
 
 	// Walk layouts
 	if err := walkLayouts(&d); err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: walking layouts failed"))
+		log.Fatal(fmt.Errorf("main: walking layouts failed: %w", err))
 	}
 
 	// Walk statics
 	if err := walkStatics(&d); err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: walking statics failed"))
+		log.Fatal(fmt.Errorf("main: walking statics failed: %w", err))
 	}
 
 	// Walk templates
 	if err := walkTemplates(&d); err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: walking templates failed"))
+		log.Fatal(fmt.Errorf("main: walking templates failed: %w", err))
 	}
 
 	// Create destination
 	dp := filepath.Join("index/resources.go")
 	f, err := os.Create(dp)
 	if err != nil {
-		astilog.Fatal(errors.Wrapf(err, "main: creating %s failed", dp))
+		log.Fatal(fmt.Errorf("main: creating %s failed: %w", dp, err))
 	}
 	defer f.Close()
 
 	// Execute template
 	if err = t.Execute(f, d); err != nil {
-		astilog.Fatal(errors.Wrap(err, "main: executing template failed"))
+		log.Fatal(fmt.Errorf("main: executing template failed: %w", err))
 	}
 }
 
@@ -115,7 +112,7 @@ func walkLayouts(d *Data) (err error) {
 	if err = filepath.Walk(lp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
-			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
+			err = fmt.Errorf("main: walking layouts has an input error for path %s: %w", path, e)
 			return
 		}
 
@@ -127,7 +124,7 @@ func walkLayouts(d *Data) (err error) {
 		// Read file
 		var b []byte
 		if b, err = ioutil.ReadFile(path); err != nil {
-			err = errors.Wrapf(err, "main: reading %s failed", path)
+			err = fmt.Errorf("main: reading %s failed: %w", path, err)
 			return
 		}
 
@@ -135,7 +132,7 @@ func walkLayouts(d *Data) (err error) {
 		d.Layouts = append(d.Layouts, b)
 		return
 	}); err != nil {
-		err = errors.Wrapf(err, "main: walking %s failed", lp)
+		err = fmt.Errorf("main: walking %s failed: %w", lp, err)
 		return
 	}
 	return
@@ -146,7 +143,7 @@ func walkStatics(d *Data) (err error) {
 	if err = filepath.Walk(sp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
-			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
+			err = fmt.Errorf("main: walking layouts has an input error for path %s: %w", path, e)
 			return
 		}
 
@@ -158,7 +155,7 @@ func walkStatics(d *Data) (err error) {
 		// Read file
 		var b []byte
 		if b, err = ioutil.ReadFile(path); err != nil {
-			err = errors.Wrapf(err, "main: reading %s failed", path)
+			err = fmt.Errorf("main: reading %s failed: %w", path, err)
 			return
 		}
 
@@ -166,7 +163,7 @@ func walkStatics(d *Data) (err error) {
 		d.Statics[filepath.ToSlash(strings.TrimPrefix(path, sp))] = b
 		return
 	}); err != nil {
-		err = errors.Wrapf(err, "main: walking %s failed", sp)
+		err = fmt.Errorf("main: walking %s failed: %w", sp, err)
 		return
 	}
 	return
@@ -177,7 +174,7 @@ func walkTemplates(d *Data) (err error) {
 	if err = filepath.Walk(tp, func(path string, info os.FileInfo, e error) (err error) {
 		// Check input error
 		if e != nil {
-			err = errors.Wrapf(e, "main: walking layouts has an input error for path %s", path)
+			err = fmt.Errorf("main: walking layouts has an input error for path %s: %w", path, e)
 			return
 		}
 
@@ -189,7 +186,7 @@ func walkTemplates(d *Data) (err error) {
 		// Read file
 		var b []byte
 		if b, err = ioutil.ReadFile(path); err != nil {
-			err = errors.Wrapf(err, "main: reading %s failed", path)
+			err = fmt.Errorf("main: reading %s failed: %w", path, err)
 			return
 		}
 
@@ -197,7 +194,7 @@ func walkTemplates(d *Data) (err error) {
 		d.Templates[filepath.ToSlash(strings.TrimPrefix(path, tp))] = b
 		return
 	}); err != nil {
-		err = errors.Wrapf(err, "main: walking %s failed", tp)
+		err = fmt.Errorf("main: walking %s failed: %w", tp, err)
 		return
 	}
 	return

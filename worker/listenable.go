@@ -1,8 +1,10 @@
 package worker
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/asticode/go-astibob"
-	"github.com/pkg/errors"
 )
 
 type Listenable struct {
@@ -79,7 +81,7 @@ func (w *Worker) sendRegisterListenables(worker string) (err error) {
 				Runnable: r,
 			},
 		); err != nil {
-			err = errors.Wrap(err, "worker: creating register message failed")
+			err = fmt.Errorf("worker: creating register message failed: %w", err)
 			return
 		}
 
@@ -102,7 +104,7 @@ func (w *Worker) registerListenables(m *astibob.Message) (err error) {
 	// Parse payload
 	var l astibob.Listenables
 	if l, err = astibob.ParseListenablesRegisterPayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing register payload failed")
+		err = fmt.Errorf("worker: parsing register payload failed: %w", err)
 		return
 	}
 

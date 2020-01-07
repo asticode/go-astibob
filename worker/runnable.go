@@ -1,12 +1,12 @@
 package worker
 
 import (
+	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 type Runnable struct {
@@ -35,13 +35,13 @@ func (w *Worker) RegisterRunnables(rs ...Runnable) {
 		w.d.On(astibob.DispatchConditions{To: w.runnableIdentifier(r.Runnable.Metadata().Name)}, r.Runnable.OnMessage)
 
 		// Log
-		astilog.Infof("worker: registered runnable %s", r.Runnable.Metadata().Name)
+		w.l.Infof("worker: registered runnable %s", r.Runnable.Metadata().Name)
 
 		// Auto start
 		if r.AutoStart {
 			// Start runnable
 			if err := w.startRunnable(r.Runnable.Metadata().Name); err != nil {
-				astilog.Error(errors.Wrapf(err, "worker: starting runnable %s failed", r.Runnable.Metadata().Name))
+				w.l.Error(fmt.Errorf("worker: starting runnable %s failed: %w", r.Runnable.Metadata().Name, err))
 			}
 		}
 	}
@@ -108,13 +108,13 @@ func (w *Worker) startRunnableFromMessage(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
 	if name, err = astibob.ParseRunnableStartPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing start payload failed")
+		err = fmt.Errorf("index: parsing start payload failed: %w", err)
 		return
 	}
 
 	// Start runnable
 	if err = w.startRunnable(name); err != nil {
-		err = errors.Wrapf(err, "worker: starting runnable %s failed", name)
+		err = fmt.Errorf("worker: starting runnable %s failed: %w", name, err)
 		return
 	}
 	return
@@ -139,7 +139,7 @@ func (w *Worker) startRunnable(name string) (err error) {
 	}
 
 	// Log
-	astilog.Infof("worker: starting runnable %s", name)
+	w.l.Infof("worker: starting runnable %s", name)
 
 	// Create started message
 	m := astibob.NewRunnableStartedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
@@ -159,23 +159,23 @@ func (w *Worker) startRunnable(name string) (err error) {
 		defer t.Done()
 
 		// Start the runnable
-		if err := r.Start(w.w.Context()); err != nil && err != astibob.ErrContextCancelled {
-			astilog.Error(errors.Wrapf(err, "worker: starting runnable %s failed", r.Metadata().Name))
+		if err := r.Start(w.w.Context()); err != nil && !errors.Is(err, context.Canceled) {
+			w.l.Error(fmt.Errorf("worker: starting runnable %s failed: %w", r.Metadata().Name, err))
 		}
 
 		// Create message
-		if err == nil || err == astibob.ErrContextCancelled {
+		if err == nil || errors.Is(err, context.Canceled) {
 			m = astibob.NewRunnableStoppedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
 				astibob.UIIdentifierType:     true,
 				astibob.WorkerIdentifierType: true,
 			}})
-			astilog.Infof("worker: runnable %s has stopped", name)
+			w.l.Infof("worker: runnable %s has stopped", name)
 		} else {
 			m = astibob.NewRunnableCrashedMessage(*w.runnableIdentifier(name), &astibob.Identifier{Types: map[string]bool{
 				astibob.UIIdentifierType:     true,
 				astibob.WorkerIdentifierType: true,
 			}})
-			astilog.Infof("worker: runnable %s has crashed", name)
+			w.l.Infof("worker: runnable %s has crashed", name)
 		}
 
 		// Dispatch
@@ -188,13 +188,13 @@ func (w *Worker) stopRunnableFromMessage(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
 	if name, err = astibob.ParseRunnableStopPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing stop payload failed")
+		err = fmt.Errorf("index: parsing stop payload failed: %w", err)
 		return
 	}
 
 	// Stop runnable
 	if err = w.stopRunnable(name); err != nil {
-		err = errors.Wrapf(err, "worker: stopping runnable %s failed", name)
+		err = fmt.Errorf("worker: stopping runnable %s failed: %w", name, err)
 		return
 	}
 	return
@@ -219,7 +219,7 @@ func (w *Worker) stopRunnable(name string) (err error) {
 	}
 
 	// Log
-	astilog.Infof("worker: stopping runnable %s", r.Metadata().Name)
+	w.l.Infof("worker: stopping runnable %s", r.Metadata().Name)
 
 	// Stop runnable
 	r.Stop()
@@ -257,7 +257,7 @@ func (w *Worker) SendMessage(o MessageOptions) (err error) {
 	// Marshal payload
 	if o.Message.Payload != nil {
 		if m.Payload, err = json.Marshal(o.Message.Payload); err != nil {
-			err = errors.Wrap(err, "worker: marshaling payload failed")
+			err = fmt.Errorf("worker: marshaling payload failed: %w", err)
 			return
 		}
 	}
@@ -285,7 +285,7 @@ func (w *Worker) doneMessage(m *astibob.Message) (err error) {
 	// Parse payload
 	var d astibob.RunnableDone
 	if d, err = astibob.ParseRunnableDonePayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing runnable done payload failed")
+		err = fmt.Errorf("worker: parsing runnable done payload failed: %w", err)
 		return
 	}
 
@@ -301,7 +301,7 @@ func (w *Worker) doneMessage(m *astibob.Message) (err error) {
 
 	// On done
 	if err = c(d.Success); err != nil {
-		err = errors.Wrap(err, "worker: on done failed")
+		err = fmt.Errorf("worker: on done failed: %w", err)
 		return
 	}
 	return

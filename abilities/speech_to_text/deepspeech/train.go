@@ -12,8 +12,6 @@ import (
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 // Regexps
@@ -57,7 +55,7 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 	// Get number of epochs
 	var numEpochs int
 	if numEpochs, err = strconv.Atoi(args["epochs"]); err != nil {
-		err = errors.Wrapf(err, "deepspeech: atoi of %s failed", args["epochs"])
+		err = fmt.Errorf("deepspeech: atoi of %s failed: %w", args["epochs"], err)
 		return
 	}
 
@@ -69,7 +67,7 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 	cmd.Stderr = astikit.NewWriterAdapter(astikit.WriterAdapterOptions{
 		Callback: func(i []byte) {
 			// Log
-			astilog.Debugf("deepspeech: stderr: %s", i)
+			d.l.Debugf("deepspeech: stderr: %s", i)
 
 			// Append
 			stderr = append(stderr, i)
@@ -81,14 +79,14 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 	cmd.Stdout = astikit.NewWriterAdapter(astikit.WriterAdapterOptions{
 		Callback: func(i []byte) {
 			// Log
-			astilog.Debugf("deepspeech: stdout: %s", i)
+			d.l.Debugf("deepspeech: stdout: %s", i)
 
 			// Parse epoch
 			if ms := regexpEpoch.FindStringSubmatch(string(i)); len(ms) >= 2 {
 				// Convert to int
 				epoch, errStdOut := strconv.Atoi(ms[1])
-				if err != nil {
-					astilog.Error(errors.Wrapf(errStdOut, "deepspeech: atoi of %s failed", ms[1]))
+				if errStdOut != nil {
+					d.l.Error(fmt.Errorf("deepspeech: atoi of %s failed: %w", ms[1], errStdOut))
 				}
 
 				// Update progress
@@ -106,13 +104,13 @@ func (d *DeepSpeech) train(ctx context.Context, speeches []speech_to_text.Speech
 	progressFunc(*p)
 
 	// Run
-	astilog.Debugf("deepspeech: running %s", strings.Join(cmd.Args, " "))
+	d.l.Debugf("deepspeech: running %s", strings.Join(cmd.Args, " "))
 	if err = cmd.Run(); err != nil {
 		var m string
 		if len(stderr) > 0 {
 			m = fmt.Sprintf(" with stderr:\n\n%s\n\n", bytes.Join(stderr, []byte("\n")))
 		}
-		err = errors.Wrapf(err, "deepspeech: running %s failed%s", strings.Join(cmd.Args, " "), m)
+		err = fmt.Errorf("deepspeech: running %s failed%s: %w", strings.Join(cmd.Args, " "), m, err)
 		return
 	}
 

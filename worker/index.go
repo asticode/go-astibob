@@ -3,16 +3,15 @@ package worker
 import (
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"sort"
 
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
-	"github.com/pkg/errors"
 )
 
 // Register registers the worker to the index
@@ -29,10 +28,11 @@ func (w *Worker) RegisterToIndex() {
 		Header: h,
 		OnDial: w.sendRegister,
 		OnReadError: func(err error) {
-			if v, ok := errors.Cause(err).(*websocket.CloseError); ok && v.Code == websocket.CloseNormalClosure {
-				astilog.Info("worker: worker has disconnected from index")
+			var e *websocket.CloseError
+			if ok := errors.As(err, &e); ok && e.Code == websocket.CloseNormalClosure {
+				w.l.Info("worker: worker has disconnected from index")
 			} else {
-				astilog.Error(errors.Wrap(err, "worker: reading websocket failed"))
+				w.l.Error(fmt.Errorf("worker: reading websocket failed: %w", err))
 			}
 		},
 	})
@@ -80,7 +80,7 @@ func (w *Worker) sendRegister() (err error) {
 		Name:      w.name,
 		Runnables: rs,
 	}); err != nil {
-		err = errors.Wrap(err, "worker: creating register message failed")
+		err = fmt.Errorf("worker: creating register message failed: %w", err)
 		return
 	}
 
@@ -93,7 +93,7 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 	// Parse payload
 	var wl astibob.WelcomeWorker
 	if wl, err = astibob.ParseWorkerWelcomePayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing message payload failed")
+		err = fmt.Errorf("worker: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -132,24 +132,24 @@ func (w *Worker) finishRegistration(m *astibob.Message) (err error) {
 
 		// Send register listenables
 		if err = w.sendRegisterListenables(mw.Name); err != nil {
-			err = errors.Wrapf(err, "worker: sending register listenables to worker %s failed", mw.Name)
+			err = fmt.Errorf("worker: sending register listenables to worker %s failed: %w", mw.Name, err)
 			return
 		}
 	}
 
 	// Log
-	astilog.Info("worker: worker has registered to the index")
+	w.l.Info("worker: worker has registered to the index")
 	return
 }
 
 func (w *Worker) handleIndexMessage(p []byte) (err error) {
 	// Log
-	astilog.Debugf("worker: handling index message %s", p)
+	w.l.Debugf("worker: handling index message %s", p)
 
 	// Unmarshal
 	m := astibob.NewMessage()
 	if err = json.Unmarshal(p, m); err != nil {
-		err = errors.Wrap(err, "worker: unmarshaling failed")
+		err = fmt.Errorf("worker: unmarshaling failed: %w", err)
 		return
 	}
 
@@ -165,11 +165,11 @@ func (w *Worker) sendMessageToIndex(m *astibob.Message) (err error) {
 	}
 
 	// Log
-	astilog.Debugf("worker: sending %s message to index", m.Name)
+	w.l.Debugf("worker: sending %s message to index", m.Name)
 
 	// Write
 	if err = w.cw.WriteJSON(m); err != nil {
-		err = errors.Wrap(err, "worker: writing JSON message failed")
+		err = fmt.Errorf("worker: writing JSON message failed: %w", err)
 		return
 	}
 	return
@@ -179,7 +179,7 @@ func (w *Worker) registerWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var mw astibob.Worker
 	if mw, err = astibob.ParseWorkerRegisteredPayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing registered payload failed")
+		err = fmt.Errorf("worker: parsing registered payload failed: %w", err)
 		return
 	}
 
@@ -193,7 +193,7 @@ func (w *Worker) registerWorker(m *astibob.Message) (err error) {
 
 	// Send register listenables
 	if err = w.sendRegisterListenables(mw.Name); err != nil {
-		err = errors.Wrapf(err, "worker: sending register listenables to worker %s failed", mw.Name)
+		err = fmt.Errorf("worker: sending register listenables to worker %s failed: %w", mw.Name, err)
 		return
 	}
 	return
@@ -224,7 +224,7 @@ func (w *Worker) unregisterWorker(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
 	if name, err = astibob.ParseWorkerDisconnectedPayload(m); err != nil {
-		err = errors.Wrap(err, "worker: parsing registered payload failed")
+		err = fmt.Errorf("worker: parsing registered payload failed: %w", err)
 		return
 	}
 

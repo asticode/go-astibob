@@ -2,32 +2,31 @@ package astibob
 
 import (
 	"encoding/json"
-	"net/http"
-
+	"fmt"
 	"mime"
+	"net/http"
 	"path/filepath"
 
-	"github.com/asticode/go-astilog"
+	"github.com/asticode/go-astikit"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
-func WriteHTTPError(rw http.ResponseWriter, code int, err error) {
+func WriteHTTPError(l astikit.SeverityLogger, rw http.ResponseWriter, code int, err error) {
 	rw.WriteHeader(code)
-	astilog.Error(err)
+	l.Error(err)
 	if err := json.NewEncoder(rw).Encode(Error{Message: err.Error()}); err != nil {
-		astilog.Error(errors.Wrap(err, "astibob: marshaling failed"))
+		l.Error(fmt.Errorf("astibob: marshaling failed: %w", err))
 	}
 }
 
-func WriteHTTPData(rw http.ResponseWriter, data interface{}) {
+func WriteHTTPData(l astikit.SeverityLogger, rw http.ResponseWriter, data interface{}) {
 	if err := json.NewEncoder(rw).Encode(data); err != nil {
-		WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "astibob: json encoding failed"))
+		WriteHTTPError(l, rw, http.StatusInternalServerError, fmt.Errorf("astibob: json encoding failed: %w", err))
 		return
 	}
 }
 
-func ContentHandle(path string, c []byte) httprouter.Handle {
+func ContentHandle(path string, c []byte, l astikit.SeverityLogger) httprouter.Handle {
 	// Get mime type
 	t := mime.TypeByExtension(filepath.Ext(path))
 	if t == "" {
@@ -40,7 +39,7 @@ func ContentHandle(path string, c []byte) httprouter.Handle {
 		// Write
 		if _, err := rw.Write(c); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			astilog.Error(errors.Wrapf(err, "astibob: writing %s failed", r.URL.Path))
+			l.Error(fmt.Errorf("astibob: writing %s failed: %w", r.URL.Path, err))
 			return
 		}
 	}

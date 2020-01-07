@@ -1,21 +1,17 @@
 package index
 
 import (
-	"net/http"
-
+	"encoding/base64"
 	"encoding/json"
-
+	"errors"
+	"fmt"
+	"net/http"
 	"time"
 
-	"encoding/base64"
-	"fmt"
-
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
 	"github.com/gorilla/websocket"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 func uiName(c *astiws.Client) string {
@@ -40,7 +36,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 				nil,
 				name,
 			); err != nil {
-				err = errors.Wrap(err, "astibob: creating disconnected message failed")
+				err = fmt.Errorf("astibob: creating disconnected message failed: %w", err)
 				return
 			}
 
@@ -53,7 +49,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		i.wu.RegisterClient(name, c)
 
 		// Log
-		astilog.Infof("astibob: ui %s has connected", name)
+		i.l.Infof("astibob: ui %s has connected", name)
 
 		// Create welcome message
 		var m *astibob.Message
@@ -65,7 +61,7 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 				Workers: i.workers(),
 			},
 		); err != nil {
-			err = errors.Wrap(err, "index: creating welcome message failed")
+			err = fmt.Errorf("index: creating welcome message failed: %w", err)
 			return
 		}
 
@@ -73,9 +69,10 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 		i.d.Dispatch(m)
 		return
 	}); err != nil {
-		if v, ok := errors.Cause(err).(*websocket.CloseError); !ok ||
-			(v.Code != websocket.CloseNoStatusReceived && v.Code != websocket.CloseNormalClosure) {
-			astilog.Error(errors.Wrap(err, "index: handling ui websocket failed"))
+		var e *websocket.CloseError
+		if ok := errors.As(err, &e); !ok ||
+			(e.Code != websocket.CloseNoStatusReceived && e.Code != websocket.CloseNormalClosure) {
+			i.l.Error(fmt.Errorf("index: handling ui websocket failed: %w", err))
 		}
 		return
 	}
@@ -83,12 +80,12 @@ func (i *Index) handleUIWebsocket(rw http.ResponseWriter, r *http.Request, p htt
 
 func (i *Index) handleUIMessage(p []byte) (err error) {
 	// Log
-	astilog.Debugf("index: handling ui message %s", p)
+	i.l.Debugf("index: handling ui message %s", p)
 
 	// Unmarshal
 	m := astibob.NewMessage()
 	if err = json.Unmarshal(p, m); err != nil {
-		err = errors.Wrap(err, "index: unmarshaling failed")
+		err = fmt.Errorf("index: unmarshaling failed: %w", err)
 		return
 	}
 
@@ -129,8 +126,8 @@ func (i *Index) sendMessageToUI(m *astibob.Message) (err error) {
 	}
 
 	// Send message
-	if err = sendMessage(m, "ui", i.wu, names...); err != nil {
-		err = errors.Wrap(err, "index: sending message failed")
+	if err = sendMessage(i.l, m, "ui", i.wu, names...); err != nil {
+		err = fmt.Errorf("index: sending message failed: %w", err)
 		return
 	}
 	return
@@ -146,7 +143,7 @@ func (i *Index) registerUI(m *astibob.Message) (err error) {
 	// Parse payload
 	var u astibob.UI
 	if u, err = astibob.ParseUIRegisterPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing message payload failed")
+		err = fmt.Errorf("index: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -169,7 +166,7 @@ func (i *Index) registerUI(m *astibob.Message) (err error) {
 	i.mu.Unlock()
 
 	// Log
-	astilog.Infof("index: ui %s has registered", *m.From.Name)
+	i.l.Infof("index: ui %s has registered", *m.From.Name)
 
 	// Create message
 	if m, err = astibob.NewUIMessageNamesAddMessage(
@@ -177,7 +174,7 @@ func (i *Index) registerUI(m *astibob.Message) (err error) {
 		&astibob.Identifier{Type: astibob.WorkerIdentifierType},
 		ns,
 	); err != nil {
-		err = errors.Wrap(err, "index: creating ui message names add failed")
+		err = fmt.Errorf("index: creating ui message names add failed: %w", err)
 		return
 	}
 
@@ -190,7 +187,7 @@ func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 	// Parse payload
 	var name string
 	if name, err = astibob.ParseUIDisconnectedPayload(m); err != nil {
-		err = errors.Wrap(err, "index: parsing message payload failed")
+		err = fmt.Errorf("index: parsing message payload failed: %w", err)
 		return
 	}
 
@@ -216,7 +213,7 @@ func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 	i.wu.UnregisterClient(name)
 
 	// Log
-	astilog.Infof("index: ui %s has disconnected", name)
+	i.l.Infof("index: ui %s has disconnected", name)
 
 	// Create message
 	if m, err = astibob.NewUIMessageNamesDeleteMessage(
@@ -224,7 +221,7 @@ func (i *Index) unregisterUI(m *astibob.Message) (err error) {
 		&astibob.Identifier{Type: astibob.WorkerIdentifierType},
 		ns,
 	); err != nil {
-		err = errors.Wrap(err, "index: creating ui message names delete failed")
+		err = fmt.Errorf("index: creating ui message names delete failed: %w", err)
 		return
 	}
 
@@ -249,7 +246,7 @@ func (i *Index) extendUIConnection(m *astibob.Message) (err error) {
 
 	// Extend connection
 	if err = c.ExtendConnection(); err != nil {
-		err = errors.Wrap(err, "index: extending connection failed")
+		err = fmt.Errorf("index: extending connection failed: %w", err)
 		return
 	}
 	return
@@ -280,7 +277,7 @@ func (i *Index) web(rw http.ResponseWriter, r *http.Request, p httprouter.Params
 
 	// Execute template
 	if err := t.Execute(rw, data); err != nil {
-		astilog.Error(errors.Wrapf(err, "index: executing %s template with data %#v failed", name, data))
+		i.l.Error(fmt.Errorf("index: executing %s template with data %#v failed: %w", name, data, err))
 		return
 	}
 }
@@ -304,7 +301,7 @@ type APIWebsocket struct {
 }
 
 func (i *Index) references(rw http.ResponseWriter, r *http.Request, p httprouter.Params) {
-	astibob.WriteHTTPData(rw, APIReferences{Websocket: APIWebsocket{
+	astibob.WriteHTTPData(i.l, rw, APIReferences{Websocket: APIWebsocket{
 		Addr:       "ws://" + i.o.Server.Addr + "/websockets/ui",
 		PingPeriod: astiws.PingPeriod,
 	}})

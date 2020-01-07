@@ -7,9 +7,7 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 func (w *Worker) Serve() {
@@ -59,12 +57,12 @@ func (w *Worker) handleWorkerMessage(rw http.ResponseWriter, r *http.Request, p 
 	// Unmarshal
 	var m astibob.Message
 	if err := json.NewDecoder(r.Body).Decode(&m); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "worker: unmarshaling failed"))
+		astibob.WriteHTTPError(w.l, rw, http.StatusInternalServerError, fmt.Errorf("worker: unmarshaling failed: %w", err))
 		return
 	}
 
 	// Log
-	astilog.Debugf("worker: handling worker message %s", m.Name)
+	w.l.Debugf("worker: handling worker message %s", m.Name)
 
 	// Dispatch
 	w.d.Dispatch(&m)
@@ -75,7 +73,7 @@ func (w *Worker) template(c []byte) httprouter.Handle {
 		// Write
 		if _, err := rw.Write(c); err != nil {
 			rw.WriteHeader(http.StatusInternalServerError)
-			astilog.Error(errors.Wrapf(err, "worker: writing template %s failed", req.URL.Path))
+			w.l.Error(fmt.Errorf("worker: writing template %s failed: %w", req.URL.Path, err))
 			return
 		}
 	}

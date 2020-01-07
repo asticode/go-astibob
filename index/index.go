@@ -8,9 +8,7 @@ import (
 
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
 	"github.com/asticode/go-astiws"
-	"github.com/pkg/errors"
 )
 
 type Options struct {
@@ -20,6 +18,7 @@ type Options struct {
 type Index struct {
 	c  *http.Client
 	d  *astibob.Dispatcher
+	l  astikit.SeverityLogger
 	mu *sync.Mutex // Locks us
 	mw *sync.Mutex // Locks ws
 	o  Options
@@ -33,24 +32,27 @@ type Index struct {
 }
 
 // New creates a new index
-func New(o Options) (i *Index, err error) {
+func New(o Options, l astikit.StdLogger) (i *Index, err error) {
 	// Create index
 	i = &Index{
 		c:  &http.Client{},
+		l:  astikit.AdaptStdLogger(l),
 		mu: &sync.Mutex{},
 		mw: &sync.Mutex{},
 		o:  o,
-		r:  newResources(),
 		t:  astikit.NewTemplater(),
 		us: make(map[string]map[string]bool),
-		w:  astikit.NewWorker(astikit.WorkerOptions{Logger: astilog.GetLogger()}),
+		w:  astikit.NewWorker(astikit.WorkerOptions{Logger: l}),
 		ws: make(map[string]*worker),
-		wu: astiws.NewManager(astiws.ManagerConfiguration{}),
-		ww: astiws.NewManager(astiws.ManagerConfiguration{}),
+		wu: astiws.NewManager(astiws.ManagerConfiguration{}, l),
+		ww: astiws.NewManager(astiws.ManagerConfiguration{}, l),
 	}
 
+	// Add resources
+	i.r = newResources(i.l)
+
 	// Create dispatcher
-	i.d = astibob.NewDispatcher(i.w.Context(), i.w.NewTask)
+	i.d = astibob.NewDispatcher(i.w.Context(), i.w.NewTask, i.l)
 
 	// Loop through layouts
 	for _, c := range i.r.layouts() {
@@ -89,14 +91,14 @@ func (i *Index) Close() error {
 	// Close ui clients
 	if i.wu != nil {
 		if err := i.wu.Close(); err != nil {
-			astilog.Error(errors.Wrap(err, "index: closing ui clients failed"))
+			i.l.Error(fmt.Errorf("index: closing ui clients failed: %w", err))
 		}
 	}
 
 	// Close worker clients
 	if i.ww != nil {
 		if err := i.ww.Close(); err != nil {
-			astilog.Error(errors.Wrap(err, "index: closing worker clients failed"))
+			i.l.Error(fmt.Errorf("index: closing worker clients failed: %w", err))
 		}
 	}
 	return nil
@@ -117,7 +119,7 @@ func (i *Index) On(c astibob.DispatchConditions, h astibob.MessageHandler) {
 	i.d.On(c, h)
 }
 
-func sendMessage(m *astibob.Message, label string, wm *astiws.Manager, names ...string) (err error) {
+func sendMessage(l astikit.SeverityLogger, m *astibob.Message, label string, wm *astiws.Manager, names ...string) (err error) {
 	// Get clients
 	var cs []*astiws.Client
 	if len(names) > 0 {
@@ -144,11 +146,11 @@ func sendMessage(m *astibob.Message, label string, wm *astiws.Manager, names ...
 	// Loop through clients
 	for _, c := range cs {
 		// Log
-		astilog.Debugf("index: sending %s message to %s with client %p", m.Name, label, c)
+		l.Debugf("index: sending %s message to %s with client %p", m.Name, label, c)
 
 		// Write
 		if err = c.WriteJSON(m); err != nil {
-			err = errors.Wrap(err, "index: writing JSON message failed")
+			err = fmt.Errorf("index: writing JSON message failed: %w", err)
 			return
 		}
 	}

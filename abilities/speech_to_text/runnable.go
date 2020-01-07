@@ -3,6 +3,7 @@ package speech_to_text
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"net/http"
@@ -16,11 +17,9 @@ import (
 	"github.com/asticode/go-astibob"
 	"github.com/asticode/go-astibob/worker"
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
 	"github.com/go-audio/audio"
 	"github.com/go-audio/wav"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 // Audio formats
@@ -59,7 +58,7 @@ type ProgressJSON struct {
 func newProgressJSON(p Progress) (pj *ProgressJSON) {
 	pj = &ProgressJSON{Progress: p}
 	if p.Error != nil {
-		pj.Error = errors.Cause(p.Error).Error()
+		pj.Error = astikit.ErrorCause(p.Error).Error()
 	}
 	return
 }
@@ -88,6 +87,7 @@ type Runnable struct {
 	cancel context.CancelFunc
 	ctx    context.Context
 	i      *os.File
+	l      astikit.SeverityLogger
 	mp     *sync.Mutex // Locks pg and ctx
 	ms     *sync.Mutex // Locks ss
 	msd    *sync.Mutex // Locks sds
@@ -103,19 +103,22 @@ type RunnableOptions struct {
 	StoreNewSpeeches bool   `toml:"store_new_speeches"`
 }
 
-func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
+func NewRunnable(name string, p Parser, l astikit.StdLogger, o RunnableOptions) *Runnable {
 	// Create runnable
 	r := &Runnable{
-		BaseOperatable: newBaseOperatable(),
-		c:              astikit.NewChan(astikit.ChanOptions{}),
-		mp:             &sync.Mutex{},
-		ms:             &sync.Mutex{},
-		msd:            &sync.Mutex{},
-		o:              o,
-		p:              p,
-		sds:            make(map[string]*astikit.PCMSilenceDetector),
-		ss:             make(map[string]*Speech),
+		c:   astikit.NewChan(astikit.ChanOptions{}),
+		l:   astikit.AdaptStdLogger(l),
+		mp:  &sync.Mutex{},
+		ms:  &sync.Mutex{},
+		msd: &sync.Mutex{},
+		o:   o,
+		p:   p,
+		sds: make(map[string]*astikit.PCMSilenceDetector),
+		ss:  make(map[string]*Speech),
 	}
+
+	// Add base operatable
+	r.BaseOperatable = newBaseOperatable(r.l)
 
 	// Add routes
 	r.BaseOperatable.AddRoute("/options/build", http.MethodPatch, r.updateBuildOptions)
@@ -129,6 +132,7 @@ func NewRunnable(name string, p Parser, o RunnableOptions) *Runnable {
 
 	// Set base runnable
 	r.BaseRunnable = astibob.NewBaseRunnable(astibob.BaseRunnableOptions{
+		Logger: l,
 		Metadata: astibob.Metadata{
 			Description: "Executes speech to text analysis when detecting silences in audio samples",
 			Name:        name,
@@ -150,21 +154,21 @@ func (r *Runnable) Init() (err error) {
 
 	// Make sure speeches directory exists
 	if err = os.MkdirAll(r.o.SpeechesDirPath, 0755); err != nil {
-		err = errors.Wrapf(err, "speech_to_text: mkdirall %s failed", r.o.SpeechesDirPath)
+		err = fmt.Errorf("speech_to_text: mkdirall %s failed: %w", r.o.SpeechesDirPath, err)
 		return
 	}
 
 	// Open index
 	p := filepath.Join(r.o.SpeechesDirPath, "index.json")
 	if r.i, err = os.OpenFile(p, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666); err != nil {
-		err = errors.Wrapf(err, "speech_to_text: opening %s failed", p)
+		err = fmt.Errorf("speech_to_text: opening %s failed: %w", p, err)
 		return
 	}
 
 	// Stat index
 	var fi os.FileInfo
 	if fi, err = r.i.Stat(); err != nil {
-		err = errors.Wrapf(err, "speech_to_text: stating %s failed", p)
+		err = fmt.Errorf("speech_to_text: stating %s failed: %w", p, err)
 		return
 	}
 
@@ -172,7 +176,7 @@ func (r *Runnable) Init() (err error) {
 	if fi.Size() > 0 {
 		r.ms.Lock()
 		if err = json.NewDecoder(r.i).Decode(&r.ss); err != nil {
-			err = errors.Wrap(err, "speech_to_text: unmarshaling failed")
+			err = fmt.Errorf("speech_to_text: unmarshaling failed: %w", err)
 			return
 		}
 		r.ms.Unlock()
@@ -215,7 +219,7 @@ func (r *Runnable) onMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case samplesMessage:
 		if err = r.onSamples(m); err != nil {
-			err = errors.Wrap(err, "speech_to_text: on samples failed")
+			err = fmt.Errorf("speech_to_text: on samples failed: %w", err)
 			return
 		}
 	}
@@ -247,7 +251,7 @@ func NewSamplesMessage(from astibob.Identifier, samples []int, bitDepth, numChan
 
 func parseSamplesPayload(m *astibob.Message) (s Samples, err error) {
 	if err = json.Unmarshal(m.Payload, &s); err != nil {
-		err = errors.Wrap(err, "speech_to_text: unmarshaling failed")
+		err = fmt.Errorf("speech_to_text: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -262,7 +266,7 @@ func (r *Runnable) onSamples(m *astibob.Message) (err error) {
 	// Parse payload
 	var s Samples
 	if s, err = parseSamplesPayload(m); err != nil {
-		err = errors.Wrap(err, "speech_to_text: parsing payload failed")
+		err = fmt.Errorf("speech_to_text: parsing payload failed: %w", err)
 		return
 	}
 
@@ -310,13 +314,13 @@ func (r *Runnable) samplesFunc(s Samples) func() {
 			// Parse speech
 			text, err := r.parseSpeech(s.From, ss, s.BitDepth, s.NumChannels, s.SampleRate)
 			if err != nil {
-				astilog.Error(errors.Wrap(err, "speech_to_text: parsing samples failed"))
+				r.l.Error(fmt.Errorf("speech_to_text: parsing samples failed: %w", err))
 			}
 
 			// Store speech
 			if r.o.StoreNewSpeeches && r.o.SpeechesDirPath != "" {
 				if err := r.storeSpeech(text, ss, s.BitDepth, s.NumChannels, s.SampleRate); err != nil {
-					astilog.Error(errors.Wrap(err, "speech_to_text: storing speech failed"))
+					r.l.Error(fmt.Errorf("speech_to_text: storing speech failed: %w", err))
 				}
 			}
 		}
@@ -340,7 +344,7 @@ func (r *Runnable) newTextMessage(from astibob.Identifier, text string) (m *asti
 		From: from,
 		Text: text,
 	}); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -348,7 +352,7 @@ func (r *Runnable) newTextMessage(from astibob.Identifier, text string) (m *asti
 
 func parseTextPayload(m *astibob.Message) (t Text, err error) {
 	if err = json.Unmarshal(m.Payload, &t); err != nil {
-		err = errors.Wrap(err, "speech_to_text: unmarshaling failed")
+		err = fmt.Errorf("speech_to_text: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -361,20 +365,20 @@ func (r *Runnable) parseSpeech(from astibob.Identifier, ss []int, bitDepth, numC
 	}
 
 	// Parse
-	astilog.Debugf("speech_to_text: parsing %d samples from runnable %s on worker %s", len(ss), *from.Name, *from.Worker)
+	r.l.Debugf("speech_to_text: parsing %d samples from runnable %s on worker %s", len(ss), *from.Name, *from.Worker)
 	start := time.Now()
 	if text, err = r.p.Parse(ss, bitDepth, numChannels, sampleRate); err != nil {
-		err = errors.Wrap(err, "speech_to_text: parsing speech failed")
+		err = fmt.Errorf("speech_to_text: parsing speech failed: %w", err)
 		return
 	}
-	astilog.Debugf("speech_to_text: parsed %d samples from runnable %s on worker %s in %s", len(ss), *from.Name, *from.Worker, time.Since(start))
+	r.l.Debugf("speech_to_text: parsed %d samples from runnable %s on worker %s in %s", len(ss), *from.Name, *from.Worker, time.Since(start))
 
 	// Dispatch text
 	if text != "" {
 		// Create message
 		var m *astibob.Message
 		if m, err = r.newTextMessage(from, text); err != nil {
-			err = errors.Wrap(err, "speech_to_text: creating text message failed")
+			err = fmt.Errorf("speech_to_text: creating text message failed: %w", err)
 			return
 		}
 
@@ -396,7 +400,7 @@ func (r *Runnable) newSpeechCreatedMessage(s Speech) (m *astibob.Message, err er
 
 	// Marshal
 	if m.Payload, err = json.Marshal(s); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -409,19 +413,19 @@ func (r *Runnable) saveIndex() (err error) {
 
 	// Truncate
 	if err = r.i.Truncate(0); err != nil {
-		err = errors.Wrap(err, "speech_to_text: truncating index failed")
+		err = fmt.Errorf("speech_to_text: truncating index failed: %w", err)
 		return
 	}
 
 	// Seek
 	if _, err = r.i.Seek(0, 0); err != nil {
-		err = errors.Wrap(err, "speech_to_text: seeking in index failed")
+		err = fmt.Errorf("speech_to_text: seeking in index failed: %w", err)
 		return
 	}
 
 	// Marshal
 	if err = json.NewEncoder(r.i).Encode(r.ss); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling index failed")
+		err = fmt.Errorf("speech_to_text: marshaling index failed: %w", err)
 		return
 	}
 	return
@@ -431,7 +435,7 @@ func (r *Runnable) storeSpeech(text string, ss []int, bitDepth, numChannels, sam
 	// Store speech to wav
 	var s *Speech
 	if s, err = r.storeSpeechToWav(ss, bitDepth, numChannels, sampleRate); err != nil {
-		err = errors.Wrap(err, "speech_to_text: storing speech to wav failed")
+		err = fmt.Errorf("speech_to_text: storing speech to wav failed: %w", err)
 		return
 	}
 
@@ -445,14 +449,14 @@ func (r *Runnable) storeSpeech(text string, ss []int, bitDepth, numChannels, sam
 
 	// Save index
 	if err = r.saveIndex(); err != nil {
-		err = errors.Wrap(err, "speech_to_text: saving index failed")
+		err = fmt.Errorf("speech_to_text: saving index failed: %w", err)
 		return
 	}
 
 	// Create message
 	var m *astibob.Message
 	if m, err = r.newSpeechCreatedMessage(*s); err != nil {
-		err = errors.Wrap(err, "speech_to_text: creating speech created message failed")
+		err = fmt.Errorf("speech_to_text: creating speech created message failed: %w", err)
 		return
 	}
 
@@ -465,7 +469,7 @@ func (r *Runnable) storeSpeechToWav(ss []int, bitDepth, numChannels, sampleRate 
 	// Create wav file
 	var f *os.File
 	if f, err = ioutil.TempFile(r.o.SpeechesDirPath, "*.wav"); err != nil {
-		err = errors.Wrap(err, "speech_to_text: creating wav file failed")
+		err = fmt.Errorf("speech_to_text: creating wav file failed: %w", err)
 		return
 	}
 	defer f.Close()
@@ -489,7 +493,7 @@ func (r *Runnable) storeSpeechToWav(ss []int, bitDepth, numChannels, sampleRate 
 		},
 		SourceBitDepth: bitDepth,
 	}); err != nil {
-		err = errors.Wrap(err, "speech_to_text: writing wav sample failed")
+		err = fmt.Errorf("speech_to_text: writing wav sample failed: %w", err)
 		return
 	}
 	return
@@ -553,7 +557,7 @@ func (r *Runnable) buildReferences(rw http.ResponseWriter, req *http.Request, p 
 	r.orderedSpeeches(func(s Speech) { rf.Speeches = append(rf.Speeches, s) })
 
 	// Write
-	astibob.WriteHTTPData(rw, rf)
+	astibob.WriteHTTPData(r.l, rw, rf)
 }
 
 func (r *Runnable) updateBuildOptions(rw http.ResponseWriter, req *http.Request, p httprouter.Params) {
@@ -563,7 +567,7 @@ func (r *Runnable) updateBuildOptions(rw http.ResponseWriter, req *http.Request,
 	// Parse body
 	var b BuildOptions
 	if err := json.NewDecoder(req.Body).Decode(&b); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusBadRequest, errors.Wrap(err, "speech_to_text: parsing build options payload failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusBadRequest, fmt.Errorf("speech_to_text: parsing build options payload failed: %w", err))
 		return
 	}
 
@@ -573,7 +577,7 @@ func (r *Runnable) updateBuildOptions(rw http.ResponseWriter, req *http.Request,
 	// Create message
 	m, err := r.newBuildOptionsUpdatedMessage()
 	if err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: creating build options updated message failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: creating build options updated message failed: %w", err))
 		return
 	}
 
@@ -593,7 +597,7 @@ func (r *Runnable) newBuildOptionsUpdatedMessage() (m *astibob.Message, err erro
 
 	// Marshal
 	if m.Payload, err = json.Marshal(BuildOptions{StoreNewSpeeches: r.o.StoreNewSpeeches}); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -611,7 +615,7 @@ func (r *Runnable) newSpeechDeletedMessage(s Speech) (m *astibob.Message, err er
 
 	// Marshal
 	if m.Payload, err = json.Marshal(s); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -635,7 +639,7 @@ func (r *Runnable) deleteSpeech(rw http.ResponseWriter, req *http.Request, p htt
 	// Delete wav
 	wp := filepath.Join(r.o.SpeechesDirPath, s.Name+".wav")
 	if err := os.Remove(wp); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrapf(err, "speech_to_text: deleting %s failed", wp))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: deleting %s failed", wp))
 		return
 	}
 
@@ -646,14 +650,14 @@ func (r *Runnable) deleteSpeech(rw http.ResponseWriter, req *http.Request, p htt
 
 	// Save index
 	if err := r.saveIndex(); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: saving index failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: saving index failed: %w", err))
 		return
 	}
 
 	// Create message
 	m, err := r.newSpeechDeletedMessage(*s)
 	if err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: creating speech deleted message failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: creating speech deleted message failed: %w", err))
 		return
 	}
 
@@ -673,7 +677,7 @@ func (r *Runnable) newSpeechUpdatedMessage(s Speech) (m *astibob.Message, err er
 
 	// Marshal
 	if m.Payload, err = json.Marshal(s); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -697,7 +701,7 @@ func (r *Runnable) updateSpeech(rw http.ResponseWriter, req *http.Request, p htt
 	// Unmarshal
 	var b Speech
 	if err := json.NewDecoder(req.Body).Decode(&b); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: unmarshaling failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: unmarshaling failed: %w", err))
 		return
 	}
 
@@ -707,14 +711,14 @@ func (r *Runnable) updateSpeech(rw http.ResponseWriter, req *http.Request, p htt
 
 	// Save index
 	if err := r.saveIndex(); err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: saving index failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: saving index failed: %w", err))
 		return
 	}
 
 	// Create message
 	m, err := r.newSpeechUpdatedMessage(*s)
 	if err != nil {
-		astibob.WriteHTTPError(rw, http.StatusInternalServerError, errors.Wrap(err, "speech_to_text: creating speech updated message failed"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: creating speech updated message failed: %w", err))
 		return
 	}
 
@@ -741,7 +745,7 @@ func (r *Runnable) trainReferences(rw http.ResponseWriter, req *http.Request, p 
 	r.mp.Unlock()
 
 	// Write
-	astibob.WriteHTTPData(rw, rf)
+	astibob.WriteHTTPData(r.l, rw, rf)
 }
 
 func (r *Runnable) newProgressMessage(p Progress) (m *astibob.Message, err error) {
@@ -756,7 +760,7 @@ func (r *Runnable) newProgressMessage(p Progress) (m *astibob.Message, err error
 
 	// Marshal
 	if m.Payload, err = json.Marshal(newProgressJSON(p)); err != nil {
-		err = errors.Wrap(err, "speech_to_text: marshaling payload failed")
+		err = fmt.Errorf("speech_to_text: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -777,7 +781,7 @@ func (r *Runnable) train(rw http.ResponseWriter, req *http.Request, p httprouter
 	// Training in progress
 	if r.ctx != nil {
 		r.mp.Unlock()
-		astibob.WriteHTTPError(rw, http.StatusBadRequest, errors.New("speech_to_text: training in progress"))
+		astibob.WriteHTTPError(r.l, rw, http.StatusBadRequest, errors.New("speech_to_text: training in progress"))
 		return
 	}
 
@@ -825,7 +829,7 @@ func (r *Runnable) progressFunc(p Progress) {
 	if p.done() {
 		// Log error
 		if p.Error != nil {
-			astilog.Error(errors.Wrap(p.Error, "speech_to_text: training failed"))
+			r.l.Error(fmt.Errorf("speech_to_text: training failed: %w", p.Error))
 		}
 
 		// Cancel context
@@ -847,7 +851,7 @@ func (r *Runnable) progressFunc(p Progress) {
 	// Create message
 	m, err := r.newProgressMessage(p)
 	if err != nil {
-		astilog.Error(errors.Wrap(err, "speech_to_text: creating progress message failed"))
+		r.l.Error(fmt.Errorf("speech_to_text: creating progress message failed: %w", err))
 		return
 	}
 

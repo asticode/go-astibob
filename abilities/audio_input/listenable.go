@@ -1,8 +1,9 @@
 package audio_input
 
 import (
+	"fmt"
+
 	"github.com/asticode/go-astibob"
-	"github.com/pkg/errors"
 )
 
 type ListenableOptions struct {
@@ -32,7 +33,7 @@ func (l *Listenable) OnMessage(m *astibob.Message) (err error) {
 	switch m.Name {
 	case samplesMessage:
 		if err = l.onSamples(m); err != nil {
-			err = errors.Wrap(err, "audio_input: on samples failed")
+			err = fmt.Errorf("audio_input: on samples failed: %w", err)
 			return
 		}
 	}
@@ -43,14 +44,14 @@ func (l *Listenable) onSamples(m *astibob.Message) (err error) {
 	// Parse payload
 	var s Samples
 	if s, err = parseSamplesPayload(m); err != nil {
-		err = errors.Wrap(err, "audio_input: parsing samples payload failed")
+		err = fmt.Errorf("audio_input: parsing samples payload failed: %w", err)
 		return
 	}
 
 	// Custom
 	if l.o.OnSamples != nil {
 		if err = l.o.OnSamples(m.From, s.Samples, s.BitDepth, s.NumChannels, s.SampleRate, s.MaxSilenceLevel); err != nil {
-			err = errors.Wrap(err, "audio_input: custom on samples failed")
+			err = fmt.Errorf("audio_input: custom on samples failed: %w", err)
 			return
 		}
 	}

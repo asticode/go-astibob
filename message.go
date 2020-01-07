@@ -2,9 +2,9 @@ package astibob
 
 import (
 	"encoding/json"
+	"fmt"
 
 	"github.com/asticode/go-astikit"
-	"github.com/pkg/errors"
 )
 
 // Identifier types
@@ -242,7 +242,7 @@ func NewListenablesRegisterMessage(from Identifier, to *Identifier, l Listenable
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(l); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -250,7 +250,7 @@ func NewListenablesRegisterMessage(from Identifier, to *Identifier, l Listenable
 
 func ParseListenablesRegisterPayload(m *Message) (l Listenables, err error) {
 	if err = json.Unmarshal(m.Payload, &l); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -258,7 +258,7 @@ func ParseListenablesRegisterPayload(m *Message) (l Listenables, err error) {
 
 func ParseRunnableStartPayload(m *Message) (name string, err error) {
 	if err = json.Unmarshal(m.Payload, &name); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -266,7 +266,7 @@ func ParseRunnableStartPayload(m *Message) (name string, err error) {
 
 func ParseRunnableStopPayload(m *Message) (name string, err error) {
 	if err = json.Unmarshal(m.Payload, &name); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -282,7 +282,7 @@ func NewRunnableDoneMessage(to *Identifier, d RunnableDone) (m *Message, err err
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(d); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -290,7 +290,7 @@ func NewRunnableDoneMessage(to *Identifier, d RunnableDone) (m *Message, err err
 
 func ParseRunnableDonePayload(m *Message) (d RunnableDone, err error) {
 	if err = json.Unmarshal(m.Payload, &d); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -310,7 +310,7 @@ func NewUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(name); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -318,7 +318,7 @@ func NewUIDisconnectedMessage(from Identifier, to *Identifier, name string) (m *
 
 func ParseUIDisconnectedPayload(m *Message) (name string, err error) {
 	if err = json.Unmarshal(m.Payload, &name); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -330,7 +330,7 @@ func NewUIMessageNamesAddMessage(from Identifier, to *Identifier, names []string
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(names); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -338,7 +338,7 @@ func NewUIMessageNamesAddMessage(from Identifier, to *Identifier, names []string
 
 func ParseUIMessageNamesAddPayload(m *Message) (names []string, err error) {
 	if err = json.Unmarshal(m.Payload, &names); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -350,7 +350,7 @@ func NewUIMessageNamesDeleteMessage(from Identifier, to *Identifier, names []str
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(names); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -358,7 +358,7 @@ func NewUIMessageNamesDeleteMessage(from Identifier, to *Identifier, names []str
 
 func ParseUIMessageNamesDeletePayload(m *Message) (names []string, err error) {
 	if err = json.Unmarshal(m.Payload, &names); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -366,7 +366,7 @@ func ParseUIMessageNamesDeletePayload(m *Message) (names []string, err error) {
 
 func ParseUIRegisterPayload(m *Message) (u UI, err error) {
 	if err = json.Unmarshal(m.Payload, &u); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -378,7 +378,7 @@ func NewUIWelcomeMessage(from Identifier, to *Identifier, w WelcomeUI) (m *Messa
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(w); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -390,7 +390,7 @@ func NewWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(worker); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -398,7 +398,7 @@ func NewWorkerDisconnectedMessage(from Identifier, to *Identifier, worker string
 
 func ParseWorkerDisconnectedPayload(m *Message) (worker string, err error) {
 	if err = json.Unmarshal(m.Payload, &worker); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -410,7 +410,7 @@ func NewWorkerRegisterMessage(from Identifier, to *Identifier, w Worker) (m *Mes
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(w); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -418,7 +418,7 @@ func NewWorkerRegisterMessage(from Identifier, to *Identifier, w Worker) (m *Mes
 
 func ParseWorkerRegisterPayload(m *Message) (w Worker, err error) {
 	if err = json.Unmarshal(m.Payload, &w); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -430,7 +430,7 @@ func NewWorkerRegisteredMessage(from Identifier, to *Identifier, w Worker) (m *M
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(w); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -438,7 +438,7 @@ func NewWorkerRegisteredMessage(from Identifier, to *Identifier, w Worker) (m *M
 
 func ParseWorkerRegisteredPayload(m *Message) (w Worker, err error) {
 	if err = json.Unmarshal(m.Payload, &w); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return
@@ -450,7 +450,7 @@ func NewWorkerWelcomeMessage(from Identifier, to *Identifier, w WelcomeWorker) (
 
 	// Marshal payload
 	if m.Payload, err = json.Marshal(w); err != nil {
-		err = errors.Wrap(err, "astibob: marshaling payload failed")
+		err = fmt.Errorf("astibob: marshaling payload failed: %w", err)
 		return
 	}
 	return
@@ -458,7 +458,7 @@ func NewWorkerWelcomeMessage(from Identifier, to *Identifier, w WelcomeWorker) (
 
 func ParseWorkerWelcomePayload(m *Message) (w WelcomeWorker, err error) {
 	if err = json.Unmarshal(m.Payload, &w); err != nil {
-		err = errors.Wrap(err, "astibob: unmarshaling failed")
+		err = fmt.Errorf("astibob: unmarshaling failed: %w", err)
 		return
 	}
 	return

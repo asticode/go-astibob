@@ -1,19 +1,17 @@
 package index
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"io/ioutil"
 	"net/http"
 	"net/url"
+	"path/filepath"
 	"text/template"
 
-	"path/filepath"
-
 	"github.com/asticode/go-astibob"
-	"github.com/asticode/go-astilog"
 	"github.com/julienschmidt/httprouter"
-	"github.com/pkg/errors"
 )
 
 func (i *Index) updateRunnableStatus(m *astibob.Message) (err error) {
@@ -68,7 +66,7 @@ func (i *Index) sendRequestToRunnable(rw http.ResponseWriter, p httprouter.Param
 	worker, err := url.QueryUnescape(p.ByName("worker"))
 	if err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
-		astilog.Error(errors.Wrap(err, "index: unescaping worker failed"))
+		i.l.Error(fmt.Errorf("index: unescaping worker failed: %w", err))
 		return
 	}
 
@@ -87,7 +85,7 @@ func (i *Index) sendRequestToRunnable(rw http.ResponseWriter, p httprouter.Param
 	runnable, err := url.QueryUnescape(p.ByName("runnable"))
 	if err != nil {
 		rw.WriteHeader(http.StatusBadRequest)
-		astilog.Error(errors.Wrap(err, "index: unescaping runnable failed"))
+		i.l.Error(fmt.Errorf("index: unescaping runnable failed: %w", err))
 		return
 	}
 
@@ -109,7 +107,7 @@ func (i *Index) sendRequestToRunnable(rw http.ResponseWriter, p httprouter.Param
 	r, err := http.NewRequest(method, u, body)
 	if err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
-		astilog.Error(errors.Wrapf(err, "index: creating %s request to %s failed", method, u))
+		i.l.Error(fmt.Errorf("index: creating %s request to %s failed: %w", method, u, err))
 		return
 	}
 
@@ -121,13 +119,13 @@ func (i *Index) sendRequestToRunnable(rw http.ResponseWriter, p httprouter.Param
 	}
 
 	// Log
-	astilog.Debugf("index: sending %s request to %s", method, u)
+	i.l.Debugf("index: sending %s request to %s", method, u)
 
 	// Send request
 	var resp *http.Response
 	if resp, err = i.c.Do(r); err != nil {
 		rw.WriteHeader(http.StatusInternalServerError)
-		astilog.Error(errors.Wrapf(err, "index: doing %s request to %s failed", method, u))
+		i.l.Error(fmt.Errorf("index: doing %s request to %s failed: %w", method, u, err))
 		return
 	}
 	defer resp.Body.Close()
@@ -155,7 +153,7 @@ func (i *Index) runnableRoutes(rw http.ResponseWriter, r *http.Request, p httpro
 
 			// Copy body
 			if _, err := io.Copy(rw, resp.Body); err != nil {
-				astilog.Error(errors.Wrapf(err, "index: copying response body of %s failed", url))
+				i.l.Error(fmt.Errorf("index: copying response body of %s failed: %w", url, err))
 				return
 			}
 		},
@@ -182,7 +180,7 @@ func (i *Index) runnableWeb(rw http.ResponseWriter, r *http.Request, p httproute
 			b, err := ioutil.ReadAll(resp.Body)
 			if err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				astilog.Error(errors.Wrapf(err, "index: reading body of %s failed", url))
+				i.l.Error(fmt.Errorf("index: reading body of %s failed: %w", url, err))
 				return
 			}
 
@@ -190,7 +188,7 @@ func (i *Index) runnableWeb(rw http.ResponseWriter, r *http.Request, p httproute
 			var t *template.Template
 			if t, err = i.t.Parse(string(b)); err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				astilog.Error(errors.Wrapf(err, "index: parsing template %s failed", url))
+				i.l.Error(fmt.Errorf("index: parsing template %s failed: %w", url, err))
 				return
 			}
 
@@ -203,7 +201,7 @@ func (i *Index) runnableWeb(rw http.ResponseWriter, r *http.Request, p httproute
 				Worker:   worker,
 			}); err != nil {
 				rw.WriteHeader(http.StatusInternalServerError)
-				astilog.Error(errors.Wrapf(err, "index: executing template %s failed", url))
+				i.l.Error(fmt.Errorf("index: executing template %s failed: %w", url, err))
 				return
 			}
 		},

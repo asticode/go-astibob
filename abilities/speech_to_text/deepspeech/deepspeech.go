@@ -2,13 +2,13 @@ package deepspeech
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 
 	"github.com/asticode/go-astibob/abilities/speech_to_text"
 	"github.com/asticode/go-astideepspeech"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
+	"github.com/asticode/go-astikit"
 )
 
 // Steps
@@ -25,6 +25,7 @@ const (
 )
 
 type DeepSpeech struct {
+	l astikit.SeverityLogger
 	m *astideepspeech.Model
 	o Options
 }
@@ -43,9 +44,12 @@ type Options struct {
 	ValidWordCountWeight float64           `toml:"1.85"`
 }
 
-func New(o Options) (d *DeepSpeech) {
+func New(o Options, l astikit.StdLogger) (d *DeepSpeech) {
 	// Create deepspeech
-	d = &DeepSpeech{o: o}
+	d = &DeepSpeech{
+		l: astikit.AdaptStdLogger(l),
+		o: o,
+	}
 
 	// Only do the following if the model path exists
 	if _, err := os.Stat(d.o.ModelPath); err == nil {
@@ -63,7 +67,7 @@ func New(o Options) (d *DeepSpeech) {
 func (d *DeepSpeech) Init() (err error) {
 	// Get absolute path
 	if d.o.PrepareDirPath, err = filepath.Abs(d.o.PrepareDirPath); err != nil {
-		err = errors.Wrapf(err, "deepspeech: getting absolute path of %s failed", d.o.PrepareDirPath)
+		err = fmt.Errorf("deepspeech: getting absolute path of %s failed: %w", d.o.PrepareDirPath, err)
 		return
 	}
 	return
@@ -72,9 +76,9 @@ func (d *DeepSpeech) Init() (err error) {
 func (d *DeepSpeech) Close() {
 	// Close the model
 	if d.m != nil {
-		astilog.Debug("deepspeech: closing model")
+		d.l.Debug("deepspeech: closing model")
 		if err := d.m.Close(); err != nil {
-			astilog.Error(errors.Wrap(err, "deepspeech: closing model failed"))
+			d.l.Error(fmt.Errorf("deepspeech: closing model failed: %w", err))
 		}
 	}
 }
@@ -96,7 +100,7 @@ func (d *DeepSpeech) Parse(samples []int, bitDepth, numChannels, sampleRate int)
 	for _, s := range samples {
 		// Add to audio converter
 		if err = c.add(s); err != nil {
-			err = errors.Wrap(err, "deepspeech: adding to audio converter failed")
+			err = fmt.Errorf("deepspeech: adding to audio converter failed: %w", err)
 			return
 		}
 	}
@@ -132,13 +136,13 @@ func (d *DeepSpeech) handleError(ctx context.Context, speeches []speech_to_text.
 
 	// Prepare
 	if err = d.prepare(ctx, speeches, progressFunc, &p); err != nil {
-		err = errors.Wrap(err, "deepspeech: preparing failed")
+		err = fmt.Errorf("deepspeech: preparing failed: %w", err)
 		return
 	}
 
 	// Train
 	if err = d.train(ctx, speeches, progressFunc, &p); err != nil {
-		err = errors.Wrap(err, "deepspeech: training failed")
+		err = fmt.Errorf("deepspeech: training failed: %w", err)
 		return
 	}
 	return

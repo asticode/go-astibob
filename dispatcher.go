@@ -6,8 +6,6 @@ import (
 	"sync"
 
 	"github.com/asticode/go-astikit"
-	"github.com/asticode/go-astilog"
-	"github.com/pkg/errors"
 )
 
 type MessageHandler func(m *Message) error
@@ -58,15 +56,17 @@ type Dispatcher struct {
 	ctx context.Context
 	cs  map[string]*astikit.Chan
 	hs  []dispatcherHandler
+	l   astikit.SeverityLogger
 	mc  *sync.Mutex // Locks cs
 	mh  *sync.Mutex // Locks hs
 	t   astikit.TaskFunc
 }
 
-func NewDispatcher(ctx context.Context, t astikit.TaskFunc) *Dispatcher {
+func NewDispatcher(ctx context.Context, t astikit.TaskFunc, l astikit.SeverityLogger) *Dispatcher {
 	return &Dispatcher{
 		ctx: ctx,
 		cs:  make(map[string]*astikit.Chan),
+		l:   l,
 		mc:  &sync.Mutex{},
 		mh:  &sync.Mutex{},
 		t:   t,
@@ -109,7 +109,7 @@ func (d *Dispatcher) Dispatch(m *Message) {
 			var ok bool
 			if c, ok = d.cs[k]; !ok {
 				// Log
-				astilog.Debugf("astibob: creating new dispatcher chan with key %s", k)
+				d.l.Debugf("astibob: creating new dispatcher chan with key %s", k)
 
 				// Create chan
 				c = astikit.NewChan(astikit.ChanOptions{ProcessAll: true})
@@ -149,7 +149,7 @@ func (d *Dispatcher) dispatch(c *astikit.Chan, m *Message, h MessageHandler) {
 	c.Add(func() {
 		// Handle message
 		if err := h(m); err != nil {
-			astilog.Error(errors.Wrap(err, "astibob: handling message failed"))
+			d.l.Error(fmt.Errorf("astibob: handling message failed: %w", err))
 		}
 	})
 }

@@ -1,5 +1,5 @@
 a:
-	go run cmd/operatable/main.go -v -as abilities
+	go run cmd/operatable/main.go -as abilities
 
 i:
-	go run cmd/index/main.go -v
+	go run cmd/index/main.go
