@@ -639,7 +639,7 @@ func (r *Runnable) deleteSpeech(rw http.ResponseWriter, req *http.Request, p htt
 	// Delete wav
 	wp := filepath.Join(r.o.SpeechesDirPath, s.Name+".wav")
 	if err := os.Remove(wp); err != nil {
-		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: deleting %s failed", wp))
+		astibob.WriteHTTPError(r.l, rw, http.StatusInternalServerError, fmt.Errorf("speech_to_text: deleting %s failed: %w", wp, err))
 		return
 	}
 
