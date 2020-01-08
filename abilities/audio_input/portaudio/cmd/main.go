@@ -8,8 +8,11 @@ import (
 )
 
 func main() {
+	// Create logger
+	l := log.New(log.Writer(), log.Prefix(), log.Flags())
+
 	// Create
-	p := portaudio.New()
+	p := portaudio.New(l)
 
 	// Initialize
 	if err := p.Initialize(); err != nil {
